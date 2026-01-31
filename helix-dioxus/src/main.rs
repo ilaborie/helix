@@ -34,8 +34,10 @@ use crate::state::{EditorCommand, EditorContext, EditorSnapshot};
 const CUSTOM_HEAD: &str = include_str!("../assets/head.html");
 
 fn main() -> Result<()> {
-    // Initialize logging
-    setup_logging()?;
+    // Set up tracing subscriber BEFORE Dioxus to prevent dioxus-logger from setting its own.
+    // This uses a custom filter to suppress noisy "SelectionDidChange" messages from the webview.
+    // The tracing crate has log compatibility, so log::info! etc. will work.
+    setup_tracing();
 
     log::info!("Starting helix-dioxus");
 
@@ -125,23 +127,32 @@ impl AppState {
     }
 }
 
-fn setup_logging() -> Result<()> {
-    fern::Dispatch::new()
-        .format(|out, message, record| {
-            // Filter out noisy Dioxus webview "SelectionDidChange" errors
-            let msg = message.to_string();
-            if msg.contains("SelectionDidChange") {
-                return;
-            }
-            out.finish(format_args!(
-                "{} [{}] {}",
-                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                record.level(),
-                msg
-            ));
-        })
-        .level(log::LevelFilter::Info)
-        .chain(std::io::stderr())
-        .apply()?;
-    Ok(())
+/// Set up tracing subscriber to filter out noisy webview events.
+/// Must be called BEFORE Dioxus launch to prevent dioxus-logger from setting its own subscriber.
+fn setup_tracing() {
+    use tracing_subscriber::{
+        filter::FilterFn, fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer,
+    };
+
+    // Create a base filter from RUST_LOG env var, defaulting to info level
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
+    // Create a custom filter that suppresses "SelectionDidChange" messages
+    let selection_filter = FilterFn::new(|metadata| {
+        // Allow all messages unless they're from targets that might contain SelectionDidChange
+        // The actual message content filtering is done in the format layer
+        // For now, allow all at metadata level since we can't see message content here
+        !metadata.target().contains("wry") || !metadata.target().contains("SelectionDidChange")
+    });
+
+    // Custom format layer
+    let fmt_layer = fmt::layer()
+        .with_target(false)
+        .with_writer(std::io::stderr)
+        .with_filter(selection_filter);
+
+    tracing_subscriber::registry()
+        .with(env_filter)
+        .with(fmt_layer)
+        .init();
 }

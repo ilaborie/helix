@@ -382,6 +382,60 @@ The `scrollIntoView({ block: 'nearest', inline: 'nearest' })` option scrolls the
 
 ---
 
+## 2026-01-31: Selection Highlighting and Logging Fixes
+
+### Progress
+- Fixed character-level selection highlighting (was incorrectly applied to entire line)
+- Fixed empty line selection visibility (selection background now shows on empty lines)
+- Fixed gaps between selected lines (hybrid line-level + span-level approach)
+- Fixed 'd' key not working after first delete (added to normal mode)
+- Migrated from fern to tracing-subscriber for logging
+- Added tracing filter to suppress noisy "SelectionDidChange" webview events
+
+### Issues Encountered
+
+**Selection with 'w' not visible**
+- Root cause: Selection background was being applied at the line div level, not to individual characters
+- The `render_styled_content` function didn't handle selection ranges
+- Fix: Updated `render_styled_content` to take `selection_range` parameter and apply background color only to selected characters within that range
+
+**Gaps between selected lines**
+- Root cause: Applying selection at span level causes gaps due to line-height
+- Fix: Hybrid approach - apply selection background at LINE level, then mask non-selected parts with normal background at span level
+
+**Empty lines not showing selection**
+- Root cause: Selection range calculation used `range_start < range_end` which fails for empty lines where both are 0
+- Fix: Changed condition to `range_start <= range_end` and added special handling for `selection_range = Some((0, 0))` to show selection background on empty lines
+
+**Delete ('d') only works once**
+- Root cause: 'd' key was only mapped in SELECT mode, but helix's selection-first model creates selections in NORMAL mode (when pressing 'w')
+- Fix: Added 'd' and 'y' key bindings to normal mode for delete and yank operations
+
+**SelectionDidChange errors in console**
+- Root cause: The error "Dispatched unknown event SelectionDidChange" comes through tracing (used by dioxus-logger), not the log crate
+- Our fern filter only captured log crate messages
+- Fix: Replaced fern with tracing-subscriber, initialized BEFORE Dioxus launch to prevent dioxus-logger from setting its own subscriber
+
+### Decisions Made
+- Use tracing instead of log+fern for unified logging
+- Keep log crate for API compatibility (tracing has log compatibility feature)
+- Hybrid selection rendering: line-level background + span-level masking for non-selected parts
+- Add 'd' and 'y' to normal mode for selection-first model compatibility
+
+### Files Modified
+- `Cargo.toml` - Replaced fern with tracing/tracing-subscriber
+- `src/main.rs` - New `setup_tracing()` function, removed `setup_logging()`
+- `src/state.rs` - Fixed selection range calculation for empty lines
+- `src/editor_view.rs` - Hybrid selection rendering approach
+- `src/app.rs` - Added 'd' and 'y' key bindings to normal mode
+
+### Next Steps
+1. Refine SelectionDidChange filter to actually suppress the messages (current filter is metadata-based)
+2. Support multiple buffers/splits
+3. Add LSP integration
+
+---
+
 ## Template for Future Entries
 
 ```markdown

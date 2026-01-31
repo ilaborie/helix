@@ -18,6 +18,8 @@ pub fn EditorView(version: usize) -> Element {
     // Scroll cursor into view after each render when version changes
     // Use requestAnimationFrame to ensure DOM is updated before scrolling
     use_effect(use_reactive!(|(version,)| {
+        // version is used to trigger the effect on each state change
+        let _ = version;
         document::eval(
             r#"
             requestAnimationFrame(() => {
@@ -95,8 +97,9 @@ fn Line(line: LineSnapshot, mode: String) -> Element {
     };
 
     // Determine line background:
-    // - Selection background takes precedence for full line coverage (no gaps between lines)
-    // - Cursor line gets highlight only if not selected
+    // - Apply selection background at the LINE level to avoid gaps between lines
+    // - Non-selected parts of the line will be masked with normal background in render_styled_content
+    // - Cursor line gets highlight only if no selection
     let has_selection = line.selection_range.is_some();
     let line_style = if has_selection {
         "background-color: #3e4451; min-height: 1.5em;"
@@ -113,23 +116,23 @@ fn Line(line: LineSnapshot, mode: String) -> Element {
         None
     };
 
-    // Render the line content with tokens and cursor (selection bg handled at line level)
+    // Render the line content with tokens, cursor, and selection highlighting
     rsx! {
         div {
             class: "line",
             style: "{line_style}",
-            {render_styled_content(&chars, &line.tokens, cursor_pos, cursor_style)}
+            {render_styled_content(&chars, &line.tokens, cursor_pos, cursor_style, line.selection_range)}
         }
     }
 }
 
-/// Render content with syntax highlighting tokens and optional cursor.
-/// Selection highlighting is handled at the line level (parent div).
+/// Render content with syntax highlighting tokens, cursor, and selection.
 fn render_styled_content(
     chars: &[char],
     tokens: &[crate::state::TokenSpan],
     cursor_pos: Option<usize>,
     cursor_style: &str,
+    selection_range: Option<(usize, usize)>,
 ) -> Element {
     // Build a list of spans to render
     let mut spans: Vec<Element> = Vec::new();
@@ -143,7 +146,7 @@ fn render_styled_content(
     let mut token_idx = 0;
 
     while pos <= len {
-        // Find the next boundary (token start, token end, cursor, or end of line)
+        // Find the next boundary (token start, token end, cursor, selection bounds, or end of line)
         let mut next_pos = len;
 
         // Check for token boundaries
@@ -166,6 +169,16 @@ fn render_styled_content(
             }
         }
 
+        // Check for selection boundaries
+        if let Some((sel_start, sel_end)) = selection_range {
+            if sel_start > pos && sel_start < next_pos {
+                next_pos = sel_start;
+            }
+            if sel_end > pos && sel_end < next_pos {
+                next_pos = sel_end;
+            }
+        }
+
         if next_pos == pos {
             if pos >= len {
                 break;
@@ -179,6 +192,11 @@ fn render_styled_content(
         // Determine if this is the cursor position
         let is_cursor = cursor_pos == Some(pos);
 
+        // Determine if this position is within the selection
+        let is_selected = selection_range
+            .map(|(sel_start, sel_end)| pos >= sel_start && pos < sel_end)
+            .unwrap_or(false);
+
         // Build the text content for this span
         let text: String = chars[pos..next_pos.min(len)].iter().collect();
         let text = if text.is_empty() && is_cursor {
@@ -190,6 +208,15 @@ fn render_styled_content(
         // Build style string
         let mut style = String::new();
 
+        // For lines with selection, non-selected parts need normal background to "mask" the line-level selection
+        // This approach: line has selection bg, non-selected spans get normal bg to hide it
+        let line_has_selection = selection_range.is_some();
+        if !is_selected && !is_cursor && line_has_selection {
+            // Mask the line-level selection background with normal background
+            style.push_str("background-color: #282c34;");
+        }
+        // Selected spans don't need explicit background since line already has it
+
         if let Some(token) = active_token {
             style.push_str(&format!("color: {};", token.color));
         }
@@ -199,7 +226,9 @@ fn render_styled_content(
 
         // Add the span (with id for cursor to enable scrollIntoView)
         if is_cursor {
-            spans.push(rsx! { span { key: "{pos}", id: "editor-cursor", style: "{style}", "{text}" } });
+            spans.push(
+                rsx! { span { key: "{pos}", id: "editor-cursor", style: "{style}", "{text}" } },
+            );
         } else if style.is_empty() {
             spans.push(rsx! { span { key: "{pos}", "{text}" } });
         } else {
@@ -218,7 +247,9 @@ fn render_styled_content(
     if let Some(cursor) = cursor_pos {
         if cursor >= len {
             let style = cursor_style.to_string();
-            spans.push(rsx! { span { key: "cursor-end", id: "editor-cursor", style: "{style}", " " } });
+            spans.push(
+                rsx! { span { key: "cursor-end", id: "editor-cursor", style: "{style}", " " } },
+            );
         }
     }
 

@@ -155,9 +155,13 @@ fn handle_normal_mode(key: &helix_view::input::KeyEvent) -> Vec<EditorCommand> {
         // Line selection (helix x/X)
         KeyCode::Char('x') => vec![EditorCommand::SelectLine],
 
+        // Delete selection (works in normal mode due to selection-first model)
+        KeyCode::Char('d') => vec![EditorCommand::DeleteSelection],
+
         // Clipboard
         KeyCode::Char('p') => vec![EditorCommand::Paste],
         KeyCode::Char('P') => vec![EditorCommand::PasteBefore],
+        KeyCode::Char('y') => vec![EditorCommand::Yank],
 
         // Search
         KeyCode::Char('/') => vec![EditorCommand::EnterSearchMode { backwards: false }],

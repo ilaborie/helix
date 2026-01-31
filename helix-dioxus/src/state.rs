@@ -706,10 +706,13 @@ impl EditorContext {
                     let line_end_char = line_start_char + line_len;
 
                     // Check if selection overlaps this line
-                    if sel_end > line_start_char && sel_start < line_end_char {
-                        let range_start = sel_start.saturating_sub(line_start_char).max(0);
+                    // For empty lines (line_len == 0), still show selection if line is within range
+                    if sel_end > line_start_char && sel_start <= line_end_char {
+                        let range_start = sel_start.saturating_sub(line_start_char);
                         let range_end = (sel_end - line_start_char).min(line_len);
-                        if range_start < range_end {
+                        // For empty lines, use (0, 0) as a marker that the line is selected
+                        // The renderer will show this as a full-line selection background
+                        if range_start <= range_end {
                             Some((range_start, range_end))
                         } else {
                             None
@@ -993,9 +996,8 @@ impl EditorContext {
         let selection = doc.selection(view_id).clone();
 
         // Helix's selection-first model: movements create selections
-        let new_selection = selection.transform(|range| {
-            helix_core::movement::move_next_word_start(text, range, 1)
-        });
+        let new_selection =
+            selection.transform(|range| helix_core::movement::move_next_word_start(text, range, 1));
 
         doc.set_selection(view_id, new_selection);
     }
@@ -1006,9 +1008,8 @@ impl EditorContext {
         let selection = doc.selection(view_id).clone();
 
         // Helix's selection-first model: movements create selections
-        let new_selection = selection.transform(|range| {
-            helix_core::movement::move_prev_word_start(text, range, 1)
-        });
+        let new_selection =
+            selection.transform(|range| helix_core::movement::move_prev_word_start(text, range, 1));
 
         doc.set_selection(view_id, new_selection);
     }
@@ -1273,12 +1274,7 @@ impl EditorContext {
     }
 
     /// Paste from clipboard.
-    fn paste(
-        &mut self,
-        doc_id: helix_view::DocumentId,
-        view_id: helix_view::ViewId,
-        before: bool,
-    ) {
+    fn paste(&mut self, doc_id: helix_view::DocumentId, view_id: helix_view::ViewId, before: bool) {
         if self.clipboard.is_empty() {
             return;
         }
@@ -1359,7 +1355,12 @@ impl EditorContext {
         self.last_search = self.search_input.clone();
 
         // Perform the search
-        self.do_search(doc_id, view_id, &self.last_search.clone(), self.search_backwards);
+        self.do_search(
+            doc_id,
+            view_id,
+            &self.last_search.clone(),
+            self.search_backwards,
+        );
 
         self.search_mode = false;
         self.search_input.clear();

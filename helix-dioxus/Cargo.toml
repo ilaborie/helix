@@ -33,10 +33,10 @@ lucide-dioxus = { version = "2", features = ["all-icons"] }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "macros"] }
 futures = "0.3"
 
-# Logging
+# Logging (tracing with log compatibility)
 log = "0.4"
-fern = "0.7"
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
+tracing = { version = "0.1", features = ["log"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Error handling
 anyhow = "1"
