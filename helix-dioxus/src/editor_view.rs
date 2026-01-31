@@ -15,18 +15,20 @@ pub fn EditorView(version: usize) -> Element {
 
     let mode = &snapshot.mode;
 
-    // Scroll cursor into view after each render
-    use_effect(move || {
-        // Use JavaScript to scroll the cursor element into view horizontally
+    // Scroll cursor into view after each render when version changes
+    // Use requestAnimationFrame to ensure DOM is updated before scrolling
+    use_effect(use_reactive!(|(version,)| {
         document::eval(
             r#"
-            const cursor = document.getElementById('editor-cursor');
-            if (cursor) {
-                cursor.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-            }
+            requestAnimationFrame(() => {
+                const cursor = document.getElementById('editor-cursor');
+                if (cursor) {
+                    cursor.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                }
+            });
         "#,
         );
-    });
+    }));
 
     rsx! {
         div {
