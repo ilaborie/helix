@@ -291,6 +291,35 @@ Helix's undo/redo is transaction-based. Each edit operation creates a transactio
 - Selection highlighting uses `#3e4451` background color (One Dark selection)
 - Cursor position is always visible on top of selection highlighting
 
+---
+
+## 2026-01-31: Scroll and Selection UI Fixes
+
+### Progress
+- Fixed selection background gaps between lines
+- Fixed horizontal and vertical scrolling to follow cursor on window resize
+
+### Issues Encountered
+
+**Selection background had gaps between lines**
+- Root cause: Selection background was applied to inline `<span>` elements, but `line-height: 1.5` creates vertical space between lines that spans don't cover
+- Solution: Apply selection background at the line `<div>` level instead of individual spans
+
+**Scrolling didn't follow cursor after window resize**
+- Root cause: The `ensure_cursor_in_view()` uses a hardcoded viewport of 40 lines, which doesn't account for smaller windows
+- Solution: Use JavaScript `scrollIntoView()` on the cursor element after each render
+- Implementation details:
+  - Added `id="editor-cursor"` to cursor span for DOM targeting
+  - Used `use_reactive!` macro to re-run effect when `version` changes
+  - Used `requestAnimationFrame` to ensure scroll happens after DOM paint
+
+### Files Modified
+- `src/editor_view.rs` - Line-level selection background, cursor ID, scrollIntoView effect
+- `build.rs` - Fixed clippy warnings
+
+### Technical Notes
+The `scrollIntoView({ block: 'nearest', inline: 'nearest' })` option scrolls the minimum amount needed to make the cursor visible, both vertically and horizontally. Using `requestAnimationFrame` ensures the DOM has been updated before attempting to scroll.
+
 ### Next Steps
 1. Add search functionality (`/`, `?`, `n`, `N`)
 2. Support yank/paste operations in select mode (`y`, `p`)
