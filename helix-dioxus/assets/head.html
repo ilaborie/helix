@@ -9,6 +9,9 @@
         font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, Monaco, monospace;
         background-color: #282c34;
         color: #abb2bf;
+        /* Disable native browser text selection to prevent SelectionDidChange events */
+        user-select: none;
+        -webkit-user-select: none;
     }
     ::-webkit-scrollbar {
         width: 10px;
