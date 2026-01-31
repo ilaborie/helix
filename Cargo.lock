@@ -3112,6 +3112,7 @@ dependencies = [
  "helix-stdx",
  "helix-view",
  "log",
+ "lucide-dioxus",
  "once_cell",
  "parking_lot",
  "thiserror 2.0.18",
@@ -3975,6 +3976,15 @@ name = "longest-increasing-subsequence"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3bd0dd2cd90571056fdb71f6275fada10131182f84899f4b2a916e565d81d86"
+
+[[package]]
+name = "lucide-dioxus"
+version = "2.40.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f37d0e58c939380ef293f14838bff75375c869ee61c32cd2ceaf10d33a765674"
+dependencies = [
+ "dioxus",
+]
 
 [[package]]
 name = "mac"

@@ -3,6 +3,7 @@
 //! Displays a modal file list with selection highlighting and keyboard navigation.
 
 use dioxus::prelude::*;
+use lucide_dioxus::{ChevronRight, File, Folder};
 
 /// File picker component that displays a scrollable list of files.
 #[component]
@@ -124,7 +125,7 @@ fn PickerItem(name: String, is_selected: bool, is_directory: bool) -> Element {
         "#abb2bf" // Default text color for files
     };
 
-    let indicator = if is_selected { ">" } else { " " };
+    let indicator_opacity = if is_selected { "1" } else { "0" };
 
     rsx! {
         div {
@@ -136,25 +137,24 @@ fn PickerItem(name: String, is_selected: bool, is_directory: bool) -> Element {
                 align-items: center;
                 cursor: pointer;
                 transition: background-color 0.1s;
+                height: 36px;
+                box-sizing: border-box;
             ",
 
             // Selection indicator
             span {
-                style: "
-                    width: 16px;
-                    color: #98c379;
-                    font-weight: bold;
-                ",
-                "{indicator}"
+                style: "width: 16px; height: 16px; display: flex; align-items: center; opacity: {indicator_opacity};",
+                ChevronRight { size: 16, color: "#98c379" }
             }
 
             // File/directory icon
             span {
-                style: "
-                    width: 20px;
-                    color: {text_color};
-                ",
-                if is_directory { "📁" } else { "📄" }
+                style: "width: 16px; height: 16px; margin-right: 8px; display: flex; align-items: center;",
+                if is_directory {
+                    Folder { size: 16, color: text_color }
+                } else {
+                    File { size: 16, color: text_color }
+                }
             }
 
             // File name
