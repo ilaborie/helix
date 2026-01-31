@@ -1,6 +1,6 @@
-//! Command prompt component.
+//! Command and search prompt components.
 //!
-//! Displays the command input at the bottom of the screen when in command mode.
+//! Displays the command/search input at the bottom of the screen.
 
 use dioxus::prelude::*;
 
@@ -38,6 +38,49 @@ pub fn CommandPrompt(input: String) -> Element {
                     width: 8px;
                     height: 16px;
                     background-color: #61afef;
+                    animation: blink 1s step-end infinite;
+                ",
+            }
+        }
+    }
+}
+
+/// Search prompt component that displays the search input.
+#[component]
+pub fn SearchPrompt(input: String, backwards: bool) -> Element {
+    let prefix = if backwards { "?" } else { "/" };
+
+    rsx! {
+        div {
+            class: "search-prompt",
+            style: "
+                height: 24px;
+                background-color: #21252b;
+                border-top: 1px solid #181a1f;
+                padding: 0 8px;
+                display: flex;
+                align-items: center;
+                font-size: 14px;
+                color: #abb2bf;
+            ",
+
+            // Search prefix (/ or ?)
+            span {
+                style: "color: #e5c07b;",
+                "{prefix}"
+            }
+
+            // Input text
+            span { "{input}" }
+
+            // Cursor
+            span {
+                class: "cursor",
+                style: "
+                    display: inline-block;
+                    width: 8px;
+                    height: 16px;
+                    background-color: #e5c07b;
                     animation: blink 1s step-end infinite;
                 ",
             }

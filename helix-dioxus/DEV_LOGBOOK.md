@@ -320,13 +320,65 @@ Helix's undo/redo is transaction-based. Each edit operation creates a transactio
 ### Technical Notes
 The `scrollIntoView({ block: 'nearest', inline: 'nearest' })` option scrolls the minimum amount needed to make the cursor visible, both vertically and horizontally. Using `requestAnimationFrame` ensures the DOM has been updated before attempting to scroll.
 
+---
+
+## 2026-01-31: Search, Clipboard, and Line Selection
+
+### Progress
+- Implemented search functionality (`/`, `?`, `n`, `N`)
+- Implemented yank/paste operations (`y`, `p`, `P`)
+- Implemented delete in select mode (`d`)
+- Implemented line selection (`x`, `X`)
+
+### Implementation Details
+
+**Search (`/`, `?`, `n`, `N`):**
+- `/` enters forward search mode, `?` enters backward search mode
+- Type pattern and press Enter to search
+- `n` finds next occurrence, `N` finds previous
+- Search wraps around at document boundaries
+- Search prompt shows `/` or `?` prefix with yellow color
+- Last search pattern saved for `n`/`N` navigation
+
+**Clipboard (`y`, `p`, `P`):**
+- `y` in select mode yanks selection to internal clipboard
+- `p` pastes after cursor, `P` pastes before cursor
+- Line-wise paste (when clipboard ends with newline) pastes on new line
+- Delete (`d`) also saves to clipboard before deleting
+
+**Line Selection (`x`, `X`):**
+- `x` selects entire current line (enters select mode)
+- `X` extends selection to include next line
+- Works in both normal and select modes
+
+### New Commands Added
+- `EnterSearchMode { backwards: bool }` - Enter search mode
+- `ExitSearchMode` - Cancel search
+- `SearchInput(char)` / `SearchBackspace` - Edit search pattern
+- `SearchExecute` - Execute search
+- `SearchNext` / `SearchPrevious` - Find next/previous match
+- `Yank` - Copy selection to clipboard
+- `Paste` / `PasteBefore` - Paste from clipboard
+- `DeleteSelection` - Delete selection (saves to clipboard first)
+- `SelectLine` / `ExtendLine` - Line selection commands
+
+### Files Modified
+- `src/state.rs` - Added commands, state fields, and handlers
+- `src/app.rs` - Added keyboard bindings and search mode handler
+- `src/prompt.rs` - Added SearchPrompt component
+
+### Technical Notes
+- Search uses simple substring matching (not regex)
+- Clipboard is internal to the editor (not system clipboard)
+- Yank in select mode auto-exits to normal mode
+- Delete in select mode auto-exits to normal mode
+
 ### Next Steps
-1. Add search functionality (`/`, `?`, `n`, `N`)
-2. Support yank/paste operations in select mode (`y`, `p`)
-3. Support delete in select mode (`d`)
-4. Support multiple buffers/splits
-5. Add LSP integration for diagnostics and completions
-6. Improve scrolling with mouse wheel support
+1. Support multiple buffers/splits
+2. Add LSP integration for diagnostics and completions
+3. Improve scrolling with mouse wheel support
+4. Add regex search support
+5. Integrate with system clipboard
 
 ---
 

@@ -7,7 +7,7 @@ use dioxus::prelude::*;
 use crate::editor_view::EditorView;
 use crate::input::translate_key_event;
 use crate::picker::FilePicker;
-use crate::prompt::CommandPrompt;
+use crate::prompt::{CommandPrompt, SearchPrompt};
 use crate::state::EditorCommand;
 use crate::statusline::StatusLine;
 use crate::AppState;
@@ -38,6 +38,8 @@ pub fn App() -> Element {
                 handle_picker_mode(&key_event)
             } else if snapshot.command_mode {
                 handle_command_mode(&key_event)
+            } else if snapshot.search_mode {
+                handle_search_mode(&key_event)
             } else {
                 match snapshot.mode.as_str() {
                     "NORMAL" => handle_normal_mode(&key_event),
@@ -79,6 +81,14 @@ pub fn App() -> Element {
             // Command prompt (shown when in command mode)
             if snapshot.command_mode {
                 CommandPrompt { input: snapshot.command_input.clone() }
+            }
+
+            // Search prompt (shown when in search mode)
+            if snapshot.search_mode {
+                SearchPrompt {
+                    input: snapshot.search_input.clone(),
+                    backwards: snapshot.search_backwards,
+                }
             }
 
             // Status line at the bottom
@@ -142,6 +152,19 @@ fn handle_normal_mode(key: &helix_view::input::KeyEvent) -> Vec<EditorCommand> {
         // Visual selection mode
         KeyCode::Char('v') => vec![EditorCommand::EnterSelectMode],
 
+        // Line selection (helix x/X)
+        KeyCode::Char('x') => vec![EditorCommand::SelectLine],
+
+        // Clipboard
+        KeyCode::Char('p') => vec![EditorCommand::Paste],
+        KeyCode::Char('P') => vec![EditorCommand::PasteBefore],
+
+        // Search
+        KeyCode::Char('/') => vec![EditorCommand::EnterSearchMode { backwards: false }],
+        KeyCode::Char('?') => vec![EditorCommand::EnterSearchMode { backwards: true }],
+        KeyCode::Char('n') => vec![EditorCommand::SearchNext],
+        KeyCode::Char('N') => vec![EditorCommand::SearchPrevious],
+
         // Command mode
         KeyCode::Char(':') => vec![EditorCommand::EnterCommandMode],
 
@@ -198,6 +221,17 @@ fn handle_select_mode(key: &helix_view::input::KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('0') | KeyCode::Home => vec![EditorCommand::ExtendLineStart],
         KeyCode::Char('$') | KeyCode::End => vec![EditorCommand::ExtendLineEnd],
 
+        // Line selection
+        KeyCode::Char('x') => vec![EditorCommand::SelectLine],
+        KeyCode::Char('X') => vec![EditorCommand::ExtendLine],
+
+        // Clipboard operations
+        KeyCode::Char('y') => vec![EditorCommand::Yank, EditorCommand::ExitSelectMode],
+        KeyCode::Char('d') => vec![EditorCommand::DeleteSelection],
+
+        // Paste replaces selection
+        KeyCode::Char('p') => vec![EditorCommand::DeleteSelection, EditorCommand::Paste],
+
         _ => vec![],
     }
 }
@@ -234,7 +268,20 @@ fn handle_picker_mode(key: &helix_view::input::KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Down => vec![EditorCommand::PickerDown],
         KeyCode::Up => vec![EditorCommand::PickerUp],
         KeyCode::Backspace => vec![EditorCommand::PickerBackspace],
-        KeyCode::Char(c) => vec![EditorCommand::PickerInput(c)],
+        KeyCode::Char(ch) => vec![EditorCommand::PickerInput(ch)],
+        _ => vec![],
+    }
+}
+
+/// Handle keyboard input in Search mode.
+fn handle_search_mode(key: &helix_view::input::KeyEvent) -> Vec<EditorCommand> {
+    use helix_view::input::KeyCode;
+
+    match key.code {
+        KeyCode::Esc => vec![EditorCommand::ExitSearchMode],
+        KeyCode::Enter => vec![EditorCommand::SearchExecute],
+        KeyCode::Backspace => vec![EditorCommand::SearchBackspace],
+        KeyCode::Char(ch) => vec![EditorCommand::SearchInput(ch)],
         _ => vec![],
     }
 }

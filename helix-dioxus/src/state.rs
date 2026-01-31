@@ -60,6 +60,25 @@ pub enum EditorCommand {
     ExtendWordBackward,
     ExtendLineStart,
     ExtendLineEnd,
+    SelectLine,
+    ExtendLine,
+
+    // Clipboard operations
+    Yank,
+    Paste,
+    PasteBefore,
+
+    // Delete
+    DeleteSelection,
+
+    // Search
+    EnterSearchMode { backwards: bool },
+    ExitSearchMode,
+    SearchInput(char),
+    SearchBackspace,
+    SearchExecute,
+    SearchNext,
+    SearchPrevious,
 
     // Command mode
     EnterCommandMode,
@@ -97,6 +116,9 @@ pub struct EditorSnapshot {
     // UI state
     pub command_mode: bool,
     pub command_input: String,
+    pub search_mode: bool,
+    pub search_backwards: bool,
+    pub search_input: String,
     pub picker_visible: bool,
     pub picker_items: Vec<String>,
     pub picker_filtered: Vec<String>,
@@ -140,10 +162,17 @@ pub struct EditorContext {
     // UI state
     command_mode: bool,
     command_input: String,
+    search_mode: bool,
+    search_backwards: bool,
+    search_input: String,
+    last_search: String,
     picker_visible: bool,
     picker_items: Vec<String>,
     picker_filter: String,
     picker_selected: usize,
+
+    // Clipboard (simple string for now)
+    clipboard: String,
 
     // Application state
     should_quit: bool,
@@ -198,10 +227,15 @@ impl EditorContext {
             command_rx,
             command_mode: false,
             command_input: String::new(),
+            search_mode: false,
+            search_backwards: false,
+            search_input: String::new(),
+            last_search: String::new(),
             picker_visible: false,
             picker_items: Vec::new(),
             picker_filter: String::new(),
             picker_selected: 0,
+            clipboard: String::new(),
             should_quit: false,
         })
     }
@@ -266,6 +300,42 @@ impl EditorContext {
             EditorCommand::ExtendWordBackward => self.extend_word_backward(doc_id, view_id),
             EditorCommand::ExtendLineStart => self.extend_line_start(doc_id, view_id),
             EditorCommand::ExtendLineEnd => self.extend_line_end(doc_id, view_id),
+            EditorCommand::SelectLine => self.select_line(doc_id, view_id),
+            EditorCommand::ExtendLine => self.extend_line(doc_id, view_id),
+
+            // Clipboard
+            EditorCommand::Yank => self.yank(doc_id, view_id),
+            EditorCommand::Paste => self.paste(doc_id, view_id, false),
+            EditorCommand::PasteBefore => self.paste(doc_id, view_id, true),
+
+            // Delete
+            EditorCommand::DeleteSelection => self.delete_selection(doc_id, view_id),
+
+            // Search
+            EditorCommand::EnterSearchMode { backwards } => {
+                self.search_mode = true;
+                self.search_backwards = backwards;
+                self.search_input.clear();
+            }
+            EditorCommand::ExitSearchMode => {
+                self.search_mode = false;
+                self.search_input.clear();
+            }
+            EditorCommand::SearchInput(ch) => {
+                self.search_input.push(ch);
+            }
+            EditorCommand::SearchBackspace => {
+                self.search_input.pop();
+            }
+            EditorCommand::SearchExecute => {
+                self.execute_search(doc_id, view_id);
+            }
+            EditorCommand::SearchNext => {
+                self.search_next(doc_id, view_id, false);
+            }
+            EditorCommand::SearchPrevious => {
+                self.search_next(doc_id, view_id, true);
+            }
 
             // History
             EditorCommand::Undo => self.undo(doc_id, view_id),
@@ -671,6 +741,9 @@ impl EditorContext {
             lines,
             command_mode: self.command_mode,
             command_input: self.command_input.clone(),
+            search_mode: self.search_mode,
+            search_backwards: self.search_backwards,
+            search_input: self.search_input.clone(),
             picker_visible: self.picker_visible,
             picker_items: self.picker_items.clone(),
             picker_filtered: self.filtered_picker_items(),
@@ -1141,6 +1214,222 @@ impl EditorContext {
         });
 
         doc.set_selection(view_id, new_selection);
+    }
+
+    /// Select the entire current line (helix `x` command).
+    fn select_line(&mut self, doc_id: helix_view::DocumentId, view_id: helix_view::ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection.transform(|range| {
+            let line = text.char_to_line(range.head);
+            let line_start = text.line_to_char(line);
+            let line_end = if line + 1 < text.len_lines() {
+                text.line_to_char(line + 1)
+            } else {
+                text.len_chars()
+            };
+            helix_core::Range::new(line_start, line_end)
+        });
+
+        doc.set_selection(view_id, new_selection);
+        self.set_mode(Mode::Select);
+    }
+
+    /// Extend selection to include the next line (helix `X` command).
+    fn extend_line(&mut self, doc_id: helix_view::DocumentId, view_id: helix_view::ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection.transform(|range| {
+            let end_line = text.char_to_line(range.to());
+            let new_end = if end_line + 1 < text.len_lines() {
+                text.line_to_char(end_line + 1)
+            } else {
+                text.len_chars()
+            };
+            helix_core::Range::new(range.from(), new_end)
+        });
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    /// Yank (copy) the current selection to clipboard.
+    fn yank(&mut self, doc_id: helix_view::DocumentId, view_id: helix_view::ViewId) {
+        let doc = self.editor.document(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id);
+        let primary = selection.primary();
+
+        // Extract selected text
+        let selected_text: String = text.slice(primary.from()..primary.to()).into();
+        self.clipboard = selected_text;
+
+        log::info!("Yanked {} characters", self.clipboard.len());
+    }
+
+    /// Paste from clipboard.
+    fn paste(
+        &mut self,
+        doc_id: helix_view::DocumentId,
+        view_id: helix_view::ViewId,
+        before: bool,
+    ) {
+        if self.clipboard.is_empty() {
+            return;
+        }
+
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let pos = if before {
+            selection.primary().from()
+        } else {
+            selection.primary().to()
+        };
+
+        // Check if clipboard ends with newline (line-wise paste)
+        let is_linewise = self.clipboard.ends_with('\n');
+
+        let insert_pos = if is_linewise && !before {
+            // For line-wise paste after, move to start of next line
+            let line = text.char_to_line(pos);
+            if line + 1 < text.len_lines() {
+                text.line_to_char(line + 1)
+            } else {
+                text.len_chars()
+            }
+        } else if is_linewise && before {
+            // For line-wise paste before, move to start of current line
+            let line = text.char_to_line(pos);
+            text.line_to_char(line)
+        } else {
+            pos
+        };
+
+        let insert_selection = helix_core::Selection::point(insert_pos);
+        let transaction = helix_core::Transaction::insert(
+            doc.text(),
+            &insert_selection,
+            self.clipboard.clone().into(),
+        );
+        doc.apply(&transaction, view_id);
+
+        log::info!("Pasted {} characters", self.clipboard.len());
+    }
+
+    /// Delete the current selection.
+    fn delete_selection(&mut self, doc_id: helix_view::DocumentId, view_id: helix_view::ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+        let primary = selection.primary();
+
+        // First yank the selection
+        let selected_text: String = text.slice(primary.from()..primary.to()).into();
+        self.clipboard = selected_text;
+
+        // Delete the selection
+        let from = primary.from();
+        let to = primary.to();
+
+        if from < to {
+            let ranges = std::iter::once((from, to));
+            let transaction = helix_core::Transaction::delete(doc.text(), ranges);
+            doc.apply(&transaction, view_id);
+        }
+
+        // Return to normal mode
+        self.set_mode(Mode::Normal);
+    }
+
+    /// Execute search with current search input.
+    fn execute_search(&mut self, doc_id: helix_view::DocumentId, view_id: helix_view::ViewId) {
+        if self.search_input.is_empty() {
+            self.search_mode = false;
+            return;
+        }
+
+        // Save search pattern for n/N
+        self.last_search = self.search_input.clone();
+
+        // Perform the search
+        self.do_search(doc_id, view_id, &self.last_search.clone(), self.search_backwards);
+
+        self.search_mode = false;
+        self.search_input.clear();
+    }
+
+    /// Search for next/previous occurrence.
+    fn search_next(
+        &mut self,
+        doc_id: helix_view::DocumentId,
+        view_id: helix_view::ViewId,
+        reverse: bool,
+    ) {
+        if self.last_search.is_empty() {
+            log::info!("No previous search");
+            return;
+        }
+
+        let backwards = if reverse {
+            !self.search_backwards
+        } else {
+            self.search_backwards
+        };
+
+        self.do_search(doc_id, view_id, &self.last_search.clone(), backwards);
+    }
+
+    /// Perform the actual search.
+    fn do_search(
+        &mut self,
+        doc_id: helix_view::DocumentId,
+        view_id: helix_view::ViewId,
+        pattern: &str,
+        backwards: bool,
+    ) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+        let cursor = selection.primary().cursor(text);
+
+        // Simple substring search
+        let text_str: String = text.into();
+
+        let found_pos = if backwards {
+            // Search backwards from cursor
+            text_str[..cursor].rfind(pattern)
+        } else {
+            // Search forwards from cursor + 1
+            let start = (cursor + 1).min(text_str.len());
+            text_str[start..].find(pattern).map(|pos| pos + start)
+        };
+
+        if let Some(pos) = found_pos {
+            // Move cursor to the found position
+            let new_selection = helix_core::Selection::single(pos, pos + pattern.len());
+            doc.set_selection(view_id, new_selection);
+            log::info!("Found '{}' at position {}", pattern, pos);
+        } else {
+            // Wrap around search
+            let wrap_pos = if backwards {
+                text_str.rfind(pattern)
+            } else {
+                text_str.find(pattern)
+            };
+
+            if let Some(pos) = wrap_pos {
+                let new_selection = helix_core::Selection::single(pos, pos + pattern.len());
+                doc.set_selection(view_id, new_selection);
+                log::info!("Wrapped: found '{}' at position {}", pattern, pos);
+            } else {
+                log::info!("Pattern '{}' not found", pattern);
+            }
+        }
     }
 }
 
