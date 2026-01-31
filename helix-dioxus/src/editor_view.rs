@@ -15,6 +15,19 @@ pub fn EditorView(version: usize) -> Element {
 
     let mode = &snapshot.mode;
 
+    // Scroll cursor into view after each render
+    use_effect(move || {
+        // Use JavaScript to scroll the cursor element into view horizontally
+        document::eval(
+            r#"
+            const cursor = document.getElementById('editor-cursor');
+            if (cursor) {
+                cursor.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            }
+        "#,
+        );
+    });
+
     rsx! {
         div {
             class: "editor-view",
@@ -182,8 +195,10 @@ fn render_styled_content(
             style.push_str(cursor_style);
         }
 
-        // Add the span
-        if style.is_empty() {
+        // Add the span (with id for cursor to enable scrollIntoView)
+        if is_cursor {
+            spans.push(rsx! { span { key: "{pos}", id: "editor-cursor", style: "{style}", "{text}" } });
+        } else if style.is_empty() {
             spans.push(rsx! { span { key: "{pos}", "{text}" } });
         } else {
             spans.push(rsx! { span { key: "{pos}", style: "{style}", "{text}" } });
@@ -201,7 +216,7 @@ fn render_styled_content(
     if let Some(cursor) = cursor_pos {
         if cursor >= len {
             let style = cursor_style.to_string();
-            spans.push(rsx! { span { key: "cursor-end", style: "{style}", " " } });
+            spans.push(rsx! { span { key: "cursor-end", id: "editor-cursor", style: "{style}", " " } });
         }
     }
 
