@@ -69,6 +69,59 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         // Command mode
         KeyCode::Char(':') => vec![EditorCommand::EnterCommandMode],
 
+        // LSP - Hover (K for documentation like vim)
+        KeyCode::Char('K') => vec![EditorCommand::TriggerHover],
+
+        _ => vec![],
+    }
+}
+
+/// Handle two-key sequences starting with 'g' (goto).
+pub fn handle_g_prefix(key: &KeyEvent) -> Vec<EditorCommand> {
+    match key.code {
+        // gg - go to first line
+        KeyCode::Char('g') => vec![EditorCommand::GotoFirstLine],
+        // gd - go to definition
+        KeyCode::Char('d') => vec![EditorCommand::GotoDefinition],
+        // gr - go to references
+        KeyCode::Char('r') => vec![EditorCommand::GotoReferences],
+        // gy - go to type definition
+        KeyCode::Char('y') => vec![EditorCommand::GotoTypeDefinition],
+        // gi - go to implementation
+        KeyCode::Char('i') => vec![EditorCommand::GotoImplementation],
+        _ => vec![],
+    }
+}
+
+/// Handle two-key sequences starting with ']' (next).
+pub fn handle_bracket_next(key: &KeyEvent) -> Vec<EditorCommand> {
+    match key.code {
+        // ]d - next diagnostic
+        KeyCode::Char('d') => vec![EditorCommand::NextDiagnostic],
+        _ => vec![],
+    }
+}
+
+/// Handle two-key sequences starting with '[' (previous).
+pub fn handle_bracket_prev(key: &KeyEvent) -> Vec<EditorCommand> {
+    match key.code {
+        // [d - previous diagnostic
+        KeyCode::Char('d') => vec![EditorCommand::PrevDiagnostic],
+        _ => vec![],
+    }
+}
+
+/// Handle two-key sequences starting with Space (leader).
+pub fn handle_space_leader(key: &KeyEvent) -> Vec<EditorCommand> {
+    match key.code {
+        // Space a - show code actions
+        KeyCode::Char('a') => vec![EditorCommand::ShowCodeActions],
+        // Space f - format document
+        KeyCode::Char('f') => vec![EditorCommand::FormatDocument],
+        // Space i - toggle inlay hints
+        KeyCode::Char('i') => vec![EditorCommand::ToggleInlayHints],
+        // Space r - rename symbol
+        KeyCode::Char('r') => vec![EditorCommand::RenameSymbol],
         _ => vec![],
     }
 }

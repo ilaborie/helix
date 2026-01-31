@@ -30,6 +30,7 @@ mod app;
 mod components;
 mod input;
 mod keybindings;
+mod lsp;
 mod operations;
 mod state;
 mod tracing;

@@ -3,16 +3,35 @@
 //! This is the root Dioxus component that composes the editor UI.
 
 use dioxus::prelude::*;
+use helix_view::input::KeyCode;
 
 use crate::components::{
-    BufferBar, CommandPrompt, EditorView, GenericPicker, SearchPrompt, StatusLine,
+    BufferBar, CodeActionsMenu, CommandPrompt, CompletionPopup, EditorView, GenericPicker,
+    HoverPopup, LocationPicker, SearchPrompt, SignatureHelpPopup, StatusLine,
 };
 use crate::input::translate_key_event;
 use crate::keybindings::{
-    handle_command_mode, handle_insert_mode, handle_normal_mode, handle_picker_mode,
-    handle_search_mode, handle_select_mode,
+    handle_bracket_next, handle_bracket_prev, handle_code_actions_mode, handle_command_mode,
+    handle_completion_mode, handle_g_prefix, handle_insert_mode, handle_location_picker_mode,
+    handle_normal_mode, handle_picker_mode, handle_search_mode, handle_select_mode,
+    handle_space_leader,
 };
 use crate::AppState;
+
+/// Tracks pending key sequence state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum PendingKeySequence {
+    #[default]
+    None,
+    /// Waiting for second key after 'g'
+    GPrefix,
+    /// Waiting for second key after ']'
+    BracketNext,
+    /// Waiting for second key after '['
+    BracketPrev,
+    /// Waiting for second key after Space
+    SpaceLeader,
+}
 
 /// Main application component.
 #[component]
@@ -20,8 +39,13 @@ pub fn App() -> Element {
     // Get app state from context
     let app_state = use_context::<AppState>();
 
+    let x : String = 3;
+
     // Track version for re-renders when editor state changes
     let mut version = use_signal(|| 0_usize);
+
+    // Track pending key sequence for multi-key commands (g, ], [, Space)
+    let mut pending_key = use_signal(PendingKeySequence::default);
 
     // Read the signal to subscribe to changes and trigger re-render of this component
     let _ = version();
@@ -44,25 +68,80 @@ pub fn App() -> Element {
         // Translate to helix key event
         if let Some(key_event) = translate_key_event(&evt) {
             log::info!(
-                "Mode: {}, command_mode: {}, search_mode: {}, picker_visible: {}",
+                "Mode: {}, command_mode: {}, search_mode: {}, picker_visible: {}, pending_key: {:?}",
                 snapshot.mode,
                 snapshot.command_mode,
                 snapshot.search_mode,
-                snapshot.picker_visible
+                snapshot.picker_visible,
+                pending_key()
             );
 
             // Handle input based on UI state first, then editor mode
-            let commands = if snapshot.picker_visible {
+            // LSP UI states take precedence
+            let commands = if snapshot.location_picker_visible {
+                handle_location_picker_mode(&key_event)
+            } else if snapshot.code_actions_visible {
+                handle_code_actions_mode(&key_event)
+            } else if snapshot.completion_visible {
+                handle_completion_mode(&key_event)
+            } else if snapshot.picker_visible {
                 handle_picker_mode(&key_event)
             } else if snapshot.command_mode {
                 handle_command_mode(&key_event)
             } else if snapshot.search_mode {
                 handle_search_mode(&key_event)
+            } else if snapshot.mode == "NORMAL" || snapshot.mode == "SELECT" {
+                // Handle multi-key sequences in normal/select mode
+                let current_pending = pending_key();
+                match current_pending {
+                    PendingKeySequence::GPrefix => {
+                        pending_key.set(PendingKeySequence::None);
+                        handle_g_prefix(&key_event)
+                    }
+                    PendingKeySequence::BracketNext => {
+                        pending_key.set(PendingKeySequence::None);
+                        handle_bracket_next(&key_event)
+                    }
+                    PendingKeySequence::BracketPrev => {
+                        pending_key.set(PendingKeySequence::None);
+                        handle_bracket_prev(&key_event)
+                    }
+                    PendingKeySequence::SpaceLeader => {
+                        pending_key.set(PendingKeySequence::None);
+                        handle_space_leader(&key_event)
+                    }
+                    PendingKeySequence::None => {
+                        // Check if this starts a sequence
+                        match key_event.code {
+                            KeyCode::Char('g') => {
+                                pending_key.set(PendingKeySequence::GPrefix);
+                                vec![]
+                            }
+                            KeyCode::Char(']') => {
+                                pending_key.set(PendingKeySequence::BracketNext);
+                                vec![]
+                            }
+                            KeyCode::Char('[') => {
+                                pending_key.set(PendingKeySequence::BracketPrev);
+                                vec![]
+                            }
+                            KeyCode::Char(' ') => {
+                                pending_key.set(PendingKeySequence::SpaceLeader);
+                                vec![]
+                            }
+                            _ => {
+                                if snapshot.mode == "SELECT" {
+                                    handle_select_mode(&key_event)
+                                } else {
+                                    handle_normal_mode(&key_event)
+                                }
+                            }
+                        }
+                    }
+                }
             } else {
                 match snapshot.mode.as_str() {
-                    "NORMAL" => handle_normal_mode(&key_event),
                     "INSERT" => handle_insert_mode(&key_event),
-                    "SELECT" => handle_select_mode(&key_event),
                     _ => vec![],
                 }
             };
@@ -144,6 +223,57 @@ pub fn App() -> Element {
                     total: snapshot.picker_total,
                     mode: snapshot.picker_mode,
                     current_path: snapshot.picker_current_path.clone(),
+                }
+            }
+
+            // LSP - Completion popup
+            if snapshot.completion_visible {
+                CompletionPopup {
+                    items: snapshot.completion_items.clone(),
+                    selected: snapshot.completion_selected,
+                    cursor_line: snapshot.cursor_line,
+                    cursor_col: snapshot.cursor_col,
+                }
+            }
+
+            // LSP - Hover popup
+            if snapshot.hover_visible {
+                if let Some(ref hover) = snapshot.hover_content {
+                    HoverPopup {
+                        hover: hover.clone(),
+                        cursor_line: snapshot.cursor_line,
+                        cursor_col: snapshot.cursor_col,
+                    }
+                }
+            }
+
+            // LSP - Signature help popup
+            if snapshot.signature_help_visible {
+                if let Some(ref sig_help) = snapshot.signature_help {
+                    SignatureHelpPopup {
+                        signature_help: sig_help.clone(),
+                        cursor_line: snapshot.cursor_line,
+                        cursor_col: snapshot.cursor_col,
+                    }
+                }
+            }
+
+            // LSP - Code actions menu
+            if snapshot.code_actions_visible {
+                CodeActionsMenu {
+                    actions: snapshot.code_actions.clone(),
+                    selected: snapshot.code_action_selected,
+                    cursor_line: snapshot.cursor_line,
+                    cursor_col: snapshot.cursor_col,
+                }
+            }
+
+            // LSP - Location picker
+            if snapshot.location_picker_visible {
+                LocationPicker {
+                    title: snapshot.location_picker_title.clone(),
+                    locations: snapshot.locations.clone(),
+                    selected: snapshot.location_selected,
                 }
             }
         }

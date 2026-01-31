@@ -7,6 +7,11 @@ use std::path::PathBuf;
 
 use helix_view::DocumentId;
 
+use crate::lsp::{
+    CodeActionSnapshot, CompletionItemSnapshot, DiagnosticSnapshot, HoverSnapshot,
+    InlayHintSnapshot, LocationSnapshot, SignatureHelpSnapshot,
+};
+
 /// Buffer info for the tab bar.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BufferInfo {
@@ -77,6 +82,42 @@ pub struct EditorSnapshot {
     // Buffer bar state
     pub open_buffers: Vec<BufferInfo>,
     pub buffer_scroll_offset: usize,
+
+    // LSP state
+    /// Diagnostics for the current document, grouped by line.
+    pub diagnostics: Vec<DiagnosticSnapshot>,
+    /// Whether the completion popup is visible.
+    pub completion_visible: bool,
+    /// Completion items to display.
+    pub completion_items: Vec<CompletionItemSnapshot>,
+    /// Selected completion item index.
+    pub completion_selected: usize,
+    /// Whether the hover popup is visible.
+    pub hover_visible: bool,
+    /// Hover content to display.
+    pub hover_content: Option<HoverSnapshot>,
+    /// Whether signature help is visible.
+    pub signature_help_visible: bool,
+    /// Signature help content.
+    pub signature_help: Option<SignatureHelpSnapshot>,
+    /// Inlay hints for the visible lines.
+    pub inlay_hints: Vec<InlayHintSnapshot>,
+    /// Whether inlay hints are enabled.
+    pub inlay_hints_enabled: bool,
+    /// Whether code actions menu is visible.
+    pub code_actions_visible: bool,
+    /// Available code actions.
+    pub code_actions: Vec<CodeActionSnapshot>,
+    /// Selected code action index.
+    pub code_action_selected: usize,
+    /// Whether location picker is visible.
+    pub location_picker_visible: bool,
+    /// Locations to display in picker.
+    pub locations: Vec<LocationSnapshot>,
+    /// Selected location index.
+    pub location_selected: usize,
+    /// Location picker title.
+    pub location_picker_title: String,
 
     // Application state
     pub should_quit: bool,
@@ -162,7 +203,9 @@ pub enum EditorCommand {
     DeleteSelection,
 
     // Search
-    EnterSearchMode { backwards: bool },
+    EnterSearchMode {
+        backwards: bool,
+    },
     ExitSearchMode,
     SearchInput(char),
     SearchBackspace,
@@ -198,6 +241,84 @@ pub enum EditorCommand {
 
     // File operations
     OpenFile(PathBuf),
+
+    // LSP - Completion
+    /// Trigger completion popup manually.
+    TriggerCompletion,
+    /// Move selection up in completion menu.
+    CompletionUp,
+    /// Move selection down in completion menu.
+    CompletionDown,
+    /// Confirm selected completion item.
+    CompletionConfirm,
+    /// Cancel/close completion popup.
+    CompletionCancel,
+
+    // LSP - Hover
+    /// Show hover information at cursor.
+    TriggerHover,
+    /// Close hover popup.
+    CloseHover,
+
+    // LSP - Goto
+    /// Go to definition of symbol under cursor.
+    GotoDefinition,
+    /// Find references to symbol under cursor.
+    GotoReferences,
+    /// Go to type definition of symbol under cursor.
+    GotoTypeDefinition,
+    /// Go to implementation of symbol under cursor.
+    GotoImplementation,
+    /// Confirm selected location in location picker.
+    LocationConfirm,
+    /// Cancel/close location picker.
+    LocationCancel,
+    /// Move selection up in location picker.
+    LocationUp,
+    /// Move selection down in location picker.
+    LocationDown,
+
+    // LSP - Code Actions
+    /// Show code actions at cursor.
+    ShowCodeActions,
+    /// Confirm selected code action.
+    CodeActionConfirm,
+    /// Cancel/close code actions menu.
+    CodeActionCancel,
+    /// Move selection up in code actions menu.
+    CodeActionUp,
+    /// Move selection down in code actions menu.
+    CodeActionDown,
+
+    // LSP - Diagnostics
+    /// Jump to next diagnostic.
+    NextDiagnostic,
+    /// Jump to previous diagnostic.
+    PrevDiagnostic,
+
+    // LSP - Format
+    /// Format the current document.
+    FormatDocument,
+
+    // LSP - Rename
+    /// Rename symbol under cursor.
+    RenameSymbol,
+
+    // LSP - Inlay Hints
+    /// Toggle inlay hints display.
+    ToggleInlayHints,
+    /// Refresh inlay hints from LSP.
+    RefreshInlayHints,
+
+    // LSP - Signature Help
+    /// Trigger signature help (usually auto-triggered on `(`).
+    TriggerSignatureHelp,
+    /// Close signature help popup.
+    CloseSignatureHelp,
+
+    // LSP - Internal responses (from async LSP operations)
+    /// Handle LSP response (internal).
+    LspResponse(crate::lsp::LspResponse),
 }
 
 /// Direction for cursor movement.

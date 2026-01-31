@@ -681,7 +681,171 @@ let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
 
 ---
 
+## 2026-01-31: LSP Integration Foundation
+
+### Progress
+- Created comprehensive LSP integration foundation with UI components and state management
+- Implemented thread-safe snapshot types for LSP data (Clone + Send + Sync)
+- All components ready for actual LSP client integration
+
+### Components Created
+
+**UI Components:**
+- `CompletionPopup` - Auto-complete menu with kind badges, labels, and details
+- `HoverPopup` - Documentation popup for symbol hover
+- `SignatureHelpPopup` - Function signature with parameter highlighting
+- `DiagnosticMarker` - Gutter icons (E/W/I/H) for diagnostic severity
+- `ErrorLens` - Inline diagnostic messages at end of lines (VS Code style)
+- `CodeActionsMenu` - Quick fix/refactor actions with preferred action indicators
+- `LocationPicker` - Multiple location picker for goto operations
+
+**Snapshot Types (thread-safe for UI):**
+- `DiagnosticSnapshot` - Diagnostic with line, columns, message, severity
+- `CompletionItemSnapshot` - Completion with kind, label, detail, documentation
+- `HoverSnapshot` - Hover content with markdown support
+- `SignatureHelpSnapshot` - Signature with parameters and active index
+- `InlayHintSnapshot` - Inline type hints with position and padding
+- `LocationSnapshot` - File location with line, column, preview
+- `CodeActionSnapshot` - Code action with title, kind, preferred flag
+
+### State Management
+- Added LSP state fields to `EditorContext`:
+  - `completion_visible`, `completion_items`, `completion_selected`
+  - `hover_visible`, `hover_content`
+  - `signature_help_visible`, `signature_help`
+  - `code_actions_visible`, `code_actions`, `code_action_selected`
+  - `location_picker_visible`, `locations`, `location_selected`
+  - `inlay_hints_enabled`
+- Added `LspResponse` enum for async response handling
+- Added command handlers for all LSP operations
+
+### Commands Added
+- Completion: `TriggerCompletion`, `CompletionUp/Down/Confirm/Cancel`
+- Hover: `TriggerHover`, `CloseHover`
+- Goto: `GotoDefinition`, `GotoReferences`, `GotoTypeDefinition`, `GotoImplementation`
+- Locations: `LocationConfirm`, `LocationCancel`, `LocationUp/Down`
+- Code Actions: `ShowCodeActions`, `CodeActionConfirm/Cancel/Up/Down`
+- Diagnostics: `NextDiagnostic`, `PrevDiagnostic`
+- Format: `FormatDocument`, `RenameSymbol`
+- Inlay Hints: `ToggleInlayHints`, `RefreshInlayHints`
+- Signature Help: `TriggerSignatureHelp`, `CloseSignatureHelp`
+
+### Keybindings Added
+- **Normal mode:**
+  - `K` - Trigger hover
+  - `]d` - Next diagnostic
+  - `[d` - Previous diagnostic
+- **g prefix (goto):**
+  - `gd` - Goto definition
+  - `gr` - Goto references
+  - `gy` - Goto type definition
+  - `gi` - Goto implementation
+- **Space leader:**
+  - `Space a` - Show code actions
+  - `Space f` - Format document
+  - `Space i` - Toggle inlay hints
+- **Insert mode:**
+  - `Ctrl+Space` - Trigger completion
+  - `(` - Trigger signature help
+- **Completion/Location/Code Actions modes:**
+  - `Up/Down`, `j/k` - Navigate
+  - `Enter` - Confirm
+  - `Esc` - Cancel
+
+### CSS Styles Added
+- Diagnostic gutter column with severity-colored markers
+- Error lens inline messages (dimmed, right-aligned)
+- Completion popup with kind badges and selection highlight
+- Hover popup with max dimensions and scrolling
+- Signature help with parameter highlighting
+- Code actions menu with preferred action styling
+- Location picker with file path and preview
+- Inlay hint styling (dimmed, italic for types)
+
+### Operations Added
+- `LspOps` trait on `EditorContext`:
+  - `next_diagnostic()` - Jump to next diagnostic
+  - `prev_diagnostic()` - Jump to previous diagnostic
+  - `get_diagnostics()` - Get all diagnostics for document
+
+### Technical Notes
+- All LSP snapshot types are Clone + Send + Sync for thread-safe UI rendering
+- Multi-key sequence handling via `PendingKeySequence` enum (g, ], [, Space prefixes)
+- Diagnostic navigation works immediately; other LSP features await client integration
+- Comments document where actual LSP client calls would be made
+
+### Files Created
+- `src/lsp/mod.rs` - LSP module re-exports
+- `src/lsp/types.rs` - Thread-safe snapshot types
+- `src/components/diagnostics.rs` - Diagnostic display components
+- `src/components/completion.rs` - Completion popup
+- `src/components/hover.rs` - Hover popup
+- `src/components/signature_help.rs` - Signature help popup
+- `src/components/code_actions.rs` - Code actions menu
+- `src/components/location_picker.rs` - Location picker
+- `src/components/inlay_hints.rs` - Inlay hints utilities
+- `src/keybindings/completion.rs` - Completion/location/code actions handlers
+- `src/operations/lsp.rs` - LSP operations trait
+
+### Files Modified
+- `src/state/mod.rs` - LSP state, command handling, snapshot collection
+- `src/state/types.rs` - LSP commands and snapshot fields
+- `src/components/mod.rs` - Export new components
+- `src/components/editor_view.rs` - Integrate diagnostic gutter
+- `src/keybindings/mod.rs` - Export new handlers
+- `src/keybindings/normal.rs` - LSP keybindings (g prefix, brackets, space leader)
+- `src/keybindings/insert.rs` - Ctrl+Space and `(` triggers
+- `src/app.rs` - Multi-key handling, LSP component rendering
+- `src/operations/mod.rs` - Export LspOps
+- `assets/head.html` - CSS for all LSP components
+
+### Next Steps
+1. Integrate actual LSP client (helix-lsp) for server communication
+2. Implement async request/response flow via command channel
+3. Connect completion, hover, goto operations to language servers
+4. Add document symbol and workspace symbol pickers
+
+---
+
 ## Planned Enhancements
+
+### Helix Commands & Modes
+- [ ] Support missing helix commands (comprehensive coverage)
+- [ ] Space mode (leader key menu)
+- [ ] Goto mode (`g` prefix commands)
+- [ ] Match mode (`m` prefix - matching brackets, surround)
+- [ ] Right/Left bracket modes (`]`/`[` prefix - next/prev item navigation)
+
+### Configuration
+- [ ] Use helix configuration (`~/.config/helix/config.toml`)
+- [ ] Use language configuration (`languages.toml`)
+- [ ] User preferences support
+
+### Standard UI Components
+- [ ] Toast notifications
+- [ ] Confirm dialogs
+- [ ] Rename prompt (for LSP rename)
+- [ ] Documentation popup (hover info)
+- [ ] Help panel
+- [ ] Autocomplete lite picker
+- [ ] Error lens (inline diagnostics)
+
+### LSP Integration
+- [x] LSP snapshot types (thread-safe for UI rendering)
+- [x] Diagnostics display with Error Lens
+- [x] Completion popup component
+- [x] Hover popup component
+- [x] Signature help popup component
+- [x] Code actions menu component
+- [x] Location picker component
+- [x] Inlay hints utilities
+- [x] Diagnostic navigation (`]d`, `[d`)
+- [x] LSP keybindings (K, gd, gr, gy, gi, Space+a/f/i)
+- [ ] LSP client integration (actual server communication)
+
+### Gutter Improvements
+- [ ] Git diff indicators (added/modified/removed lines)
+- [ ] Diagnostic indicators (error/warning icons)
 
 ### Application Icon (macOS)
 - [ ] Fix macOS dock icon not displaying
@@ -700,9 +864,24 @@ let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
 - [ ] Option to hide buffer bar (add setting)
 - [ ] Context menu on right-click (close, close others, close all)
 
-### Picker
+### Picker Infrastructure
 - [ ] Mouse click to select items
 - [ ] Scrollbar for long lists
+- [ ] Preview pane (file content preview)
+
+### Additional Pickers
+- [ ] Symbol picker (document symbols via LSP)
+- [ ] Workspace symbol picker (project-wide symbols)
+- [ ] Global search picker (ripgrep integration)
+- [ ] Diagnostics picker (jump to errors/warnings)
+- [ ] References picker (LSP references)
+- [ ] Command picker (all available commands)
+- [ ] Theme picker (preview and switch themes)
+- [ ] Jumplist picker (navigation history)
+- [ ] Changed files picker (modified buffers)
+
+### Architecture Note
+Split views are **not planned** for helix-dioxus. For multiple views, users should launch multiple editor instances. This keeps the architecture simpler and aligns with a single-document-focus paradigm.
 
 ---
 

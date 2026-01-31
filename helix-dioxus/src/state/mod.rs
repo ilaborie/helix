@@ -24,8 +24,13 @@ use std::sync::Arc;
 use anyhow::Result;
 use helix_view::document::Mode;
 
+use crate::lsp::{
+    CodeActionSnapshot, CompletionItemSnapshot, DiagnosticSeverity, DiagnosticSnapshot,
+    HoverSnapshot, InlayHintSnapshot, LocationSnapshot, LspResponse, SignatureHelpSnapshot,
+};
 use crate::operations::{
-    BufferOps, CliOps, ClipboardOps, EditingOps, MovementOps, PickerOps, SearchOps, SelectionOps,
+    BufferOps, CliOps, ClipboardOps, EditingOps, LspOps, MovementOps, PickerOps, SearchOps,
+    SelectionOps,
 };
 
 /// The editor wrapper that lives on the main thread.
@@ -54,6 +59,40 @@ pub struct EditorContext {
 
     // Clipboard (simple string for now) - pub(crate) for operations access
     pub(crate) clipboard: String,
+
+    // LSP state - pub(crate) for operations access
+    /// Whether the completion popup is visible.
+    pub(crate) completion_visible: bool,
+    /// Completion items.
+    pub(crate) completion_items: Vec<CompletionItemSnapshot>,
+    /// Selected completion index.
+    pub(crate) completion_selected: usize,
+    /// Whether hover is visible.
+    pub(crate) hover_visible: bool,
+    /// Hover content.
+    pub(crate) hover_content: Option<HoverSnapshot>,
+    /// Whether signature help is visible.
+    pub(crate) signature_help_visible: bool,
+    /// Signature help content.
+    pub(crate) signature_help: Option<SignatureHelpSnapshot>,
+    /// Cached inlay hints.
+    pub(crate) inlay_hints: Vec<InlayHintSnapshot>,
+    /// Whether inlay hints are enabled.
+    pub(crate) inlay_hints_enabled: bool,
+    /// Whether code actions menu is visible.
+    pub(crate) code_actions_visible: bool,
+    /// Code actions.
+    pub(crate) code_actions: Vec<CodeActionSnapshot>,
+    /// Selected code action index.
+    pub(crate) code_action_selected: usize,
+    /// Whether location picker is visible.
+    pub(crate) location_picker_visible: bool,
+    /// Locations for picker.
+    pub(crate) locations: Vec<LocationSnapshot>,
+    /// Selected location index.
+    pub(crate) location_selected: usize,
+    /// Location picker title.
+    pub(crate) location_picker_title: String,
 
     // Application state - pub(crate) for operations access
     pub(crate) should_quit: bool,
@@ -120,6 +159,23 @@ impl EditorContext {
             picker_current_path: None,
             buffer_bar_scroll: 0,
             clipboard: String::new(),
+            // LSP state
+            completion_visible: false,
+            completion_items: Vec::new(),
+            completion_selected: 0,
+            hover_visible: false,
+            hover_content: None,
+            signature_help_visible: false,
+            signature_help: None,
+            inlay_hints: Vec::new(),
+            inlay_hints_enabled: true,
+            code_actions_visible: false,
+            code_actions: Vec::new(),
+            code_action_selected: 0,
+            location_picker_visible: false,
+            locations: Vec::new(),
+            location_selected: 0,
+            location_picker_title: String::new(),
             should_quit: false,
         })
     }
@@ -318,6 +374,217 @@ impl EditorContext {
             EditorCommand::OpenFile(path) => {
                 self.open_file(&path);
             }
+
+            // LSP - Completion
+            EditorCommand::TriggerCompletion => {
+                // TODO: Trigger LSP completion request
+                log::info!("TriggerCompletion - not yet implemented");
+            }
+            EditorCommand::CompletionUp => {
+                if self.completion_selected > 0 {
+                    self.completion_selected -= 1;
+                }
+            }
+            EditorCommand::CompletionDown => {
+                if self.completion_selected + 1 < self.completion_items.len() {
+                    self.completion_selected += 1;
+                }
+            }
+            EditorCommand::CompletionConfirm => {
+                // TODO: Apply selected completion
+                log::info!("CompletionConfirm - not yet implemented");
+                self.completion_visible = false;
+                self.completion_items.clear();
+                self.completion_selected = 0;
+            }
+            EditorCommand::CompletionCancel => {
+                self.completion_visible = false;
+                self.completion_items.clear();
+                self.completion_selected = 0;
+            }
+
+            // LSP - Hover
+            EditorCommand::TriggerHover => {
+                // TODO: Trigger LSP hover request
+                log::info!("TriggerHover - not yet implemented");
+            }
+            EditorCommand::CloseHover => {
+                self.hover_visible = false;
+                self.hover_content = None;
+            }
+
+            // LSP - Goto
+            EditorCommand::GotoDefinition => {
+                // TODO: Trigger LSP goto definition
+                log::info!("GotoDefinition - not yet implemented");
+            }
+            EditorCommand::GotoReferences => {
+                // TODO: Trigger LSP find references
+                log::info!("GotoReferences - not yet implemented");
+            }
+            EditorCommand::GotoTypeDefinition => {
+                // TODO: Trigger LSP goto type definition
+                log::info!("GotoTypeDefinition - not yet implemented");
+            }
+            EditorCommand::GotoImplementation => {
+                // TODO: Trigger LSP goto implementation
+                log::info!("GotoImplementation - not yet implemented");
+            }
+            EditorCommand::LocationUp => {
+                if self.location_selected > 0 {
+                    self.location_selected -= 1;
+                }
+            }
+            EditorCommand::LocationDown => {
+                if self.location_selected + 1 < self.locations.len() {
+                    self.location_selected += 1;
+                }
+            }
+            EditorCommand::LocationConfirm => {
+                // TODO: Jump to selected location
+                log::info!("LocationConfirm - not yet implemented");
+                self.location_picker_visible = false;
+                self.locations.clear();
+                self.location_selected = 0;
+            }
+            EditorCommand::LocationCancel => {
+                self.location_picker_visible = false;
+                self.locations.clear();
+                self.location_selected = 0;
+            }
+
+            // LSP - Code Actions
+            EditorCommand::ShowCodeActions => {
+                // TODO: Trigger LSP code actions request
+                log::info!("ShowCodeActions - not yet implemented");
+            }
+            EditorCommand::CodeActionUp => {
+                if self.code_action_selected > 0 {
+                    self.code_action_selected -= 1;
+                }
+            }
+            EditorCommand::CodeActionDown => {
+                if self.code_action_selected + 1 < self.code_actions.len() {
+                    self.code_action_selected += 1;
+                }
+            }
+            EditorCommand::CodeActionConfirm => {
+                // TODO: Execute selected code action
+                log::info!("CodeActionConfirm - not yet implemented");
+                self.code_actions_visible = false;
+                self.code_actions.clear();
+                self.code_action_selected = 0;
+            }
+            EditorCommand::CodeActionCancel => {
+                self.code_actions_visible = false;
+                self.code_actions.clear();
+                self.code_action_selected = 0;
+            }
+
+            // LSP - Diagnostics
+            EditorCommand::NextDiagnostic => {
+                self.next_diagnostic(doc_id, view_id);
+            }
+            EditorCommand::PrevDiagnostic => {
+                self.prev_diagnostic(doc_id, view_id);
+            }
+
+            // LSP - Format
+            EditorCommand::FormatDocument => {
+                // TODO: Trigger LSP format document
+                log::info!("FormatDocument - not yet implemented");
+            }
+
+            // LSP - Rename
+            EditorCommand::RenameSymbol => {
+                // TODO: Trigger LSP rename
+                log::info!("RenameSymbol - not yet implemented");
+            }
+
+            // LSP - Inlay Hints
+            EditorCommand::ToggleInlayHints => {
+                self.inlay_hints_enabled = !self.inlay_hints_enabled;
+                if !self.inlay_hints_enabled {
+                    self.inlay_hints.clear();
+                }
+                log::info!(
+                    "Inlay hints {}",
+                    if self.inlay_hints_enabled {
+                        "enabled"
+                    } else {
+                        "disabled"
+                    }
+                );
+            }
+            EditorCommand::RefreshInlayHints => {
+                // TODO: Request fresh inlay hints from LSP
+                log::info!("RefreshInlayHints - not yet implemented");
+            }
+
+            // LSP - Signature Help
+            EditorCommand::TriggerSignatureHelp => {
+                // TODO: Trigger LSP signature help
+                log::info!("TriggerSignatureHelp - not yet implemented");
+            }
+            EditorCommand::CloseSignatureHelp => {
+                self.signature_help_visible = false;
+                self.signature_help = None;
+            }
+
+            // LSP - Internal responses
+            EditorCommand::LspResponse(response) => {
+                self.handle_lsp_response(response);
+            }
+        }
+    }
+
+    /// Handle an LSP response.
+    fn handle_lsp_response(&mut self, response: LspResponse) {
+        match response {
+            LspResponse::Completions(items) => {
+                self.completion_items = items;
+                self.completion_selected = 0;
+                self.completion_visible = !self.completion_items.is_empty();
+            }
+            LspResponse::Hover(hover) => {
+                self.hover_content = hover;
+                self.hover_visible = self.hover_content.is_some();
+            }
+            LspResponse::SignatureHelp(help) => {
+                self.signature_help = help;
+                self.signature_help_visible = self.signature_help.is_some();
+            }
+            LspResponse::InlayHints(hints) => {
+                if self.inlay_hints_enabled {
+                    self.inlay_hints = hints;
+                }
+            }
+            LspResponse::GotoDefinition(locations) | LspResponse::References(locations) => {
+                if locations.len() == 1 {
+                    // Single location - jump directly
+                    // TODO: Jump to location
+                    log::info!("Would jump to: {:?}", locations.first());
+                } else if !locations.is_empty() {
+                    // Multiple locations - show picker
+                    self.locations = locations;
+                    self.location_selected = 0;
+                    self.location_picker_visible = true;
+                }
+            }
+            LspResponse::CodeActions(actions) => {
+                self.code_actions = actions;
+                self.code_action_selected = 0;
+                self.code_actions_visible = !self.code_actions.is_empty();
+            }
+            LspResponse::DiagnosticsUpdated => {
+                // Diagnostics are pulled from the document in snapshot()
+            }
+            LspResponse::FormatApplied | LspResponse::WorkspaceEditApplied => {
+                // Nothing to do - changes already applied
+            }
+            LspResponse::Error(msg) => {
+                log::error!("LSP error: {}", msg);
+            }
         }
     }
 
@@ -427,6 +694,9 @@ impl EditorContext {
             })
             .collect();
 
+        // Collect diagnostics from doc before releasing the borrow
+        let diagnostics = self.collect_diagnostics(doc, visible_start, visible_end);
+
         let (open_buffers, buffer_scroll_offset) = self.buffer_bar_snapshot();
 
         EditorSnapshot {
@@ -455,8 +725,66 @@ impl EditorContext {
                 .map(|p| p.to_string_lossy().to_string()),
             open_buffers,
             buffer_scroll_offset,
+            // LSP state
+            diagnostics,
+            completion_visible: self.completion_visible,
+            completion_items: self.completion_items.clone(),
+            completion_selected: self.completion_selected,
+            hover_visible: self.hover_visible,
+            hover_content: self.hover_content.clone(),
+            signature_help_visible: self.signature_help_visible,
+            signature_help: self.signature_help.clone(),
+            inlay_hints: self.inlay_hints.clone(),
+            inlay_hints_enabled: self.inlay_hints_enabled,
+            code_actions_visible: self.code_actions_visible,
+            code_actions: self.code_actions.clone(),
+            code_action_selected: self.code_action_selected,
+            location_picker_visible: self.location_picker_visible,
+            locations: self.locations.clone(),
+            location_selected: self.location_selected,
+            location_picker_title: self.location_picker_title.clone(),
             should_quit: self.should_quit,
         }
+    }
+
+    /// Collect diagnostics for visible lines from the document.
+    fn collect_diagnostics(
+        &self,
+        doc: &helix_view::Document,
+        visible_start: usize,
+        visible_end: usize,
+    ) -> Vec<DiagnosticSnapshot> {
+        let text = doc.text();
+        doc.diagnostics()
+            .iter()
+            .filter_map(|diag| {
+                let line = diag.line;
+                // Only include diagnostics for visible lines
+                if line < visible_start || line >= visible_end {
+                    return None;
+                }
+
+                let line_start = text.line_to_char(line);
+                let start_col = diag.range.start.saturating_sub(line_start);
+                let end_col = diag.range.end.saturating_sub(line_start);
+
+                Some(DiagnosticSnapshot {
+                    line: line + 1, // 1-indexed for display
+                    start_col,
+                    end_col,
+                    message: diag.message.clone(),
+                    severity: diag
+                        .severity
+                        .map(DiagnosticSeverity::from)
+                        .unwrap_or_default(),
+                    source: diag.source.clone(),
+                    code: diag.code.as_ref().map(|c| match c {
+                        helix_core::diagnostic::NumberOrString::Number(n) => n.to_string(),
+                        helix_core::diagnostic::NumberOrString::String(s) => s.clone(),
+                    }),
+                })
+            })
+            .collect()
     }
 
     /// Compute syntax highlighting tokens for a range of visible lines.

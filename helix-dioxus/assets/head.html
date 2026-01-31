@@ -363,4 +363,277 @@ function scrollCursorIntoView() {
         font-weight: 600;
         font-size: 14px;
     }
+
+    /* Diagnostic gutter (for severity icons) */
+    .diagnostic-gutter {
+        padding: 8px 4px 8px 4px;
+        background-color: #21252b;
+        user-select: none;
+        min-width: 20px;
+        text-align: center;
+    }
+
+    .diagnostic-gutter-line {
+        height: 1.5em;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .diagnostic-marker {
+        font-weight: bold;
+        font-size: 12px;
+    }
+
+    /* Error Lens (inline diagnostic messages) */
+    .error-lens {
+        font-style: italic;
+        font-size: 12px;
+        margin-left: 2em;
+        opacity: 0.8;
+    }
+
+    /* Diagnostic underlines */
+    .diagnostic-underline {
+        position: absolute;
+        bottom: 0;
+        height: 0;
+        pointer-events: none;
+    }
+
+    /* Completion popup */
+    .completion-popup {
+        position: fixed;
+        background-color: #21252b;
+        border: 1px solid #3e4451;
+        border-radius: 4px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        max-height: 300px;
+        min-width: 250px;
+        max-width: 500px;
+        overflow-y: auto;
+        z-index: 200;
+    }
+
+    .completion-item {
+        padding: 4px 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+    }
+
+    .completion-item-selected {
+        background-color: #3e4451;
+    }
+
+    .completion-item-kind {
+        font-size: 10px;
+        padding: 2px 4px;
+        border-radius: 2px;
+        background-color: #3e4451;
+        min-width: 24px;
+        text-align: center;
+    }
+
+    .completion-item-label {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .completion-item-detail {
+        color: #5c6370;
+        font-size: 12px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 200px;
+    }
+
+    .completion-item-deprecated {
+        text-decoration: line-through;
+        opacity: 0.6;
+    }
+
+    /* Hover popup */
+    .hover-popup {
+        position: fixed;
+        background-color: #21252b;
+        border: 1px solid #3e4451;
+        border-radius: 4px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        padding: 8px 12px;
+        max-width: 600px;
+        max-height: 400px;
+        overflow-y: auto;
+        z-index: 200;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .hover-popup code {
+        background-color: #282c34;
+        padding: 2px 4px;
+        border-radius: 2px;
+    }
+
+    .hover-popup pre {
+        background-color: #282c34;
+        padding: 8px;
+        border-radius: 4px;
+        overflow-x: auto;
+        margin: 8px 0;
+    }
+
+    /* Signature help popup */
+    .signature-help-popup {
+        position: fixed;
+        background-color: #21252b;
+        border: 1px solid #3e4451;
+        border-radius: 4px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        padding: 8px 12px;
+        max-width: 600px;
+        z-index: 200;
+        font-size: 13px;
+    }
+
+    .signature-label {
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .signature-param-active {
+        color: #e5c07b;
+        font-weight: bold;
+    }
+
+    .signature-docs {
+        margin-top: 8px;
+        color: #5c6370;
+        font-size: 12px;
+    }
+
+    /* Inlay hints */
+    .inlay-hint {
+        color: #5c6370;
+        font-style: italic;
+        font-size: 12px;
+        opacity: 0.7;
+    }
+
+    .inlay-hint-type {
+        color: #61afef;
+    }
+
+    .inlay-hint-param {
+        color: #d19a66;
+    }
+
+    /* Code actions menu */
+    .code-actions-menu {
+        position: fixed;
+        background-color: #21252b;
+        border: 1px solid #3e4451;
+        border-radius: 4px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        min-width: 200px;
+        max-width: 400px;
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 200;
+    }
+
+    .code-action-item {
+        padding: 6px 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .code-action-item-selected {
+        background-color: #3e4451;
+    }
+
+    .code-action-title {
+        flex: 1;
+    }
+
+    .code-action-preferred {
+        color: #e5c07b;
+    }
+
+    .code-action-disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* Location picker */
+    .location-picker-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        padding-top: 80px;
+        z-index: 100;
+    }
+
+    .location-picker-container {
+        background-color: #21252b;
+        border: 1px solid #3e4451;
+        border-radius: 6px;
+        width: 600px;
+        max-height: 450px;
+        overflow: hidden;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .location-picker-header {
+        padding: 12px;
+        border-bottom: 1px solid #3e4451;
+        font-weight: 500;
+    }
+
+    .location-picker-list {
+        overflow-y: auto;
+        max-height: 380px;
+    }
+
+    .location-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        border-bottom: 1px solid #2c313a;
+    }
+
+    .location-item-selected {
+        background-color: #3e4451;
+    }
+
+    .location-path {
+        color: #61afef;
+        font-size: 13px;
+    }
+
+    .location-position {
+        color: #5c6370;
+        font-size: 11px;
+        margin-left: 8px;
+    }
+
+    .location-preview {
+        color: #abb2bf;
+        font-size: 12px;
+        margin-top: 4px;
+        font-family: 'JetBrains Mono', monospace;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
 </style>

@@ -4,6 +4,10 @@
 
 use dioxus::prelude::*;
 
+use crate::components::{
+    first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker, ErrorLens,
+};
+use crate::lsp::DiagnosticSnapshot;
 use crate::state::{LineSnapshot, TokenSpan};
 use crate::AppState;
 
@@ -17,6 +21,7 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
     let snapshot = app_state.get_snapshot();
 
     let mode = &snapshot.mode;
+    let diagnostics = &snapshot.diagnostics;
 
     // Scroll cursor into view after each render when version changes
     use_effect(move || {
@@ -28,6 +33,27 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
     rsx! {
         div {
             class: "editor-view",
+
+            // Diagnostic gutter (for severity icons)
+            div {
+                class: "diagnostic-gutter",
+                for line in &snapshot.lines {
+                    {
+                        let line_num = line.line_number;
+                        let severity = highest_severity_for_line(diagnostics, line_num);
+                        let key = format!("diag-{}-{}", line_num, version);
+                        rsx! {
+                            div {
+                                key: "{key}",
+                                class: "diagnostic-gutter-line",
+                                if let Some(sev) = severity {
+                                    DiagnosticMarker { severity: sev }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             // Line numbers gutter
             div {
@@ -56,12 +82,15 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                     // Include version and selection state in key to force re-render
                     {
                         let has_sel = line.selection_range.is_some();
-                        let key = format!("{}-{}-{}", line.line_number, version, has_sel);
+                        let line_num = line.line_number;
+                        let line_diag = first_diagnostic_for_line(diagnostics, line_num).cloned();
+                        let key = format!("{}-{}-{}", line_num, version, has_sel);
                         rsx! {
                             Line {
                                 key: "{key}",
                                 line: line.clone(),
                                 mode: mode.clone(),
+                                diagnostic: line_diag,
                             }
                         }
                     }
@@ -73,7 +102,7 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
 
 /// Individual line component with cursor and syntax highlighting rendering.
 #[component]
-fn Line(line: LineSnapshot, mode: String) -> Element {
+fn Line(line: LineSnapshot, mode: String, diagnostic: Option<DiagnosticSnapshot>) -> Element {
     // Remove trailing newline for display
     let display_content = line.content.trim_end_matches('\n');
     let chars: Vec<char> = display_content.chars().collect();
@@ -109,6 +138,10 @@ fn Line(line: LineSnapshot, mode: String) -> Element {
         div {
             class: "{line_class}",
             {render_styled_content(&chars, &line.tokens, cursor_pos, cursor_style, line.selection_range)}
+            // Error Lens: Show diagnostic message at end of line
+            if let Some(diag) = diagnostic {
+                ErrorLens { diagnostic: diag }
+            }
         }
     }
 }

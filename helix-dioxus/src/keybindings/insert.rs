@@ -13,7 +13,11 @@ pub fn handle_insert_mode(key: &KeyEvent) -> Vec<EditorCommand> {
 
     // Handle control key combinations
     if key.modifiers.contains(KeyModifiers::CONTROL) {
-        return vec![];
+        return match key.code {
+            // Ctrl+Space - trigger completion
+            KeyCode::Char(' ') => vec![EditorCommand::TriggerCompletion],
+            _ => vec![],
+        };
     }
 
     match key.code {
