@@ -83,6 +83,72 @@ From GitHub discussions and helix-gpui analysis:
 
 ---
 
+## 2026-01-31: File Picker and Lucide Icons
+
+### Progress
+- Implemented file picker command (`:o` / `:open`)
+  - Modal overlay with file listing from working directory
+  - j/k navigation with selection highlighting
+  - Enter to open file, Esc to cancel
+  - Visual scrolling window for large file lists (15 items visible)
+- Added command mode prompt component
+  - Triggered by `:` key in normal mode
+  - Text input with command parsing
+- Replaced emoji icons with Lucide SVG icons
+  - Added `lucide-dioxus` dependency
+  - Folder/File icons for directory/file entries
+  - ChevronRight icon for selection indicator
+  - Fixed row height consistency
+
+### Files Created/Modified
+- `src/picker.rs` - File picker component with Lucide icons
+- `src/prompt.rs` - Command mode prompt component
+- `src/app.rs` - Integrated picker and prompt into main app
+- `src/state.rs` - Added picker state management
+- `Cargo.toml` - Added lucide-dioxus dependency
+
+### Technical Notes
+- Used opacity toggle for selection indicator to maintain consistent row heights
+- Directories detected by trailing `/` in path
+- File listing uses `std::fs::read_dir` sorted alphabetically with directories first
+
+### Next Steps
+1. Add fuzzy search/filtering to file picker
+2. Support relative path navigation (entering directories)
+3. Add syntax highlighting to editor view
+4. Implement save functionality (`:w` command)
+5. Add `:q` quit command
+6. Improve scrolling and viewport management
+
+---
+
+## 2026-01-31: File Picker UI Polish
+
+### Progress
+- Fixed dialog position to top (no more jumping during filtering)
+  - Changed from vertically centered to `align-items: flex-start` with `padding-top: 80px`
+- Reduced padding throughout the picker for a tighter UI
+  - Header padding: 0
+  - Search box padding: `6px 8px` (was `8px 12px`)
+  - Help row padding: `2px`
+  - Result item padding: `6px 8px` (was `8px 16px`)
+- Added `<kbd>` elements for keyboard shortcuts in help text
+  - Styled with darker background (`#3e4451`) and rounded corners
+- Added "filtered / total" count on help line (right-aligned)
+  - Shows e.g. "15 / 42" when filtering
+- Added `picker_total` field to `EditorSnapshot` for tracking total items
+
+### Files Modified
+- `src/state.rs` - Added `picker_total` field to snapshot
+- `src/app.rs` - Pass `total` prop to FilePicker
+- `src/picker.rs` - All UI polish changes
+
+### Technical Notes
+- The fixed position prevents the dialog from jumping when the filtered result count changes
+- kbd styling uses `font-family: inherit` to match the rest of the UI
+
+---
+
 ## Template for Future Entries
 
 ```markdown

@@ -87,8 +87,10 @@ pub fn App() -> Element {
             // File picker overlay (shown when picker is visible)
             if snapshot.picker_visible {
                 FilePicker {
-                    items: snapshot.picker_items.clone(),
+                    items: snapshot.picker_filtered.clone(),
                     selected: snapshot.picker_selected,
+                    filter: snapshot.picker_filter.clone(),
+                    total: snapshot.picker_total,
                 }
             }
         }
@@ -188,13 +190,24 @@ fn handle_command_mode(key: &helix_view::input::KeyEvent) -> Vec<EditorCommand> 
 
 /// Handle keyboard input in File picker mode.
 fn handle_picker_mode(key: &helix_view::input::KeyEvent) -> Vec<EditorCommand> {
-    use helix_view::input::KeyCode;
+    use helix_view::input::{KeyCode, KeyModifiers};
+
+    // Ctrl+n/p for navigation (like many fuzzy finders)
+    if key.modifiers.contains(KeyModifiers::CONTROL) {
+        return match key.code {
+            KeyCode::Char('n') => vec![EditorCommand::PickerDown],
+            KeyCode::Char('p') => vec![EditorCommand::PickerUp],
+            _ => vec![],
+        };
+    }
 
     match key.code {
         KeyCode::Esc => vec![EditorCommand::PickerCancel],
         KeyCode::Enter => vec![EditorCommand::PickerConfirm],
-        KeyCode::Char('j') | KeyCode::Down => vec![EditorCommand::PickerDown],
-        KeyCode::Char('k') | KeyCode::Up => vec![EditorCommand::PickerUp],
+        KeyCode::Down => vec![EditorCommand::PickerDown],
+        KeyCode::Up => vec![EditorCommand::PickerUp],
+        KeyCode::Backspace => vec![EditorCommand::PickerBackspace],
+        KeyCode::Char(c) => vec![EditorCommand::PickerInput(c)],
         _ => vec![],
     }
 }

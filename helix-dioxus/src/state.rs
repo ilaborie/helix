@@ -64,6 +64,8 @@ pub enum EditorCommand {
     PickerDown,
     PickerConfirm,
     PickerCancel,
+    PickerInput(char),
+    PickerBackspace,
 
     // File operations
     OpenFile(PathBuf),
@@ -87,7 +89,10 @@ pub struct EditorSnapshot {
     pub command_input: String,
     pub picker_visible: bool,
     pub picker_items: Vec<String>,
+    pub picker_filtered: Vec<String>,
+    pub picker_filter: String,
     pub picker_selected: usize,
+    pub picker_total: usize,
 }
 
 /// Snapshot of a single line for rendering.
@@ -109,6 +114,7 @@ pub struct EditorContext {
     command_input: String,
     picker_visible: bool,
     picker_items: Vec<String>,
+    picker_filter: String,
     picker_selected: usize,
 }
 
@@ -158,6 +164,7 @@ impl EditorContext {
             command_input: String::new(),
             picker_visible: false,
             picker_items: Vec::new(),
+            picker_filter: String::new(),
             picker_selected: 0,
         })
     }
@@ -242,7 +249,8 @@ impl EditorContext {
                 }
             }
             EditorCommand::PickerDown => {
-                if self.picker_selected + 1 < self.picker_items.len() {
+                let filtered_len = self.filtered_picker_items().len();
+                if self.picker_selected + 1 < filtered_len {
                     self.picker_selected += 1;
                 }
             }
@@ -252,6 +260,15 @@ impl EditorContext {
             EditorCommand::PickerCancel => {
                 self.picker_visible = false;
                 self.picker_items.clear();
+                self.picker_filter.clear();
+                self.picker_selected = 0;
+            }
+            EditorCommand::PickerInput(c) => {
+                self.picker_filter.push(c);
+                self.picker_selected = 0;
+            }
+            EditorCommand::PickerBackspace => {
+                self.picker_filter.pop();
                 self.picker_selected = 0;
             }
 
@@ -346,13 +363,28 @@ impl EditorContext {
         });
 
         self.picker_items = items;
+        self.picker_filter.clear();
         self.picker_selected = 0;
         self.picker_visible = true;
     }
 
+    /// Get filtered picker items based on current filter.
+    fn filtered_picker_items(&self) -> Vec<String> {
+        if self.picker_filter.is_empty() {
+            return self.picker_items.clone();
+        }
+
+        self.picker_items
+            .iter()
+            .filter(|item| fuzzy_match(item, &self.picker_filter))
+            .cloned()
+            .collect()
+    }
+
     /// Confirm the current picker selection.
     fn picker_confirm(&mut self) {
-        if let Some(selected) = self.picker_items.get(self.picker_selected).cloned() {
+        let filtered = self.filtered_picker_items();
+        if let Some(selected) = filtered.get(self.picker_selected).cloned() {
             let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
             if selected.ends_with('/') {
@@ -373,6 +405,7 @@ impl EditorContext {
 
         self.picker_visible = false;
         self.picker_items.clear();
+        self.picker_filter.clear();
         self.picker_selected = 0;
     }
 
@@ -461,7 +494,10 @@ impl EditorContext {
             command_input: self.command_input.clone(),
             picker_visible: self.picker_visible,
             picker_items: self.picker_items.clone(),
+            picker_filtered: self.filtered_picker_items(),
+            picker_filter: self.picker_filter.clone(),
             picker_selected: self.picker_selected,
+            picker_total: self.picker_items.len(),
         }
     }
 
@@ -727,6 +763,26 @@ enum Direction {
     Right,
     Up,
     Down,
+}
+
+/// Fuzzy match: check if all characters in `pattern` appear in order in `text`.
+/// Case-insensitive matching.
+fn fuzzy_match(text: &str, pattern: &str) -> bool {
+    let text_lower = text.to_lowercase();
+    let pattern_lower = pattern.to_lowercase();
+
+    let mut pattern_chars = pattern_lower.chars().peekable();
+
+    for c in text_lower.chars() {
+        if pattern_chars.peek() == Some(&c) {
+            pattern_chars.next();
+        }
+        if pattern_chars.peek().is_none() {
+            return true;
+        }
+    }
+
+    pattern_chars.peek().is_none()
 }
 
 /// Create dummy handlers for initialization.

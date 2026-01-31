@@ -3,11 +3,11 @@
 //! Displays a modal file list with selection highlighting and keyboard navigation.
 
 use dioxus::prelude::*;
-use lucide_dioxus::{ChevronRight, File, Folder};
+use lucide_dioxus::{ChevronRight, File, Folder, Search};
 
 /// File picker component that displays a scrollable list of files.
 #[component]
-pub fn FilePicker(items: Vec<String>, selected: usize) -> Element {
+pub fn FilePicker(items: Vec<String>, selected: usize, filter: String, total: usize) -> Element {
     // Calculate visible window (show 15 items max, centered on selection)
     let window_size = 15usize;
     let half_window = window_size / 2;
@@ -27,6 +27,8 @@ pub fn FilePicker(items: Vec<String>, selected: usize) -> Element {
         .map(|(i, item)| (start + i, item))
         .collect();
 
+    let filtered_count = items.len();
+
     rsx! {
         // Overlay backdrop
         div {
@@ -40,7 +42,8 @@ pub fn FilePicker(items: Vec<String>, selected: usize) -> Element {
                 background-color: rgba(0, 0, 0, 0.5);
                 display: flex;
                 justify-content: center;
-                align-items: center;
+                align-items: flex-start;
+                padding-top: 80px;
                 z-index: 100;
             ",
 
@@ -57,23 +60,93 @@ pub fn FilePicker(items: Vec<String>, selected: usize) -> Element {
                     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
                 ",
 
-                // Header
+                // Header with search input
                 div {
                     class: "picker-header",
                     style: "
-                        padding: 12px 16px;
+                        padding: 0;
                         border-bottom: 1px solid #3e4451;
-                        font-size: 14px;
-                        color: #abb2bf;
                     ",
-                    "Open file"
-                    span {
+
+                    // Search input display
+                    div {
                         style: "
-                            margin-left: 8px;
-                            color: #5c6370;
-                            font-size: 12px;
+                            display: flex;
+                            align-items: center;
+                            background-color: #282c34;
+                            border: 1px solid #3e4451;
+                            border-radius: 4px;
+                            padding: 6px 8px;
+                            margin-bottom: 4px;
                         ",
-                        "(j/k to navigate, Enter to open, Esc to cancel)"
+                        span {
+                            style: "width: 16px; height: 16px; margin-right: 8px; display: flex; align-items: center; color: #5c6370;",
+                            Search { size: 16, color: "#5c6370" }
+                        }
+                        span {
+                            style: "
+                                color: #abb2bf;
+                                font-size: 14px;
+                                flex: 1;
+                            ",
+                            if filter.is_empty() {
+                                span {
+                                    style: "color: #5c6370;",
+                                    "Type to filter..."
+                                }
+                            } else {
+                                "{filter}"
+                            }
+                        }
+                    }
+
+                    // Help text row with count
+                    div {
+                        style: "display: flex; justify-content: space-between; align-items: center; padding: 2px;",
+
+                        // Left: help text with kbd elements
+                        span {
+                            style: "color: #5c6370; font-size: 12px;",
+                            kbd {
+                                style: "
+                                    background-color: #3e4451;
+                                    border-radius: 3px;
+                                    padding: 2px 5px;
+                                    font-family: inherit;
+                                    font-size: 11px;
+                                ",
+                                "\u{2191}\u{2193}"
+                            }
+                            " navigate \u{2022} "
+                            kbd {
+                                style: "
+                                    background-color: #3e4451;
+                                    border-radius: 3px;
+                                    padding: 2px 5px;
+                                    font-family: inherit;
+                                    font-size: 11px;
+                                ",
+                                "Enter"
+                            }
+                            " open \u{2022} "
+                            kbd {
+                                style: "
+                                    background-color: #3e4451;
+                                    border-radius: 3px;
+                                    padding: 2px 5px;
+                                    font-family: inherit;
+                                    font-size: 11px;
+                                ",
+                                "Esc"
+                            }
+                            " cancel"
+                        }
+
+                        // Right: count
+                        span {
+                            style: "color: #5c6370; font-size: 12px;",
+                            "{filtered_count} / {total}"
+                        }
                     }
                 }
 
@@ -131,7 +204,7 @@ fn PickerItem(name: String, is_selected: bool, is_directory: bool) -> Element {
         div {
             class: "picker-item",
             style: "
-                padding: 8px 16px;
+                padding: 6px 8px;
                 background-color: {bg_color};
                 display: flex;
                 align-items: center;
