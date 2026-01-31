@@ -139,6 +139,9 @@ fn handle_normal_mode(key: &helix_view::input::KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('u') => vec![EditorCommand::Undo],
         KeyCode::Char('U') => vec![EditorCommand::Redo], // Shift+U also redoes (helix convention)
 
+        // Visual selection mode
+        KeyCode::Char('v') => vec![EditorCommand::EnterSelectMode],
+
         // Command mode
         KeyCode::Char(':') => vec![EditorCommand::EnterCommandMode],
 
@@ -178,11 +181,23 @@ fn handle_select_mode(key: &helix_view::input::KeyEvent) -> Vec<EditorCommand> {
     use helix_view::input::KeyCode;
 
     match key.code {
-        KeyCode::Esc => vec![EditorCommand::ExitInsertMode], // Also exits select mode
+        // Exit select mode
+        KeyCode::Esc => vec![EditorCommand::ExitSelectMode],
+
+        // Character movement - extends selection
         KeyCode::Char('h') | KeyCode::Left => vec![EditorCommand::ExtendLeft],
         KeyCode::Char('l') | KeyCode::Right => vec![EditorCommand::ExtendRight],
         KeyCode::Char('j') | KeyCode::Down => vec![EditorCommand::ExtendDown],
         KeyCode::Char('k') | KeyCode::Up => vec![EditorCommand::ExtendUp],
+
+        // Word movement - extends selection
+        KeyCode::Char('w') => vec![EditorCommand::ExtendWordForward],
+        KeyCode::Char('b') => vec![EditorCommand::ExtendWordBackward],
+
+        // Line movement - extends selection
+        KeyCode::Char('0') | KeyCode::Home => vec![EditorCommand::ExtendLineStart],
+        KeyCode::Char('$') | KeyCode::End => vec![EditorCommand::ExtendLineEnd],
+
         _ => vec![],
     }
 }

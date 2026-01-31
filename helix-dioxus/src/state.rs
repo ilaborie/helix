@@ -36,6 +36,8 @@ pub enum EditorCommand {
     EnterInsertModeAfter,
     EnterInsertModeLineEnd,
     ExitInsertMode,
+    EnterSelectMode,
+    ExitSelectMode,
 
     // Editing
     InsertChar(char),
@@ -54,6 +56,10 @@ pub enum EditorCommand {
     ExtendRight,
     ExtendUp,
     ExtendDown,
+    ExtendWordForward,
+    ExtendWordBackward,
+    ExtendLineStart,
+    ExtendLineEnd,
 
     // Command mode
     EnterCommandMode,
@@ -110,6 +116,9 @@ pub struct LineSnapshot {
     pub is_cursor_line: bool,
     pub cursor_col: Option<usize>,
     pub tokens: Vec<TokenSpan>,
+    /// Selection range within this line (start_col, end_col) - for visual mode highlighting.
+    /// If Some, the range [start, end) should be highlighted as selected.
+    pub selection_range: Option<(usize, usize)>,
 }
 
 /// A span of text with a specific color for syntax highlighting.
@@ -235,6 +244,8 @@ impl EditorContext {
                 self.set_mode(Mode::Insert);
             }
             EditorCommand::ExitInsertMode => self.set_mode(Mode::Normal),
+            EditorCommand::EnterSelectMode => self.set_mode(Mode::Select),
+            EditorCommand::ExitSelectMode => self.set_mode(Mode::Normal),
             EditorCommand::InsertChar(c) => self.insert_char(doc_id, view_id, c),
             EditorCommand::InsertNewline => self.insert_char(doc_id, view_id, '\n'),
             EditorCommand::DeleteCharBackward => self.delete_char_backward(doc_id, view_id),
@@ -251,6 +262,10 @@ impl EditorContext {
             EditorCommand::ExtendRight => self.extend_selection(doc_id, view_id, Direction::Right),
             EditorCommand::ExtendUp => self.extend_selection(doc_id, view_id, Direction::Up),
             EditorCommand::ExtendDown => self.extend_selection(doc_id, view_id, Direction::Down),
+            EditorCommand::ExtendWordForward => self.extend_word_forward(doc_id, view_id),
+            EditorCommand::ExtendWordBackward => self.extend_word_backward(doc_id, view_id),
+            EditorCommand::ExtendLineStart => self.extend_line_start(doc_id, view_id),
+            EditorCommand::ExtendLineEnd => self.extend_line_end(doc_id, view_id),
 
             // History
             EditorCommand::Undo => self.undo(doc_id, view_id),
@@ -595,6 +610,12 @@ impl EditorContext {
         // Compute syntax highlighting tokens for visible lines
         let line_tokens = self.compute_syntax_tokens(doc, visible_start, visible_end);
 
+        // Get selection range for highlighting in select mode
+        let primary_range = selection.primary();
+        let sel_start = primary_range.from();
+        let sel_end = primary_range.to();
+        let is_select_mode = matches!(self.editor.mode(), Mode::Select);
+
         let lines: Vec<LineSnapshot> = (visible_start..visible_end)
             .enumerate()
             .map(|(idx, line_idx)| {
@@ -606,12 +627,35 @@ impl EditorContext {
                     None
                 };
 
+                // Calculate selection range within this line
+                let selection_range = if is_select_mode {
+                    let line_start_char = text.line_to_char(line_idx);
+                    let line_len = text.line(line_idx).len_chars().saturating_sub(1); // Exclude newline
+                    let line_end_char = line_start_char + line_len;
+
+                    // Check if selection overlaps this line
+                    if sel_end > line_start_char && sel_start < line_end_char {
+                        let range_start = sel_start.saturating_sub(line_start_char).max(0);
+                        let range_end = (sel_end - line_start_char).min(line_len);
+                        if range_start < range_end {
+                            Some((range_start, range_end))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
                 LineSnapshot {
                     line_number: line_idx + 1,
                     content: line_content,
                     is_cursor_line,
                     cursor_col: cursor_col_opt,
                     tokens: line_tokens.get(idx).cloned().unwrap_or_default(),
+                    selection_range,
                 }
             })
             .collect();
@@ -1039,6 +1083,64 @@ impl EditorContext {
         if !doc.redo(view) {
             log::info!("Already at newest change");
         }
+    }
+
+    fn extend_word_forward(&mut self, doc_id: helix_view::DocumentId, view_id: helix_view::ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection.transform(|range| {
+            let new_range = helix_core::movement::move_next_word_start(text, range, 1);
+            helix_core::Range::new(range.anchor, new_range.head)
+        });
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    fn extend_word_backward(
+        &mut self,
+        doc_id: helix_view::DocumentId,
+        view_id: helix_view::ViewId,
+    ) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection.transform(|range| {
+            let new_range = helix_core::movement::move_prev_word_start(text, range, 1);
+            helix_core::Range::new(range.anchor, new_range.head)
+        });
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    fn extend_line_start(&mut self, doc_id: helix_view::DocumentId, view_id: helix_view::ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection.transform(|range| {
+            let line = text.char_to_line(range.head);
+            let line_start = text.line_to_char(line);
+            helix_core::Range::new(range.anchor, line_start)
+        });
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    fn extend_line_end(&mut self, doc_id: helix_view::DocumentId, view_id: helix_view::ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection.transform(|range| {
+            let line = text.char_to_line(range.head);
+            let line_end = text.line_to_char(line) + text.line(line).len_chars().saturating_sub(1);
+            helix_core::Range::new(range.anchor, line_end.max(text.line_to_char(line)))
+        });
+
+        doc.set_selection(view_id, new_selection);
     }
 }
 

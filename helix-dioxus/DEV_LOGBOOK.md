@@ -263,6 +263,44 @@ Helix's undo/redo is transaction-based. Each edit operation creates a transactio
 
 ---
 
+## 2026-01-31: Visual Selection Mode
+
+### Progress
+- Implemented visual selection mode (`v` key from normal mode)
+- Selection extends with movement keys while preserving anchor point
+- Selection is visually highlighted with background color
+
+### Implementation
+- Added `v` key binding in normal mode to enter select mode
+- Updated `handle_select_mode()` with full key bindings:
+  - `Esc` - Exit select mode (returns to normal mode)
+  - `h/j/k/l` or arrow keys - Extend selection by character/line
+  - `w/b` - Extend selection by word forward/backward
+  - `0/$` or Home/End - Extend selection to line start/end
+- Added `selection_range` field to `LineSnapshot` to track selection bounds per line
+- Updated `render_styled_content()` to render selection highlighting with background color
+
+### Files Modified
+- `src/app.rs` - Added `v` binding in normal mode, expanded `handle_select_mode()`
+- `src/state.rs` - Added `selection_range` to `LineSnapshot`, computed in `snapshot()`
+- `src/editor_view.rs` - Selection highlighting in `render_styled_content()`
+
+### Technical Notes
+- Selection uses helix's `Range` with anchor (start point) and head (cursor/end point)
+- `primary_range.from()` and `primary_range.to()` give ordered start/end positions
+- Selection highlighting uses `#3e4451` background color (One Dark selection)
+- Cursor position is always visible on top of selection highlighting
+
+### Next Steps
+1. Add search functionality (`/`, `?`, `n`, `N`)
+2. Support yank/paste operations in select mode (`y`, `p`)
+3. Support delete in select mode (`d`)
+4. Support multiple buffers/splits
+5. Add LSP integration for diagnostics and completions
+6. Improve scrolling with mouse wheel support
+
+---
+
 ## Template for Future Entries
 
 ```markdown

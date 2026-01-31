@@ -92,22 +92,23 @@ fn Line(line: LineSnapshot, mode: String) -> Element {
         None
     };
 
-    // Render the line content with tokens and cursor
+    // Render the line content with tokens, cursor, and selection
     rsx! {
         div {
             class: "line",
             style: "{line_style}",
-            {render_styled_content(&chars, &line.tokens, cursor_pos, cursor_style)}
+            {render_styled_content(&chars, &line.tokens, cursor_pos, cursor_style, line.selection_range)}
         }
     }
 }
 
-/// Render content with syntax highlighting tokens and optional cursor.
+/// Render content with syntax highlighting tokens, optional cursor, and selection.
 fn render_styled_content(
     chars: &[char],
     tokens: &[crate::state::TokenSpan],
     cursor_pos: Option<usize>,
     cursor_style: &str,
+    selection_range: Option<(usize, usize)>,
 ) -> Element {
     // Build a list of spans to render
     let mut spans: Vec<Element> = Vec::new();
@@ -121,7 +122,7 @@ fn render_styled_content(
     let mut token_idx = 0;
 
     while pos <= len {
-        // Find the next boundary (token start, token end, cursor, or end of line)
+        // Find the next boundary (token start, token end, cursor, selection bounds, or end of line)
         let mut next_pos = len;
 
         // Check for token boundaries
@@ -144,6 +145,16 @@ fn render_styled_content(
             }
         }
 
+        // Check for selection boundaries
+        if let Some((sel_start, sel_end)) = selection_range {
+            if sel_start > pos && sel_start < next_pos {
+                next_pos = sel_start;
+            }
+            if sel_end > pos && sel_end < next_pos {
+                next_pos = sel_end;
+            }
+        }
+
         if next_pos == pos {
             if pos >= len {
                 break;
@@ -157,6 +168,11 @@ fn render_styled_content(
         // Determine if this is the cursor position
         let is_cursor = cursor_pos == Some(pos);
 
+        // Determine if this position is within the selection
+        let is_selected = selection_range
+            .map(|(start, end)| pos >= start && pos < end)
+            .unwrap_or(false);
+
         // Build the text content for this span
         let text: String = chars[pos..next_pos.min(len)].iter().collect();
         let text = if text.is_empty() && is_cursor {
@@ -167,6 +183,12 @@ fn render_styled_content(
 
         // Build style string
         let mut style = String::new();
+
+        // Selection background (applied first, so cursor can override)
+        if is_selected && !is_cursor {
+            style.push_str("background-color: #3e4451;");
+        }
+
         if let Some(token) = active_token {
             style.push_str(&format!("color: {};", token.color));
         }
