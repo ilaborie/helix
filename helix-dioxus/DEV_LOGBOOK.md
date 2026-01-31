@@ -209,6 +209,34 @@ Key insight: The `highlights` iterator from `highlighter.advance()` is only popu
 
 ---
 
+## 2026-01-31: Fix Viewport Scrolling
+
+### Progress
+- Fixed viewport not scrolling when cursor moves off-screen
+- Added `ensure_cursor_in_view()` call after processing commands
+
+### Issue
+When moving the cursor with j/k beyond the visible viewport, the view didn't scroll to follow the cursor. The cursor would move off-screen and become invisible.
+
+### Solution
+Added a call to `self.editor.ensure_cursor_in_view(view_id)` at the end of `process_commands()`. This uses helix-view's built-in viewport management that:
+1. Gets the current scrolloff config
+2. Calculates if the cursor is outside the visible area
+3. Updates the document's view_offset to keep the cursor visible
+
+### Files Modified
+- `src/state.rs` - Added ensure_cursor_in_view call in process_commands()
+
+### Technical Notes
+The `Editor::ensure_cursor_in_view(view_id)` method internally:
+1. Gets the View and Document
+2. Calls `view.ensure_cursor_in_view(doc, config.scrolloff)`
+3. Which updates `doc.set_view_offset()` if needed
+
+This is the same pattern used throughout helix-term after cursor movements.
+
+---
+
 ## Template for Future Entries
 
 ```markdown

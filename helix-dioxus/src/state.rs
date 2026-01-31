@@ -198,6 +198,10 @@ impl EditorContext {
         while let Ok(cmd) = self.command_rx.try_recv() {
             self.handle_command(cmd);
         }
+
+        // Ensure cursor stays visible in viewport after any cursor movements
+        let view_id = self.editor.tree.focus;
+        self.editor.ensure_cursor_in_view(view_id);
     }
 
     /// Handle a single command.
