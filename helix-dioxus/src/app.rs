@@ -99,7 +99,15 @@ pub fn App() -> Element {
 
 /// Handle keyboard input in Normal mode.
 fn handle_normal_mode(key: &helix_view::input::KeyEvent) -> Vec<EditorCommand> {
-    use helix_view::input::KeyCode;
+    use helix_view::input::{KeyCode, KeyModifiers};
+
+    // Handle Ctrl+key combinations first
+    if key.modifiers.contains(KeyModifiers::CONTROL) {
+        return match key.code {
+            KeyCode::Char('r') => vec![EditorCommand::Redo],
+            _ => vec![],
+        };
+    }
 
     match key.code {
         // Movement
@@ -126,6 +134,10 @@ fn handle_normal_mode(key: &helix_view::input::KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('A') => vec![EditorCommand::EnterInsertModeLineEnd],
         KeyCode::Char('o') => vec![EditorCommand::OpenLineBelow],
         KeyCode::Char('O') => vec![EditorCommand::OpenLineAbove],
+
+        // History
+        KeyCode::Char('u') => vec![EditorCommand::Undo],
+        KeyCode::Char('U') => vec![EditorCommand::Redo], // Shift+U also redoes (helix convention)
 
         // Command mode
         KeyCode::Char(':') => vec![EditorCommand::EnterCommandMode],

@@ -237,6 +237,32 @@ This is the same pattern used throughout helix-term after cursor movements.
 
 ---
 
+## 2026-01-31: Undo/Redo Support
+
+### Progress
+- Added undo (`u`) and redo (`Ctrl+r`, `U`) commands
+- Uses helix's built-in document history system
+
+### Implementation
+- Added `Undo` and `Redo` variants to `EditorCommand` enum
+- Implemented `undo()` and `redo()` methods calling `doc.undo(view)` / `doc.redo(view)`
+- Added keyboard bindings:
+  - `u` - Undo
+  - `U` (Shift+U) - Redo
+  - `Ctrl+r` - Redo
+
+### Files Modified
+- `src/state.rs` - Added Undo/Redo commands and handler methods
+- `src/app.rs` - Added keyboard bindings for u, U, and Ctrl+r
+
+### Technical Notes
+Helix's undo/redo is transaction-based. Each edit operation creates a transaction that gets recorded in the document's history. The `doc.undo(view)` and `doc.redo(view)` methods handle:
+- Reverting/replaying the transaction
+- Restoring cursor position
+- Updating the document state
+
+---
+
 ## Template for Future Entries
 
 ```markdown

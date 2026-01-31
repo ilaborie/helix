@@ -45,6 +45,10 @@ pub enum EditorCommand {
     OpenLineBelow,
     OpenLineAbove,
 
+    // History
+    Undo,
+    Redo,
+
     // Selection
     ExtendLeft,
     ExtendRight,
@@ -247,6 +251,10 @@ impl EditorContext {
             EditorCommand::ExtendRight => self.extend_selection(doc_id, view_id, Direction::Right),
             EditorCommand::ExtendUp => self.extend_selection(doc_id, view_id, Direction::Up),
             EditorCommand::ExtendDown => self.extend_selection(doc_id, view_id, Direction::Down),
+
+            // History
+            EditorCommand::Undo => self.undo(doc_id, view_id),
+            EditorCommand::Redo => self.redo(doc_id, view_id),
 
             // Command mode
             EditorCommand::EnterCommandMode => {
@@ -1015,6 +1023,22 @@ impl EditorContext {
 
         // Move cursor to the new empty line
         doc.set_selection(view_id, helix_core::Selection::point(line_start));
+    }
+
+    fn undo(&mut self, doc_id: helix_view::DocumentId, view_id: helix_view::ViewId) {
+        let view = self.editor.tree.get_mut(view_id);
+        let doc = self.editor.documents.get_mut(&doc_id).expect("doc exists");
+        if !doc.undo(view) {
+            log::info!("Already at oldest change");
+        }
+    }
+
+    fn redo(&mut self, doc_id: helix_view::DocumentId, view_id: helix_view::ViewId) {
+        let view = self.editor.tree.get_mut(view_id);
+        let doc = self.editor.documents.get_mut(&doc_id).expect("doc exists");
+        if !doc.redo(view) {
+            log::info!("Already at newest change");
+        }
     }
 }
 
