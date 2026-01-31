@@ -1,0 +1,49 @@
+[package]
+name = "helix-dioxus"
+description = "Dioxus-based GUI frontend for Helix editor"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+categories.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[[bin]]
+name = "hx-dioxus"
+path = "src/main.rs"
+
+[features]
+default = []
+
+[dependencies]
+helix-stdx = { path = "../helix-stdx" }
+helix-core = { path = "../helix-core" }
+helix-event = { path = "../helix-event" }
+helix-view = { path = "../helix-view" }
+helix-lsp = { path = "../helix-lsp" }
+helix-loader = { path = "../helix-loader" }
+
+# Dioxus for GUI
+dioxus = { version = "0.6", features = ["desktop"] }
+
+# Async runtime
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "macros"] }
+
+# Logging
+log = "0.4"
+fern = "0.7"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+
+# Error handling
+anyhow = "1"
+thiserror.workspace = true
+
+# Utilities
+once_cell = "1.21"
+arc-swap = "1.8.0"
+parking_lot.workspace = true
+
+[build-dependencies]
+helix-loader = { path = "../helix-loader" }
