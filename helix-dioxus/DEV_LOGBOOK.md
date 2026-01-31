@@ -430,9 +430,120 @@ The `scrollIntoView({ block: 'nearest', inline: 'nearest' })` option scrolls the
 - `src/app.rs` - Added 'd' and 'y' key bindings to normal mode
 
 ### Next Steps
-1. Refine SelectionDidChange filter to actually suppress the messages (current filter is metadata-based)
+1. ~~Refine SelectionDidChange filter to actually suppress the messages (current filter is metadata-based)~~
 2. Support multiple buffers/splits
 3. Add LSP integration
+
+---
+
+## 2026-01-31: Tracing Module Refactor
+
+### Progress
+- Moved all tracing configuration to a dedicated `tracing.rs` module
+- Implemented content-based message filtering using custom `FormatEvent`
+- Now properly suppresses "SelectionDidChange" and "Dispatched unknown event" messages
+
+### Implementation Details
+
+The previous approach used `FilterFn` which only has access to metadata (target, level, module path) and cannot filter based on actual message content. The new approach:
+
+1. Created `FilteringFormatter` that implements `FormatEvent<S, N>` trait
+2. Captures the formatted message to a buffer first
+3. Checks if the message contains any suppressed patterns
+4. Either writes the message or silently suppresses it
+
+**Key code pattern:**
+```rust
+const SUPPRESSED_PATTERNS: &[&str] = &[
+    "SelectionDidChange",
+    "Dispatched unknown event",
+];
+
+impl<S, N> FormatEvent<S, N> for FilteringFormatter {
+    fn format_event(&self, ctx, mut writer, event) -> std::fmt::Result {
+        let mut message_buf = String::new();
+        self.inner.format_event(ctx, Writer::new(&mut message_buf), event)?;
+
+        let should_suppress = SUPPRESSED_PATTERNS
+            .iter()
+            .any(|pattern| message_buf.contains(pattern));
+
+        if should_suppress {
+            Ok(())  // Don't write - suppresses the message
+        } else {
+            write!(writer, "{message_buf}")
+        }
+    }
+}
+```
+
+### Files Created
+- `src/tracing.rs` - New dedicated tracing configuration module
+
+### Files Modified
+- `src/main.rs` - Replaced inline `setup_tracing()` with `mod tracing; tracing::init();`
+
+### Technical Notes
+- Suppressed patterns are defined in a const array for easy extension
+- The module includes unit tests verifying the suppressed patterns
+- Must be initialized before Dioxus launch to prevent dioxus-logger from setting its own subscriber
+
+### Next Steps
+1. Support multiple buffers/splits
+2. Add LSP integration
+
+---
+
+## 2026-01-31: Bug Fixes and Improvements
+
+### Progress
+- Fixed buffer tab click handlers not working in Dioxus WebView
+  - Changed from `onclick` to `onmousedown` for more reliable event handling
+  - Added `pointer-events: none` to icon spans so clicks pass through to parent
+  - Added `evt.stop_propagation()` to prevent event bubbling
+  - Added `on_change` callback to trigger full app re-render (fixes editor not updating on tab click)
+- Added tooltip for truncated buffer names (`title` attribute)
+- Added parent directory entry ("..") to file picker for navigation
+  - Shows "Parent directory" label right-aligned on same line
+- Fixed buffer picker layout - "current" indicator now shows on same line, right-aligned
+- Added folder/glob argument support:
+  - Multiple file arguments (shell-expanded glob): opens all files as buffers
+  - Single argument with `*` or `?` (unexpanded glob): uses glob crate to expand
+  - Directory argument: changes cwd and auto-opens recursive file picker
+- Auto-scroll buffer bar to show current buffer
+  - When opening multiple files, the current (last) buffer is now visible
+  - When switching buffers via picker or tab click, bar scrolls to show selection
+
+### Technical Notes
+- Buffer bar uses `onmousedown` instead of `onclick` for WebView compatibility
+- Auto-scroll logic moved to `buffer_bar_snapshot()` in state.rs to keep scroll offset in sync
+- `snapshot()` method now takes `&mut self` to allow scroll offset updates
+- BufferBar receives `on_change` callback to trigger app-level re-renders
+
+### Files Modified
+- `src/buffer_bar.rs` - Click handlers, tooltip, on_change callback
+- `src/state.rs` - Parent directory entry, auto-scroll logic
+- `src/picker.rs` - Buffer picker and parent directory layout
+- `src/main.rs` - Folder/glob argument handling, mutable editor_ctx
+- `src/app.rs` - Pass on_change callback to BufferBar
+- `Cargo.toml` - Added `glob` crate
+
+### Next Steps
+1. Support multiple buffers/splits
+2. Add LSP integration
+
+---
+
+## Planned Enhancements
+
+### Buffer Bar
+- [ ] File-type specific icons (use lucide icons based on extension)
+- [ ] Option to hide buffer bar (add setting)
+- [ ] Context menu on right-click (close, close others, close all)
+
+### Picker
+- [ ] Mouse click to select items
+- [ ] Scrollbar for long lists
 
 ---
 

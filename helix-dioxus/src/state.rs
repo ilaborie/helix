@@ -15,6 +15,45 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use helix_view::document::Mode;
+use helix_view::DocumentId;
+
+/// Buffer info for the tab bar.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BufferInfo {
+    pub id: DocumentId,
+    pub name: String,
+    pub is_modified: bool,
+    pub is_current: bool,
+}
+
+/// Icon type for picker items.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PickerIcon {
+    #[default]
+    File,
+    Folder,
+    Buffer,
+    BufferModified,
+}
+
+/// Generic picker item with match highlighting.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct PickerItem {
+    pub id: String,
+    pub display: String,
+    pub icon: PickerIcon,
+    pub match_indices: Vec<usize>,
+    pub secondary: Option<String>,
+}
+
+/// Picker mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PickerMode {
+    #[default]
+    DirectoryBrowser,
+    FilesRecursive,
+    Buffers,
+}
 
 /// Commands that can be sent to the editor.
 #[derive(Debug, Clone)]
@@ -89,12 +128,22 @@ pub enum EditorCommand {
 
     // File picker
     ShowFilePicker,
+    ShowFilesRecursivePicker,
+    ShowBufferPicker,
     PickerUp,
     PickerDown,
     PickerConfirm,
     PickerCancel,
     PickerInput(char),
     PickerBackspace,
+
+    // Buffer navigation
+    BufferBarScrollLeft,
+    BufferBarScrollRight,
+    SwitchToBuffer(DocumentId),
+    CloseBuffer(DocumentId),
+    NextBuffer,
+    PreviousBuffer,
 
     // File operations
     OpenFile(PathBuf),
@@ -119,12 +168,19 @@ pub struct EditorSnapshot {
     pub search_mode: bool,
     pub search_backwards: bool,
     pub search_input: String,
+
+    // Picker state
     pub picker_visible: bool,
-    pub picker_items: Vec<String>,
-    pub picker_filtered: Vec<String>,
+    pub picker_items: Vec<PickerItem>,
     pub picker_filter: String,
     pub picker_selected: usize,
     pub picker_total: usize,
+    pub picker_mode: PickerMode,
+    pub picker_current_path: Option<String>,
+
+    // Buffer bar state
+    pub open_buffers: Vec<BufferInfo>,
+    pub buffer_scroll_offset: usize,
 
     // Application state
     pub should_quit: bool,
@@ -166,10 +222,17 @@ pub struct EditorContext {
     search_backwards: bool,
     search_input: String,
     last_search: String,
+
+    // Picker state
     picker_visible: bool,
-    picker_items: Vec<String>,
+    picker_items: Vec<PickerItem>,
     picker_filter: String,
     picker_selected: usize,
+    picker_mode: PickerMode,
+    picker_current_path: Option<PathBuf>,
+
+    // Buffer bar state
+    buffer_bar_scroll: usize,
 
     // Clipboard (simple string for now)
     clipboard: String,
@@ -235,6 +298,9 @@ impl EditorContext {
             picker_items: Vec::new(),
             picker_filter: String::new(),
             picker_selected: 0,
+            picker_mode: PickerMode::default(),
+            picker_current_path: None,
+            buffer_bar_scroll: 0,
             clipboard: String::new(),
             should_quit: false,
         })
@@ -364,6 +430,12 @@ impl EditorContext {
             EditorCommand::ShowFilePicker => {
                 self.show_file_picker();
             }
+            EditorCommand::ShowFilesRecursivePicker => {
+                self.show_files_recursive_picker();
+            }
+            EditorCommand::ShowBufferPicker => {
+                self.show_buffer_picker();
+            }
             EditorCommand::PickerUp => {
                 if self.picker_selected > 0 {
                     self.picker_selected -= 1;
@@ -383,6 +455,8 @@ impl EditorContext {
                 self.picker_items.clear();
                 self.picker_filter.clear();
                 self.picker_selected = 0;
+                self.picker_mode = PickerMode::default();
+                self.picker_current_path = None;
             }
             EditorCommand::PickerInput(c) => {
                 self.picker_filter.push(c);
@@ -391,6 +465,30 @@ impl EditorContext {
             EditorCommand::PickerBackspace => {
                 self.picker_filter.pop();
                 self.picker_selected = 0;
+            }
+
+            // Buffer navigation
+            EditorCommand::BufferBarScrollLeft => {
+                self.buffer_bar_scroll = self.buffer_bar_scroll.saturating_sub(1);
+            }
+            EditorCommand::BufferBarScrollRight => {
+                let buffer_count = self.editor.documents.len();
+                let max_scroll = buffer_count.saturating_sub(8);
+                if self.buffer_bar_scroll < max_scroll {
+                    self.buffer_bar_scroll += 1;
+                }
+            }
+            EditorCommand::SwitchToBuffer(doc_id) => {
+                self.switch_to_buffer(doc_id);
+            }
+            EditorCommand::CloseBuffer(doc_id) => {
+                self.close_buffer(doc_id);
+            }
+            EditorCommand::NextBuffer => {
+                self.cycle_buffer(1);
+            }
+            EditorCommand::PreviousBuffer => {
+                self.cycle_buffer(-1);
             }
 
             // File operations
@@ -446,6 +544,24 @@ impl EditorContext {
                 self.save_document(None, true);
                 self.try_quit(true);
             }
+
+            // Buffer commands
+            "b" | "buffer" => {
+                self.show_buffer_picker();
+            }
+            "bn" | "bnext" => {
+                self.cycle_buffer(1);
+            }
+            "bp" | "bprev" | "bprevious" => {
+                self.cycle_buffer(-1);
+            }
+            "bd" | "bdelete" => {
+                self.close_current_buffer(false);
+            }
+            "bd!" | "bdelete!" => {
+                self.close_current_buffer(true);
+            }
+
             _ => {
                 log::warn!("Unknown command: {}", cmd);
             }
@@ -466,6 +582,17 @@ impl EditorContext {
         // Collect files and directories
         let mut items = Vec::new();
 
+        // Add parent directory entry if not at root
+        if cwd.parent().is_some() {
+            items.push(PickerItem {
+                id: "..".to_string(),
+                display: "..".to_string(),
+                icon: PickerIcon::Folder,
+                match_indices: vec![],
+                secondary: Some("Parent directory".to_string()),
+            });
+        }
+
         if let Ok(entries) = std::fs::read_dir(&cwd) {
             for entry in entries.flatten() {
                 let path = entry.path();
@@ -479,25 +606,35 @@ impl EditorContext {
                     continue;
                 }
 
-                // Add directory indicator
-                let display_name = if path.is_dir() {
+                let is_dir = path.is_dir();
+                let display_name = if is_dir {
                     format!("{}/", name)
                 } else {
-                    name
+                    name.clone()
                 };
 
-                items.push(display_name);
+                items.push(PickerItem {
+                    id: path.to_string_lossy().to_string(),
+                    display: display_name,
+                    icon: if is_dir {
+                        PickerIcon::Folder
+                    } else {
+                        PickerIcon::File
+                    },
+                    match_indices: vec![],
+                    secondary: None,
+                });
             }
         }
 
         // Sort: directories first, then files, alphabetically
         items.sort_by(|a, b| {
-            let a_is_dir = a.ends_with('/');
-            let b_is_dir = b.ends_with('/');
+            let a_is_dir = matches!(a.icon, PickerIcon::Folder);
+            let b_is_dir = matches!(b.icon, PickerIcon::Folder);
             match (a_is_dir, b_is_dir) {
                 (true, false) => std::cmp::Ordering::Less,
                 (false, true) => std::cmp::Ordering::Greater,
-                _ => a.to_lowercase().cmp(&b.to_lowercase()),
+                _ => a.display.to_lowercase().cmp(&b.display.to_lowercase()),
             }
         });
 
@@ -505,47 +642,307 @@ impl EditorContext {
         self.picker_filter.clear();
         self.picker_selected = 0;
         self.picker_visible = true;
+        self.picker_mode = PickerMode::DirectoryBrowser;
+        self.picker_current_path = Some(cwd);
     }
 
-    /// Get filtered picker items based on current filter.
-    fn filtered_picker_items(&self) -> Vec<String> {
+    /// Show recursive file picker using the ignore crate.
+    fn show_files_recursive_picker(&mut self) {
+        use ignore::WalkBuilder;
+
+        self.command_mode = false;
+        self.command_input.clear();
+
+        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+
+        let mut items = Vec::new();
+
+        let walker = WalkBuilder::new(&cwd)
+            .hidden(true)
+            .git_ignore(true)
+            .git_global(true)
+            .git_exclude(true)
+            .build();
+
+        for entry in walker.flatten() {
+            let path = entry.path();
+
+            // Skip directories, we only want files
+            if path.is_dir() {
+                continue;
+            }
+
+            // Get relative path
+            let relative = path
+                .strip_prefix(&cwd)
+                .unwrap_or(path)
+                .to_string_lossy()
+                .to_string();
+
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
+
+            items.push(PickerItem {
+                id: path.to_string_lossy().to_string(),
+                display: name,
+                icon: PickerIcon::File,
+                match_indices: vec![],
+                secondary: Some(relative),
+            });
+        }
+
+        // Sort alphabetically by display name
+        items.sort_by(|a, b| a.display.to_lowercase().cmp(&b.display.to_lowercase()));
+
+        self.picker_items = items;
+        self.picker_filter.clear();
+        self.picker_selected = 0;
+        self.picker_visible = true;
+        self.picker_mode = PickerMode::FilesRecursive;
+        self.picker_current_path = Some(cwd);
+    }
+
+    /// Show buffer picker with open documents.
+    fn show_buffer_picker(&mut self) {
+        self.command_mode = false;
+        self.command_input.clear();
+
+        let current_doc_id = self.editor.tree.get(self.editor.tree.focus).doc;
+
+        let items: Vec<PickerItem> = self
+            .editor
+            .documents
+            .iter()
+            .map(|(&id, doc)| {
+                let name = doc.display_name().into_owned();
+                let is_modified = doc.is_modified();
+                let is_current = id == current_doc_id;
+
+                PickerItem {
+                    id: format!("{:?}", id),
+                    display: name,
+                    icon: if is_modified {
+                        PickerIcon::BufferModified
+                    } else {
+                        PickerIcon::Buffer
+                    },
+                    match_indices: vec![],
+                    secondary: if is_current {
+                        Some("current".to_string())
+                    } else {
+                        None
+                    },
+                }
+            })
+            .collect();
+
+        self.picker_items = items;
+        self.picker_filter.clear();
+        self.picker_selected = 0;
+        self.picker_visible = true;
+        self.picker_mode = PickerMode::Buffers;
+        self.picker_current_path = None;
+    }
+
+    /// Get filtered picker items with match indices populated.
+    fn filtered_picker_items(&self) -> Vec<PickerItem> {
         if self.picker_filter.is_empty() {
             return self.picker_items.clone();
         }
 
-        self.picker_items
+        let mut results: Vec<(u16, PickerItem)> = self
+            .picker_items
             .iter()
-            .filter(|item| fuzzy_match(item, &self.picker_filter))
-            .cloned()
-            .collect()
+            .filter_map(|item| {
+                // Match against display name (primary) or secondary path
+                let display_match = fuzzy_match_with_indices(&item.display, &self.picker_filter);
+                let secondary_match = item
+                    .secondary
+                    .as_ref()
+                    .and_then(|s| fuzzy_match_with_indices(s, &self.picker_filter));
+
+                // Use the better match
+                match (display_match, secondary_match) {
+                    (Some((score1, indices)), Some((score2, _))) if score1 >= score2 => {
+                        let mut new_item = item.clone();
+                        new_item.match_indices = indices;
+                        Some((score1, new_item))
+                    }
+                    (Some((score, indices)), None) => {
+                        let mut new_item = item.clone();
+                        new_item.match_indices = indices;
+                        Some((score, new_item))
+                    }
+                    (None, Some((score, _))) => {
+                        // Match in secondary, no indices for display
+                        Some((score, item.clone()))
+                    }
+                    (Some((score1, _)), Some((score2, indices))) if score2 > score1 => {
+                        // Secondary match is better
+                        let mut new_item = item.clone();
+                        new_item.match_indices = indices;
+                        Some((score2, new_item))
+                    }
+                    _ => None,
+                }
+            })
+            .collect();
+
+        // Sort by score descending
+        results.sort_by(|a, b| b.0.cmp(&a.0));
+
+        results.into_iter().map(|(_, item)| item).collect()
     }
 
     /// Confirm the current picker selection.
     fn picker_confirm(&mut self) {
         let filtered = self.filtered_picker_items();
         if let Some(selected) = filtered.get(self.picker_selected).cloned() {
-            let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+            match self.picker_mode {
+                PickerMode::DirectoryBrowser => {
+                    // Handle parent directory navigation
+                    if selected.id == ".." {
+                        if let Some(parent) = self
+                            .picker_current_path
+                            .as_ref()
+                            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+                        {
+                            if std::env::set_current_dir(&parent).is_ok() {
+                                self.show_file_picker();
+                                return;
+                            }
+                        }
+                        return;
+                    }
 
-            if selected.ends_with('/') {
-                // It's a directory, change to it and refresh picker
-                let dir_name = selected.trim_end_matches('/');
-                let new_path = cwd.join(dir_name);
-                if std::env::set_current_dir(&new_path).is_ok() {
-                    self.show_file_picker();
-                    return;
+                    if matches!(selected.icon, PickerIcon::Folder) {
+                        // It's a directory, change to it and refresh picker
+                        let path = PathBuf::from(&selected.id);
+                        if std::env::set_current_dir(&path).is_ok() {
+                            self.show_file_picker();
+                            return;
+                        }
+                        return;
+                    }
+
+                    // Open the file
+                    let path = PathBuf::from(&selected.id);
+                    self.open_file(&path);
                 }
-                return;
+                PickerMode::FilesRecursive => {
+                    let path = PathBuf::from(&selected.id);
+                    self.open_file(&path);
+                }
+                PickerMode::Buffers => {
+                    // Parse document ID and switch to it
+                    // The id format is "DocumentId(N)" from Debug
+                    if let Some(doc_id) = self.parse_document_id(&selected.id) {
+                        self.switch_to_buffer(doc_id);
+                    }
+                }
             }
-
-            // Build full path for file
-            let path = cwd.join(&selected);
-            self.open_file(&path);
         }
 
         self.picker_visible = false;
         self.picker_items.clear();
         self.picker_filter.clear();
         self.picker_selected = 0;
+        self.picker_mode = PickerMode::default();
+        self.picker_current_path = None;
+    }
+
+    /// Parse a document ID from its debug string representation.
+    fn parse_document_id(&self, id_str: &str) -> Option<DocumentId> {
+        // The id is stored directly, we need to find the matching document
+        for (&doc_id, _) in &self.editor.documents {
+            if format!("{:?}", doc_id) == id_str {
+                return Some(doc_id);
+            }
+        }
+        None
+    }
+
+    /// Switch to a specific buffer.
+    fn switch_to_buffer(&mut self, doc_id: DocumentId) {
+        self.editor
+            .switch(doc_id, helix_view::editor::Action::Replace);
+    }
+
+    /// Close a buffer.
+    fn close_buffer(&mut self, doc_id: DocumentId) {
+        let _ = self.editor.close_document(doc_id, false);
+    }
+
+    /// Close the current buffer.
+    fn close_current_buffer(&mut self, force: bool) {
+        let view_id = self.editor.tree.focus;
+        let doc_id = self.editor.tree.get(view_id).doc;
+
+        if !force {
+            if let Some(doc) = self.editor.document(doc_id) {
+                if doc.is_modified() {
+                    log::warn!("Buffer has unsaved changes. Use :bd! to force close.");
+                    return;
+                }
+            }
+        }
+
+        let _ = self.editor.close_document(doc_id, force);
+    }
+
+    /// Cycle through buffers.
+    fn cycle_buffer(&mut self, direction: i32) {
+        let doc_ids: Vec<DocumentId> = self.editor.documents.keys().copied().collect();
+        if doc_ids.is_empty() {
+            return;
+        }
+
+        let current_doc_id = self.editor.tree.get(self.editor.tree.focus).doc;
+
+        let current_idx = doc_ids
+            .iter()
+            .position(|&id| id == current_doc_id)
+            .unwrap_or(0);
+
+        let len = doc_ids.len() as i32;
+        let new_idx = ((current_idx as i32 + direction).rem_euclid(len)) as usize;
+
+        if let Some(&new_doc_id) = doc_ids.get(new_idx) {
+            self.switch_to_buffer(new_doc_id);
+        }
+    }
+
+    /// Get buffer bar snapshot for rendering.
+    fn buffer_bar_snapshot(&mut self) -> (Vec<BufferInfo>, usize) {
+        let current_doc_id = self.editor.tree.get(self.editor.tree.focus).doc;
+
+        let buffers: Vec<BufferInfo> = self
+            .editor
+            .documents
+            .iter()
+            .map(|(&id, doc)| BufferInfo {
+                id,
+                name: doc.display_name().into_owned(),
+                is_modified: doc.is_modified(),
+                is_current: id == current_doc_id,
+            })
+            .collect();
+
+        // Auto-scroll to make current buffer visible (max 8 visible tabs)
+        const MAX_VISIBLE_TABS: usize = 8;
+        if let Some(current_idx) = buffers.iter().position(|b| b.is_current) {
+            if current_idx < self.buffer_bar_scroll {
+                // Current buffer is to the left of visible area
+                self.buffer_bar_scroll = current_idx;
+            } else if current_idx >= self.buffer_bar_scroll + MAX_VISIBLE_TABS {
+                // Current buffer is to the right of visible area
+                self.buffer_bar_scroll = current_idx.saturating_sub(MAX_VISIBLE_TABS - 1);
+            }
+        }
+
+        (buffers, self.buffer_bar_scroll)
     }
 
     /// Save the current document.
@@ -638,7 +1035,7 @@ impl EditorContext {
     }
 
     /// Create a snapshot of the current editor state.
-    pub fn snapshot(&self, viewport_lines: usize) -> EditorSnapshot {
+    pub fn snapshot(&mut self, viewport_lines: usize) -> EditorSnapshot {
         let view_id = self.editor.tree.focus;
         let view = self.editor.tree.get(view_id);
         let doc = match self.editor.document(view.doc) {
@@ -688,6 +1085,9 @@ impl EditorContext {
         // Show selection when it's more than a single character (not a point selection)
         let has_selection = sel_end > sel_start;
 
+        // Extract is_modified before we release the doc borrow
+        let is_modified = doc.is_modified();
+
         let lines: Vec<LineSnapshot> = (visible_start..visible_end)
             .enumerate()
             .map(|(idx, line_idx)| {
@@ -735,10 +1135,13 @@ impl EditorContext {
             })
             .collect();
 
+        // Get buffer bar info (this needs &mut self, so must be after doc borrow ends)
+        let (open_buffers, buffer_scroll_offset) = self.buffer_bar_snapshot();
+
         EditorSnapshot {
             mode: mode.to_string(),
             file_name,
-            is_modified: doc.is_modified(),
+            is_modified,
             cursor_line: cursor_line + 1,
             cursor_col: cursor_col + 1,
             total_lines,
@@ -750,11 +1153,17 @@ impl EditorContext {
             search_backwards: self.search_backwards,
             search_input: self.search_input.clone(),
             picker_visible: self.picker_visible,
-            picker_items: self.picker_items.clone(),
-            picker_filtered: self.filtered_picker_items(),
+            picker_items: self.filtered_picker_items(),
             picker_filter: self.picker_filter.clone(),
             picker_selected: self.picker_selected,
             picker_total: self.picker_items.len(),
+            picker_mode: self.picker_mode,
+            picker_current_path: self
+                .picker_current_path
+                .as_ref()
+                .map(|p| p.to_string_lossy().to_string()),
+            open_buffers,
+            buffer_scroll_offset,
             should_quit: self.should_quit,
         }
     }
@@ -1471,24 +1880,59 @@ fn color_to_css(color: &helix_view::graphics::Color) -> Option<String> {
     }
 }
 
-/// Fuzzy match: check if all characters in `pattern` appear in order in `text`.
+/// Fuzzy match with indices: returns (score, match_indices) or None if no match.
+/// Score is based on consecutive matches and start-of-word bonuses.
 /// Case-insensitive matching.
-fn fuzzy_match(text: &str, pattern: &str) -> bool {
-    let text_lower = text.to_lowercase();
-    let pattern_lower = pattern.to_lowercase();
+fn fuzzy_match_with_indices(text: &str, pattern: &str) -> Option<(u16, Vec<usize>)> {
+    if pattern.is_empty() {
+        return Some((0, vec![]));
+    }
 
-    let mut pattern_chars = pattern_lower.chars().peekable();
+    let text_lower: Vec<char> = text.to_lowercase().chars().collect();
+    let pattern_lower: Vec<char> = pattern.to_lowercase().chars().collect();
 
-    for c in text_lower.chars() {
-        if pattern_chars.peek() == Some(&c) {
-            pattern_chars.next();
-        }
-        if pattern_chars.peek().is_none() {
-            return true;
+    let mut match_indices = Vec::with_capacity(pattern_lower.len());
+    let mut pattern_idx = 0;
+    let mut score: u16 = 0;
+    let mut prev_match_idx: Option<usize> = None;
+
+    for (text_idx, &text_char) in text_lower.iter().enumerate() {
+        if pattern_idx < pattern_lower.len() && text_char == pattern_lower[pattern_idx] {
+            match_indices.push(text_idx);
+
+            // Scoring bonuses
+            if text_idx == 0 {
+                // Start of string bonus
+                score = score.saturating_add(10);
+            } else if let Some(prev_idx) = prev_match_idx {
+                if text_idx == prev_idx + 1 {
+                    // Consecutive match bonus
+                    score = score.saturating_add(5);
+                }
+            }
+
+            // Word boundary bonus (after separator)
+            if text_idx > 0 {
+                let prev_char = text.chars().nth(text_idx - 1);
+                if matches!(prev_char, Some('/' | '\\' | '_' | '-' | ' ' | '.')) {
+                    score = score.saturating_add(8);
+                }
+            }
+
+            prev_match_idx = Some(text_idx);
+            pattern_idx += 1;
         }
     }
 
-    pattern_chars.peek().is_none()
+    if pattern_idx == pattern_lower.len() {
+        // All pattern characters matched
+        // Bonus for shorter text (prefer exact or near-exact matches)
+        let len_bonus = (100u16).saturating_sub(text.len() as u16);
+        score = score.saturating_add(len_bonus / 10);
+        Some((score, match_indices))
+    } else {
+        None
+    }
 }
 
 /// Create dummy handlers for initialization.

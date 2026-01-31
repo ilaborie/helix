@@ -4,9 +4,10 @@
 
 use dioxus::prelude::*;
 
+use crate::buffer_bar::BufferBar;
 use crate::editor_view::EditorView;
 use crate::input::translate_key_event;
-use crate::picker::FilePicker;
+use crate::picker::GenericPicker;
 use crate::prompt::{CommandPrompt, SearchPrompt};
 use crate::state::EditorCommand;
 use crate::statusline::StatusLine;
@@ -72,6 +73,14 @@ pub fn App() -> Element {
             onkeydown: onkeydown,
             style: "display: flex; flex-direction: column; height: 100vh; outline: none; position: relative;",
 
+            // Buffer bar at the top
+            BufferBar {
+                version: version(),
+                on_change: move |_| {
+                    version += 1;
+                },
+            }
+
             // Editor view takes up most of the space
             div {
                 style: "flex: 1; overflow: hidden;",
@@ -94,13 +103,15 @@ pub fn App() -> Element {
             // Status line at the bottom
             StatusLine { version: version() }
 
-            // File picker overlay (shown when picker is visible)
+            // Generic picker overlay (shown when picker is visible)
             if snapshot.picker_visible {
-                FilePicker {
-                    items: snapshot.picker_filtered.clone(),
+                GenericPicker {
+                    items: snapshot.picker_items.clone(),
                     selected: snapshot.picker_selected,
                     filter: snapshot.picker_filter.clone(),
                     total: snapshot.picker_total,
+                    mode: snapshot.picker_mode,
+                    current_path: snapshot.picker_current_path.clone(),
                 }
             }
         }
@@ -115,6 +126,8 @@ fn handle_normal_mode(key: &helix_view::input::KeyEvent) -> Vec<EditorCommand> {
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         return match key.code {
             KeyCode::Char('r') => vec![EditorCommand::Redo],
+            KeyCode::Char('h') => vec![EditorCommand::PreviousBuffer],
+            KeyCode::Char('l') => vec![EditorCommand::NextBuffer],
             _ => vec![],
         };
     }

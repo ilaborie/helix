@@ -21,23 +21,37 @@ use std::sync::mpsc;
 use anyhow::Result;
 
 mod app;
+mod buffer_bar;
 mod editor_view;
 mod input;
 mod picker;
 mod prompt;
 mod state;
 mod statusline;
+mod tracing;
 
 use crate::state::{EditorCommand, EditorContext, EditorSnapshot};
 
 /// Custom HTML head content with CSS styles.
 const CUSTOM_HEAD: &str = include_str!("../assets/head.html");
 
+/// Determines what action to take based on command line argument.
+enum StartupAction {
+    /// No argument provided - open scratch buffer.
+    None,
+    /// Single file to open.
+    OpenFile(PathBuf),
+    /// Multiple files to open (from glob pattern).
+    OpenFiles(Vec<PathBuf>),
+    /// Directory argument - open file picker in that directory.
+    OpenFilePicker,
+}
+
 fn main() -> Result<()> {
     // Set up tracing subscriber BEFORE Dioxus to prevent dioxus-logger from setting its own.
-    // This uses a custom filter to suppress noisy "SelectionDidChange" messages from the webview.
+    // This uses a custom filter to suppress noisy webview messages.
     // The tracing crate has log compatibility, so log::info! etc. will work.
-    setup_tracing();
+    tracing::init();
 
     log::info!("Starting helix-dioxus");
 
@@ -49,15 +63,101 @@ fn main() -> Result<()> {
     let runtime = tokio::runtime::Runtime::new()?;
     let _guard = runtime.enter();
 
-    // Get file to open from command line args
-    let args: Vec<String> = std::env::args().collect();
-    let file_to_open = args.get(1).map(PathBuf::from);
+    // Get file(s) to open from command line args
+    let args: Vec<String> = std::env::args().skip(1).collect();
+
+    // Determine what to do with the arguments
+    let startup_action = if args.is_empty() {
+        StartupAction::None
+    } else if args.len() > 1 {
+        // Multiple arguments (shell-expanded glob or multiple files)
+        let files: Vec<PathBuf> = args
+            .iter()
+            .map(PathBuf::from)
+            .filter(|path| path.is_file())
+            .collect();
+
+        if files.is_empty() {
+            log::warn!("No valid files in arguments");
+            StartupAction::None
+        } else {
+            log::info!("Opening {} files", files.len());
+            StartupAction::OpenFiles(files)
+        }
+    } else {
+        // Single argument
+        let path_str = &args[0];
+
+        // Check if it's a glob pattern (contains * or ?) - for shells that don't expand globs
+        if path_str.contains('*') || path_str.contains('?') {
+            let files: Vec<PathBuf> = glob::glob(path_str)
+                .ok()
+                .map(|paths| {
+                    paths
+                        .filter_map(Result::ok)
+                        .filter(|path| path.is_file())
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            if files.is_empty() {
+                log::warn!("No files match pattern: {path_str}");
+                StartupAction::None
+            } else {
+                log::info!("Opening {} files from glob pattern", files.len());
+                StartupAction::OpenFiles(files)
+            }
+        } else {
+            let path = PathBuf::from(path_str);
+            if path.is_dir() {
+                // Change to directory and open file picker
+                if std::env::set_current_dir(&path).is_ok() {
+                    log::info!("Changed to directory: {}", path.display());
+                    StartupAction::OpenFilePicker
+                } else {
+                    log::error!("Cannot change to directory: {}", path.display());
+                    StartupAction::None
+                }
+            } else {
+                StartupAction::OpenFile(path)
+            }
+        }
+    };
 
     // Create command channel
     let (command_tx, command_rx) = mpsc::channel::<EditorCommand>();
 
-    // Initialize editor context
-    let editor_ctx = EditorContext::new(file_to_open, command_rx)?;
+    // Initialize editor context based on startup action
+    let (mut editor_ctx, pending_commands) = match &startup_action {
+        StartupAction::None | StartupAction::OpenFilePicker => {
+            (EditorContext::new(None, command_rx)?, Vec::new())
+        }
+        StartupAction::OpenFile(path) => (
+            EditorContext::new(Some(path.clone()), command_rx)?,
+            Vec::new(),
+        ),
+        StartupAction::OpenFiles(files) => {
+            // Open first file, then queue commands to open the rest
+            let first = files.first().cloned();
+            let rest: Vec<EditorCommand> = files
+                .iter()
+                .skip(1)
+                .cloned()
+                .map(EditorCommand::OpenFile)
+                .collect();
+            (EditorContext::new(first, command_rx)?, rest)
+        }
+    };
+
+    // Send pending commands (for glob pattern - open remaining files)
+    for cmd in pending_commands {
+        let _ = command_tx.send(cmd);
+    }
+
+    // Send command to show file picker if directory was specified
+    if matches!(startup_action, StartupAction::OpenFilePicker) {
+        let _ = command_tx.send(EditorCommand::ShowFilesRecursivePicker);
+    }
 
     // Create initial snapshot
     let initial_snapshot = editor_ctx.snapshot(40);
@@ -125,34 +225,4 @@ impl AppState {
     pub fn get_snapshot(&self) -> EditorSnapshot {
         self.snapshot.lock().clone()
     }
-}
-
-/// Set up tracing subscriber to filter out noisy webview events.
-/// Must be called BEFORE Dioxus launch to prevent dioxus-logger from setting its own subscriber.
-fn setup_tracing() {
-    use tracing_subscriber::{
-        filter::FilterFn, fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer,
-    };
-
-    // Create a base filter from RUST_LOG env var, defaulting to info level
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-
-    // Create a custom filter that suppresses "SelectionDidChange" messages
-    let selection_filter = FilterFn::new(|metadata| {
-        // Allow all messages unless they're from targets that might contain SelectionDidChange
-        // The actual message content filtering is done in the format layer
-        // For now, allow all at metadata level since we can't see message content here
-        !metadata.target().contains("wry") || !metadata.target().contains("SelectionDidChange")
-    });
-
-    // Custom format layer
-    let fmt_layer = fmt::layer()
-        .with_target(false)
-        .with_writer(std::io::stderr)
-        .with_filter(selection_filter);
-
-    tracing_subscriber::registry()
-        .with(env_filter)
-        .with(fmt_layer)
-        .init();
 }

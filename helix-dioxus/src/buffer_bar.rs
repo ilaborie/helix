@@ -1,0 +1,242 @@
+//! Buffer bar component for displaying open buffers as tabs.
+//!
+//! Shows a horizontal tab bar with overflow scroll buttons when needed.
+
+use dioxus::prelude::*;
+use lucide_dioxus::{ChevronLeft, ChevronRight, FileText, X};
+
+use crate::state::{BufferInfo, EditorCommand};
+use crate::AppState;
+
+/// Maximum number of visible tabs before scrolling is needed.
+const MAX_VISIBLE_TABS: usize = 8;
+
+/// Buffer bar component that displays open buffers as clickable tabs.
+#[component]
+pub fn BufferBar(version: usize, on_change: EventHandler<()>) -> Element {
+    // Suppress unused warning - version is used to trigger re-renders
+    let _ = version;
+
+    let app_state = use_context::<AppState>();
+    let snapshot = app_state.get_snapshot();
+
+    let buffers = &snapshot.open_buffers;
+    let scroll_offset = snapshot.buffer_scroll_offset;
+
+    // Only show if there are buffers
+    if buffers.is_empty() {
+        return rsx! {};
+    }
+
+    // Calculate visible range (auto-scroll to current buffer is handled in state.rs)
+    let visible_start = scroll_offset.min(buffers.len().saturating_sub(1));
+    let visible_end = (visible_start + MAX_VISIBLE_TABS).min(buffers.len());
+    let visible_buffers: Vec<&BufferInfo> = buffers
+        .get(visible_start..visible_end)
+        .unwrap_or(&[])
+        .iter()
+        .collect();
+
+    // Determine if we need scroll buttons
+    let needs_left_scroll = scroll_offset > 0;
+    let needs_right_scroll = visible_end < buffers.len();
+
+    // Clone for closures
+    let app_state_left = app_state.clone();
+    let app_state_right = app_state.clone();
+
+    rsx! {
+        div {
+            class: "buffer-bar",
+            style: "
+                display: flex;
+                align-items: center;
+                background-color: #21252b;
+                border-bottom: 1px solid #181a1f;
+                height: 32px;
+                padding: 0 4px;
+                flex-shrink: 0;
+            ",
+
+            // Left scroll button
+            if needs_left_scroll {
+                ScrollButton {
+                    direction: "left",
+                    onclick: move |_| {
+                        app_state_left.send_command(EditorCommand::BufferBarScrollLeft);
+                        on_change.call(());
+                    },
+                }
+            }
+
+            // Buffer tabs
+            div {
+                style: "
+                    display: flex;
+                    flex: 1;
+                    overflow: hidden;
+                    gap: 2px;
+                ",
+                for buffer in visible_buffers {
+                    BufferTab {
+                        key: "{buffer.id:?}",
+                        buffer: buffer.clone(),
+                        on_action: move |_| {
+                            on_change.call(());
+                        },
+                    }
+                }
+            }
+
+            // Right scroll button
+            if needs_right_scroll {
+                ScrollButton {
+                    direction: "right",
+                    onclick: move |_| {
+                        app_state_right.send_command(EditorCommand::BufferBarScrollRight);
+                        on_change.call(());
+                    },
+                }
+            }
+        }
+    }
+}
+
+/// Individual buffer tab component.
+#[component]
+fn BufferTab(buffer: BufferInfo, on_action: EventHandler<()>) -> Element {
+    let app_state = use_context::<AppState>();
+    let app_state_switch = app_state.clone();
+    let app_state_close = app_state.clone();
+
+    let on_action_switch = on_action.clone();
+    let on_action_close = on_action.clone();
+
+    let doc_id = buffer.id;
+    let doc_id_close = buffer.id;
+
+    let bg_color = if buffer.is_current {
+        "#282c34" // Active tab background
+    } else {
+        "transparent"
+    };
+
+    let text_color = if buffer.is_current {
+        "#abb2bf" // Active tab text
+    } else {
+        "#5c6370" // Inactive tab text
+    };
+
+    let border_bottom = if buffer.is_current {
+        "2px solid #61afef" // Active indicator
+    } else {
+        "2px solid transparent"
+    };
+
+    let modified_indicator = if buffer.is_modified { " \u{25cf}" } else { "" };
+
+    rsx! {
+        div {
+            class: "buffer-tab",
+            style: "
+                display: flex;
+                align-items: center;
+                padding: 4px 8px;
+                background-color: {bg_color};
+                border-bottom: {border_bottom};
+                cursor: pointer;
+                min-width: 80px;
+                max-width: 160px;
+                height: 28px;
+                box-sizing: border-box;
+            ",
+            // Tooltip with full name for truncated tabs
+            title: "{buffer.name}",
+            onmousedown: move |evt| {
+                evt.stop_propagation();
+                log::info!("Buffer tab clicked: {:?}", doc_id);
+                app_state_switch.send_command(EditorCommand::SwitchToBuffer(doc_id));
+                on_action_switch.call(());
+            },
+
+            // File icon - pointer-events: none so clicks pass through to parent
+            span {
+                style: "width: 14px; height: 14px; margin-right: 6px; display: flex; align-items: center; pointer-events: none;",
+                FileText { size: 14, color: text_color }
+            }
+
+            // File name (truncated) - pointer-events: none so clicks pass through to parent
+            span {
+                style: "
+                    color: {text_color};
+                    font-size: 12px;
+                    flex: 1;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    pointer-events: none;
+                ",
+                "{buffer.name}{modified_indicator}"
+            }
+
+            // Close button
+            div {
+                style: "
+                    width: 16px;
+                    height: 16px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin-left: 4px;
+                    border-radius: 3px;
+                    opacity: 0.6;
+                    cursor: pointer;
+                ",
+                onmousedown: move |evt| {
+                    evt.stop_propagation();
+                    log::info!("Close button clicked: {:?}", doc_id_close);
+                    app_state_close.send_command(EditorCommand::CloseBuffer(doc_id_close));
+                    on_action_close.call(());
+                },
+                span {
+                    style: "pointer-events: none; display: flex; align-items: center; justify-content: center;",
+                    X { size: 12, color: text_color }
+                }
+            }
+        }
+    }
+}
+
+/// Scroll button for buffer bar overflow.
+#[component]
+fn ScrollButton(direction: &'static str, onclick: EventHandler<MouseEvent>) -> Element {
+    let is_left = direction == "left";
+
+    rsx! {
+        div {
+            style: "
+                width: 24px;
+                height: 24px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                border-radius: 3px;
+                color: #5c6370;
+            ",
+            onmousedown: move |evt| {
+                evt.stop_propagation();
+                log::info!("Scroll button clicked: {}", direction);
+                onclick.call(evt);
+            },
+            span {
+                style: "pointer-events: none; display: flex; align-items: center; justify-content: center;",
+                if is_left {
+                    ChevronLeft { size: 16, color: "#5c6370" }
+                } else {
+                    ChevronRight { size: 16, color: "#5c6370" }
+                }
+            }
+        }
+    }
+}
