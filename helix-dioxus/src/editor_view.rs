@@ -66,50 +66,136 @@ pub fn EditorView(version: usize) -> Element {
     }
 }
 
-/// Individual line component with cursor rendering.
+/// Individual line component with cursor and syntax highlighting rendering.
 #[component]
 fn Line(line: LineSnapshot, mode: String) -> Element {
     // Remove trailing newline for display
     let display_content = line.content.trim_end_matches('\n');
+    let chars: Vec<char> = display_content.chars().collect();
 
-    // If this is the cursor line, we need to render with cursor
-    if line.is_cursor_line {
-        if let Some(cursor_col) = line.cursor_col {
-            let chars: Vec<char> = display_content.chars().collect();
-            let cursor_pos = cursor_col; // Already 0-indexed
+    let cursor_style = match mode.as_str() {
+        "INSERT" => "background-color: transparent; box-shadow: -2px 0 0 0 #61afef;",
+        "SELECT" => "background-color: #c678dd; color: #282c34;",
+        _ => "background-color: #61afef; color: #282c34;", // Normal mode
+    };
 
-            // Split content around cursor position
-            let before: String = chars.iter().take(cursor_pos).collect();
-            let cursor_char = chars.get(cursor_pos).copied().unwrap_or(' ');
-            let after: String = chars.iter().skip(cursor_pos + 1).collect();
+    let line_style = if line.is_cursor_line {
+        "background-color: #2c313a; min-height: 1.5em;"
+    } else {
+        "min-height: 1.5em;"
+    };
 
-            let cursor_style = match mode.as_str() {
-                "INSERT" => "background-color: transparent; box-shadow: -2px 0 0 0 #61afef;",
-                "SELECT" => "background-color: #c678dd; color: #282c34;",
-                _ => "background-color: #61afef; color: #282c34;", // Normal mode
-            };
+    // Build sorted list of styling events (token starts/ends and cursor position)
+    let cursor_pos = if line.is_cursor_line {
+        line.cursor_col
+    } else {
+        None
+    };
 
-            return rsx! {
-                div {
-                    class: "line",
-                    style: "background-color: #2c313a; min-height: 1.5em;",
-                    span { "{before}" }
-                    span {
-                        class: "cursor",
-                        style: "{cursor_style}",
-                        "{cursor_char}"
-                    }
-                    span { "{after}" }
-                }
-            };
-        }
-    }
-
+    // Render the line content with tokens and cursor
     rsx! {
         div {
             class: "line",
-            style: "min-height: 1.5em;",
-            "{display_content}"
+            style: "{line_style}",
+            {render_styled_content(&chars, &line.tokens, cursor_pos, cursor_style)}
         }
     }
+}
+
+/// Render content with syntax highlighting tokens and optional cursor.
+fn render_styled_content(
+    chars: &[char],
+    tokens: &[crate::state::TokenSpan],
+    cursor_pos: Option<usize>,
+    cursor_style: &str,
+) -> Element {
+    // Build a list of spans to render
+    let mut spans: Vec<Element> = Vec::new();
+    let mut pos = 0;
+    let len = chars.len();
+
+    // Sort tokens by start position
+    let mut sorted_tokens = tokens.to_vec();
+    sorted_tokens.sort_by_key(|t| t.start);
+
+    let mut token_idx = 0;
+
+    while pos <= len {
+        // Find the next boundary (token start, token end, cursor, or end of line)
+        let mut next_pos = len;
+
+        // Check for token boundaries
+        for token in &sorted_tokens[token_idx..] {
+            if token.start > pos {
+                next_pos = next_pos.min(token.start);
+                break;
+            }
+            if token.end > pos {
+                next_pos = next_pos.min(token.end);
+            }
+        }
+
+        // Check for cursor position
+        if let Some(cursor) = cursor_pos {
+            if cursor > pos && cursor < next_pos {
+                next_pos = cursor;
+            } else if cursor == pos {
+                next_pos = next_pos.min(pos + 1);
+            }
+        }
+
+        if next_pos == pos {
+            if pos >= len {
+                break;
+            }
+            next_pos = pos + 1;
+        }
+
+        // Find active token at this position
+        let active_token = sorted_tokens.iter().find(|t| t.start <= pos && pos < t.end);
+
+        // Determine if this is the cursor position
+        let is_cursor = cursor_pos == Some(pos);
+
+        // Build the text content for this span
+        let text: String = chars[pos..next_pos.min(len)].iter().collect();
+        let text = if text.is_empty() && is_cursor {
+            " ".to_string()
+        } else {
+            text
+        };
+
+        // Build style string
+        let mut style = String::new();
+        if let Some(token) = active_token {
+            style.push_str(&format!("color: {};", token.color));
+        }
+        if is_cursor {
+            style.push_str(cursor_style);
+        }
+
+        // Add the span
+        if style.is_empty() {
+            spans.push(rsx! { span { key: "{pos}", "{text}" } });
+        } else {
+            spans.push(rsx! { span { key: "{pos}", style: "{style}", "{text}" } });
+        }
+
+        pos = next_pos;
+
+        // Advance token index past completed tokens
+        while token_idx < sorted_tokens.len() && sorted_tokens[token_idx].end <= pos {
+            token_idx += 1;
+        }
+    }
+
+    // Handle cursor at end of line
+    if let Some(cursor) = cursor_pos {
+        if cursor >= len {
+            let style = cursor_style.to_string();
+            spans.push(rsx! { span { key: "cursor-end", style: "{style}", " " } });
+        }
+    }
+
+    rsx! { {spans.into_iter()} }
 }

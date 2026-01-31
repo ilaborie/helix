@@ -13,6 +13,13 @@
 //! 3. Commands are sent via channels and processed on the main thread
 //! 4. The Dioxus app runs in a single-threaded context
 
+use std::cell::RefCell;
+use std::path::PathBuf;
+use std::rc::Rc;
+use std::sync::mpsc;
+
+use anyhow::Result;
+
 mod app;
 mod editor_view;
 mod input;
@@ -20,13 +27,6 @@ mod picker;
 mod prompt;
 mod state;
 mod statusline;
-
-use std::cell::RefCell;
-use std::path::PathBuf;
-use std::rc::Rc;
-use std::sync::mpsc;
-
-use anyhow::Result;
 
 use crate::state::{EditorCommand, EditorContext, EditorSnapshot};
 
@@ -89,6 +89,12 @@ fn main() -> Result<()> {
                     if let Ok(mut ctx) = editor_ctx_clone.try_borrow_mut() {
                         ctx.process_commands();
                         let new_snapshot = ctx.snapshot(40);
+
+                        // Check if we should quit
+                        if new_snapshot.should_quit {
+                            std::process::exit(0);
+                        }
+
                         *snapshot_ref.lock() = new_snapshot;
                     }
                 }),

@@ -93,6 +93,9 @@ pub struct EditorSnapshot {
     pub picker_filter: String,
     pub picker_selected: usize,
     pub picker_total: usize,
+
+    // Application state
+    pub should_quit: bool,
 }
 
 /// Snapshot of a single line for rendering.
@@ -102,6 +105,18 @@ pub struct LineSnapshot {
     pub content: String,
     pub is_cursor_line: bool,
     pub cursor_col: Option<usize>,
+    pub tokens: Vec<TokenSpan>,
+}
+
+/// A span of text with a specific color for syntax highlighting.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TokenSpan {
+    /// Start character offset in the line (0-indexed).
+    pub start: usize,
+    /// End character offset in the line (exclusive).
+    pub end: usize,
+    /// CSS color string, e.g., "#e06c75".
+    pub color: String,
 }
 
 /// The editor wrapper that lives on the main thread.
@@ -116,6 +131,9 @@ pub struct EditorContext {
     picker_items: Vec<String>,
     picker_filter: String,
     picker_selected: usize,
+
+    // Application state
+    should_quit: bool,
 }
 
 impl EditorContext {
@@ -147,6 +165,11 @@ impl EditorContext {
             handlers,
         );
 
+        // Initialize syntax highlighting scopes from the theme
+        // This is required for the highlighter to produce meaningful highlights
+        let scopes = editor.theme.scopes();
+        editor.syn_loader.load().set_scopes(scopes.to_vec());
+
         // Open file if provided
         // Note: Use VerticalSplit for initial file - Replace assumes an existing view
         if let Some(path) = file {
@@ -166,6 +189,7 @@ impl EditorContext {
             picker_items: Vec::new(),
             picker_filter: String::new(),
             picker_selected: 0,
+            should_quit: false,
         })
     }
 
@@ -304,8 +328,26 @@ impl EditorContext {
                 }
             }
             "q" | "quit" => {
-                // Could implement quit logic here
-                log::info!("Quit command received");
+                self.try_quit(false);
+            }
+            "q!" | "quit!" => {
+                self.try_quit(true);
+            }
+            "w" | "write" => {
+                let path = args.map(PathBuf::from);
+                self.save_document(path, false);
+            }
+            "w!" | "write!" => {
+                let path = args.map(PathBuf::from);
+                self.save_document(path, true);
+            }
+            "wq" | "x" => {
+                self.save_document(None, false);
+                self.try_quit(false);
+            }
+            "wq!" | "x!" => {
+                self.save_document(None, true);
+                self.try_quit(true);
             }
             _ => {
                 log::warn!("Unknown command: {}", cmd);
@@ -409,6 +451,82 @@ impl EditorContext {
         self.picker_selected = 0;
     }
 
+    /// Save the current document.
+    /// If path is None, saves to the document's existing path.
+    fn save_document(&mut self, path: Option<PathBuf>, force: bool) {
+        let view_id = self.editor.tree.focus;
+        let doc_id = self.editor.tree.get(view_id).doc;
+
+        // Flush pending changes to history before saving
+        // This ensures is_modified() returns false after save
+        {
+            let view = self.editor.tree.get_mut(view_id);
+            let doc = match self.editor.documents.get_mut(&doc_id) {
+                Some(doc) => doc,
+                None => {
+                    log::error!("No document to save");
+                    return;
+                }
+            };
+            doc.append_changes_to_history(view);
+        }
+
+        // Get the save future in a separate scope to release the borrow
+        let save_future = {
+            let doc = match self.editor.document_mut(doc_id) {
+                Some(doc) => doc,
+                None => {
+                    log::error!("No document to save");
+                    return;
+                }
+            };
+
+            match doc.save::<PathBuf>(path, force) {
+                Ok(future) => future,
+                Err(e) => {
+                    log::error!("Failed to initiate save: {}", e);
+                    return;
+                }
+            }
+        };
+
+        // Block on the async save operation
+        match futures::executor::block_on(save_future) {
+            Ok(event) => {
+                log::info!("Saved to {:?}", event.path);
+                // Update the document's modified state
+                if let Some(doc) = self.editor.document_mut(doc_id) {
+                    doc.set_last_saved_revision(event.revision, event.save_time);
+                }
+            }
+            Err(e) => {
+                log::error!("Save failed: {}", e);
+            }
+        }
+    }
+
+    /// Try to quit the editor.
+    /// If force is false and there are unsaved changes, logs a warning and does not quit.
+    fn try_quit(&mut self, force: bool) {
+        let view_id = self.editor.tree.focus;
+        let view = self.editor.tree.get(view_id);
+        let doc = match self.editor.document(view.doc) {
+            Some(doc) => doc,
+            None => {
+                self.should_quit = true;
+                return;
+            }
+        };
+
+        if doc.is_modified() && !force {
+            log::warn!("Unsaved changes. Use :q! to force quit.");
+            return;
+        }
+
+        self.should_quit = true;
+        log::info!("Quit command executed");
+    }
+
     /// Open a file in the editor.
     fn open_file(&mut self, path: &std::path::Path) {
         let path = helix_stdx::path::canonicalize(path);
@@ -462,8 +580,12 @@ impl EditorContext {
         let visible_start = text.char_to_line(view_offset.anchor.min(text.len_chars()));
         let visible_end = (visible_start + viewport_lines).min(total_lines);
 
+        // Compute syntax highlighting tokens for visible lines
+        let line_tokens = self.compute_syntax_tokens(doc, visible_start, visible_end);
+
         let lines: Vec<LineSnapshot> = (visible_start..visible_end)
-            .map(|line_idx| {
+            .enumerate()
+            .map(|(idx, line_idx)| {
                 let line_content = text.line(line_idx).to_string();
                 let is_cursor_line = line_idx == cursor_line;
                 let cursor_col_opt = if is_cursor_line {
@@ -477,6 +599,7 @@ impl EditorContext {
                     content: line_content,
                     is_cursor_line,
                     cursor_col: cursor_col_opt,
+                    tokens: line_tokens.get(idx).cloned().unwrap_or_default(),
                 }
             })
             .collect();
@@ -498,7 +621,140 @@ impl EditorContext {
             picker_filter: self.picker_filter.clone(),
             picker_selected: self.picker_selected,
             picker_total: self.picker_items.len(),
+            should_quit: self.should_quit,
         }
+    }
+
+    /// Compute syntax highlighting tokens for a range of visible lines.
+    /// Returns a Vec of Vec<TokenSpan>, one for each line in the range.
+    ///
+    /// This follows helix-term's pattern from document.rs - maintaining a computed
+    /// style that gets updated as we process highlight events.
+    fn compute_syntax_tokens(
+        &self,
+        doc: &helix_view::Document,
+        visible_start: usize,
+        visible_end: usize,
+    ) -> Vec<Vec<TokenSpan>> {
+        use helix_core::syntax::HighlightEvent;
+
+        let text = doc.text();
+        let text_slice = text.slice(..);
+
+        // Get syntax information
+        let syntax = match doc.syntax() {
+            Some(s) => s,
+            None => {
+                return vec![Vec::new(); visible_end - visible_start];
+            }
+        };
+
+        let loader = self.editor.syn_loader.load();
+        let theme = &self.editor.theme;
+
+        // Calculate byte range for visible lines
+        let start_char = text.line_to_char(visible_start);
+        let end_char = if visible_end >= text.len_lines() {
+            text.len_chars()
+        } else {
+            text.line_to_char(visible_end)
+        };
+        let start_byte = text.char_to_byte(start_char) as u32;
+        let end_byte = text.char_to_byte(end_char) as u32;
+
+        // Create highlighter for the visible range
+        let mut highlighter = syntax.highlighter(text_slice, &loader, start_byte..end_byte);
+
+        // Prepare storage for each line
+        let mut line_tokens: Vec<Vec<TokenSpan>> = vec![Vec::new(); visible_end - visible_start];
+
+        // Default text style (no foreground color)
+        let text_style = helix_view::theme::Style::default();
+
+        // Current computed style - following helix-term's SyntaxHighlighter pattern
+        let mut current_style = text_style;
+
+        // Current position in bytes
+        let mut pos = start_byte;
+
+        // Process highlight events following helix-term's pattern
+        loop {
+            // Get the position of the next event
+            let next_event_pos = highlighter.next_event_offset();
+
+            // If no more events (u32::MAX), process remaining text to end_byte
+            let span_end = if next_event_pos == u32::MAX {
+                end_byte
+            } else {
+                next_event_pos
+            };
+
+            // Emit a span from pos to span_end with current style
+            if span_end > pos {
+                // Only emit if we have a foreground color
+                if let Some(fg) = current_style.fg {
+                    if let Some(css_color) = color_to_css(&fg) {
+                        // Convert byte positions to character positions
+                        let span_start_char = text.byte_to_char(pos as usize);
+                        let span_end_char = text.byte_to_char(span_end as usize);
+
+                        // Find which lines this span affects
+                        let span_start_line = text.char_to_line(span_start_char);
+                        let span_end_line =
+                            text.char_to_line(span_end_char.saturating_sub(1).max(span_start_char));
+
+                        for line_idx in span_start_line..=span_end_line {
+                            if line_idx < visible_start || line_idx >= visible_end {
+                                continue;
+                            }
+                            let line_start_char = text.line_to_char(line_idx);
+                            let line_end_char = if line_idx + 1 < text.len_lines() {
+                                text.line_to_char(line_idx + 1)
+                            } else {
+                                text.len_chars()
+                            };
+
+                            // Calculate token start/end within this line
+                            let token_start =
+                                span_start_char.max(line_start_char) - line_start_char;
+                            let token_end = span_end_char.min(line_end_char) - line_start_char;
+
+                            if token_start < token_end {
+                                let line_slot = line_idx - visible_start;
+                                line_tokens[line_slot].push(TokenSpan {
+                                    start: token_start,
+                                    end: token_end,
+                                    color: css_color.clone(),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            // If no more events, we're done
+            if next_event_pos == u32::MAX || next_event_pos >= end_byte {
+                break;
+            }
+
+            // Move position to the event location
+            pos = next_event_pos;
+
+            // Process the highlight event - following helix-term's exact pattern
+            let (event, highlights) = highlighter.advance();
+
+            // Determine the base style based on event type
+            let base = match event {
+                HighlightEvent::Refresh => text_style,
+                HighlightEvent::Push => current_style,
+            };
+
+            // Fold all highlights onto the base style
+            current_style =
+                highlights.fold(base, |acc, highlight| acc.patch(theme.highlight(highlight)));
+        }
+
+        line_tokens
     }
 
     // Helper methods for editing operations
@@ -763,6 +1019,34 @@ enum Direction {
     Right,
     Up,
     Down,
+}
+
+/// Convert a helix Color to a CSS color string.
+fn color_to_css(color: &helix_view::graphics::Color) -> Option<String> {
+    use helix_view::graphics::Color;
+    match color {
+        Color::Rgb(r, g, b) => Some(format!("#{:02x}{:02x}{:02x}", r, g, b)),
+        Color::Reset => None,
+        // Map standard colors to One Dark palette
+        Color::Black => Some("#282c34".into()),
+        Color::Red => Some("#e06c75".into()),
+        Color::Green => Some("#98c379".into()),
+        Color::Yellow => Some("#e5c07b".into()),
+        Color::Blue => Some("#61afef".into()),
+        Color::Magenta => Some("#c678dd".into()),
+        Color::Cyan => Some("#56b6c2".into()),
+        Color::Gray => Some("#5c6370".into()),
+        Color::White => Some("#abb2bf".into()),
+        Color::LightRed => Some("#e06c75".into()),
+        Color::LightGreen => Some("#98c379".into()),
+        Color::LightYellow => Some("#e5c07b".into()),
+        Color::LightBlue => Some("#61afef".into()),
+        Color::LightMagenta => Some("#c678dd".into()),
+        Color::LightCyan => Some("#56b6c2".into()),
+        Color::LightGray => Some("#abb2bf".into()),
+        // For indexed colors, use a default
+        Color::Indexed(_) => Some("#abb2bf".into()),
+    }
 }
 
 /// Fuzzy match: check if all characters in `pattern` appear in order in `text`.

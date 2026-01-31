@@ -19,7 +19,7 @@ pub fn App() -> Element {
     let app_state = use_context::<AppState>();
 
     // Track version for re-renders when editor state changes
-    let mut version = use_signal(|| 0usize);
+    let mut version = use_signal(|| 0_usize);
 
     // Clone app_state for the closure
     let app_state_for_handler = app_state.clone();

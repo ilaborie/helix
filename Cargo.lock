@@ -3105,6 +3105,7 @@ dependencies = [
  "chrono",
  "dioxus",
  "fern",
+ "futures",
  "helix-core",
  "helix-event",
  "helix-loader",

@@ -149,6 +149,66 @@ From GitHub discussions and helix-gpui analysis:
 
 ---
 
+## 2026-01-31: Syntax Highlighting, Save, and Quit
+
+### Progress
+- Implemented syntax highlighting using tree-sitter
+  - Colors now appear for keywords, strings, comments, types, etc.
+  - Follows helix-term's `SyntaxHighlighter` pattern from `document.rs`
+- Fixed save command (`:w`) to properly clear modified indicator
+  - Calls `append_changes_to_history()` before saving to flush pending changes
+  - Updates `last_saved_revision` after save completes
+- Quit command (`:q`) already working
+  - Checks for unsaved changes, warns unless `:q!` is used
+  - Added `should_quit` flag with exit handling in main event loop
+
+### Issues Encountered
+
+**Syntax highlighting producing 0 tokens despite 200+ events**
+- Root cause: `set_scopes()` was never called on the syntax loader
+- The `Editor::new()` sets the theme but does NOT call `set_scopes()`
+- This is only called during `set_theme()` / `set_theme_impl()`
+- Solution: Manually call `editor.syn_loader.load().set_scopes(theme.scopes().to_vec())` after creating the Editor
+
+**Save works but modified indicator [+] remains**
+- Root cause: Pending changes weren't flushed to history before saving
+- Solution: Call `doc.append_changes_to_history(view)` before initiating save
+
+### Technical Notes
+
+The syntax highlighting implementation:
+1. `compute_syntax_tokens()` creates a highlighter for visible byte range
+2. Processes `HighlightEvent::Refresh` and `HighlightEvent::Push` events
+3. Maintains a computed `Style` that accumulates highlight colors
+4. Converts `helix_view::graphics::Color` to CSS hex strings via `color_to_css()`
+5. `TokenSpan` structs hold start/end offsets and color for each line
+6. `render_styled_content()` in `editor_view.rs` renders spans with inline styles
+
+Key insight: The `highlights` iterator from `highlighter.advance()` is only populated when `set_scopes()` has been called with the theme's scope names. Without this, tree-sitter produces events but no highlight information is mapped.
+
+### Files Modified
+- `src/state.rs` - Added `set_scopes()` call, `TokenSpan` struct, `compute_syntax_tokens()`, `color_to_css()`
+- `src/editor_view.rs` - `render_styled_content()` for token rendering (already existed)
+- `src/main.rs` - Changed log level to Info
+
+### Commands Supported
+- `:w` / `:write` - Save current file
+- `:w!` / `:write!` - Force save
+- `:q` / `:quit` - Quit (fails if modified)
+- `:q!` / `:quit!` - Force quit
+- `:wq` / `:x` - Save and quit
+- `:wq!` / `:x!` - Force save and quit
+
+### Next Steps
+1. Add undo/redo support (`u`, `Ctrl+r`)
+2. Implement visual selection mode
+3. Add search functionality (`/`, `?`, `n`, `N`)
+4. Support multiple buffers/splits
+5. Add LSP integration for diagnostics and completions
+6. Improve scrolling with mouse wheel support
+
+---
+
 ## Template for Future Entries
 
 ```markdown
