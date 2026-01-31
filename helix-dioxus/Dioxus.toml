@@ -1,0 +1,8 @@
+[application]
+name = "helix-dioxus"
+default_platform = "desktop"
+
+[bundle]
+identifier = "com.helix-editor.helix-dioxus"
+publisher = "Helix Editor"
+icon = ["assets/icon.png"]

@@ -19,6 +19,7 @@ use std::rc::Rc;
 use std::sync::mpsc;
 
 use anyhow::Result;
+use dioxus::desktop::tao::window::Icon;
 
 // Thread-local storage for EditorContext to allow synchronous command processing
 thread_local! {
@@ -36,6 +37,14 @@ mod statusline;
 mod tracing;
 
 use crate::state::{EditorCommand, EditorContext, EditorSnapshot};
+
+/// Load the helix icon from embedded PNG.
+fn load_icon() -> Option<Icon> {
+    let icon_bytes = include_bytes!("../../contrib/helix.png");
+    let image = image::load_from_memory(icon_bytes).ok()?.into_rgba8();
+    let (width, height) = image.dimensions();
+    Icon::from_rgba(image.into_raw(), width, height).ok()
+}
 
 /// Custom HTML head content with CSS styles.
 const CUSTOM_HEAD: &str = include_str!("../assets/head.html");
@@ -192,8 +201,9 @@ fn main() -> Result<()> {
             dioxus::desktop::Config::new()
                 .with_window(
                     dioxus::desktop::WindowBuilder::new()
-                        .with_title("Helix")
-                        .with_inner_size(dioxus::desktop::LogicalSize::new(1200.0, 800.0)),
+                        .with_title("helix-dioxus")
+                        .with_inner_size(dioxus::desktop::LogicalSize::new(1200.0, 800.0))
+                        .with_window_icon(load_icon()),
                 )
                 .with_custom_head(CUSTOM_HEAD.to_string())
                 .with_custom_event_handler(move |_event, _target| {

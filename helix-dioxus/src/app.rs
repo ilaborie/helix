@@ -25,6 +25,20 @@ pub fn App() -> Element {
     // Read the signal to subscribe to changes and trigger re-render of this component
     let _ = version();
 
+    // Auto-focus the app container on mount
+    use_effect(|| {
+        document::eval(
+            r#"
+            requestAnimationFrame(() => {
+                const container = document.querySelector('.app-container');
+                if (container) {
+                    container.focus();
+                }
+            });
+        "#,
+        );
+    });
+
     // Clone app_state for the closure
     let app_state_for_handler = app_state.clone();
 
@@ -89,6 +103,9 @@ pub fn App() -> Element {
     );
 
     rsx! {
+        // Dynamic window title based on current buffer
+        document::Title { "helix-dioxus - {snapshot.file_name}" }
+
         div {
             class: "app-container",
             tabindex: 0,

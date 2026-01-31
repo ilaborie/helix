@@ -590,7 +590,56 @@ For the selection bug, Helix internally always has a 1-char selection (anchor an
 
 ---
 
+## 2026-01-31: Window Title and Icon
+
+### Progress
+- Implemented dynamic window title that updates based on current buffer
+  - Uses Dioxus 0.7's `document::Title` component
+  - Title format: `helix-dioxus - {buffer_name}`
+  - Reactively updates when switching buffers
+- Added `image` crate dependency for PNG loading
+- Added `load_icon()` function to load helix icon from `contrib/helix.png`
+- Set window icon via `WindowBuilder::with_window_icon()`
+
+### Technical Notes
+- The `document::Title` component is placed at the start of the `rsx!` block in `App`
+- Icon loading uses `include_bytes!` to embed the PNG at compile time
+- `image::load_from_memory()` converts PNG to RGBA8 format required by tao's `Icon`
+
+### Known Issue: macOS Dock Icon
+The window icon set via `with_window_icon()` does not display in the macOS dock. On macOS, the dock icon comes from the app bundle, not the window API. When running with `cargo run`, there's no `.app` bundle, so the default icon appears.
+
+**Workaround attempted:**
+- Created `Dioxus.toml` with bundle configuration
+- Created `assets/icon.png` for the dx CLI
+- The `dx` CLI has issues with workspace crates
+
+**TODO for later:** Properly bundle the app using `dx bundle` or create a macOS `.app` bundle manually to display the helix icon in the dock.
+
+### Files Modified
+- `Cargo.toml` - Added `image` crate with PNG feature
+- `src/main.rs` - Added `load_icon()` function, set window icon and title
+- `src/app.rs` - Added `document::Title` component
+
+### Files Created
+- `Dioxus.toml` - Bundle configuration for dx CLI (not yet working)
+- `assets/icon.png` - Copy of helix icon for bundling
+
+---
+
 ## Planned Enhancements
+
+### Application Icon (macOS)
+- [ ] Fix macOS dock icon not displaying
+  - Investigate `dx bundle` for creating proper `.app` bundle
+  - Alternative: Create `.app` bundle structure manually
+  - May need to convert PNG to ICNS format for macOS
+
+### Command Panel
+- [ ] Rework command panel to be a picker-style UI
+  - Fuzzy search through available commands
+  - Show command descriptions and keybindings
+  - Similar to VSCode's command palette or helix's `:` menu
 
 ### Buffer Bar
 - [ ] File-type specific icons (use lucide icons based on extension)
