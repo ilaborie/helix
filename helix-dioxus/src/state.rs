@@ -680,11 +680,13 @@ impl EditorContext {
         // Compute syntax highlighting tokens for visible lines
         let line_tokens = self.compute_syntax_tokens(doc, visible_start, visible_end);
 
-        // Get selection range for highlighting in select mode
+        // Get selection range for highlighting
+        // Helix uses a selection-first model - selections are always visible, not just in select mode
         let primary_range = selection.primary();
         let sel_start = primary_range.from();
         let sel_end = primary_range.to();
-        let is_select_mode = matches!(self.editor.mode(), Mode::Select);
+        // Show selection when it's more than a single character (not a point selection)
+        let has_selection = sel_end > sel_start;
 
         let lines: Vec<LineSnapshot> = (visible_start..visible_end)
             .enumerate()
@@ -698,7 +700,7 @@ impl EditorContext {
                 };
 
                 // Calculate selection range within this line
-                let selection_range = if is_select_mode {
+                let selection_range = if has_selection {
                     let line_start_char = text.line_to_char(line_idx);
                     let line_len = text.line(line_idx).len_chars().saturating_sub(1); // Exclude newline
                     let line_end_char = line_start_char + line_len;
@@ -990,9 +992,9 @@ impl EditorContext {
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
 
+        // Helix's selection-first model: movements create selections
         let new_selection = selection.transform(|range| {
-            let new_range = helix_core::movement::move_next_word_start(text, range, 1);
-            helix_core::Range::point(new_range.head.min(text.len_chars().saturating_sub(1)))
+            helix_core::movement::move_next_word_start(text, range, 1)
         });
 
         doc.set_selection(view_id, new_selection);
@@ -1003,9 +1005,9 @@ impl EditorContext {
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
 
+        // Helix's selection-first model: movements create selections
         let new_selection = selection.transform(|range| {
-            let new_range = helix_core::movement::move_prev_word_start(text, range, 1);
-            helix_core::Range::point(new_range.head)
+            helix_core::movement::move_prev_word_start(text, range, 1)
         });
 
         doc.set_selection(view_id, new_selection);
