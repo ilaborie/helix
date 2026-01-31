@@ -26,8 +26,8 @@ helix-lsp = { path = "../helix-lsp" }
 helix-loader = { path = "../helix-loader" }
 
 # Dioxus for GUI
-dioxus = { version = "0.6", features = ["desktop"] }
-lucide-dioxus = { version = "2", features = ["all-icons"] }
+dioxus = { version = "0.7", features = ["desktop"] }
+lucide-dioxus = { version = "2.563", features = ["all-icons"] }
 
 # Async runtime
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "macros"] }

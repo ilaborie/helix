@@ -15,9 +15,12 @@ pub fn translate_key_event(evt: &KeyboardEvent) -> Option<KeyEvent> {
 
 /// Translate Dioxus key to helix KeyCode.
 fn translate_key_code(evt: &KeyboardEvent) -> Option<KeyCode> {
-    use dioxus::events::Key;
+    use dioxus::prelude::Key;
 
-    match evt.key() {
+    let key = evt.key();
+    log::debug!("translate_key_code: key = {:?}", key);
+
+    match key {
         // Letters and characters
         Key::Character(c) => {
             let ch = c.chars().next()?;

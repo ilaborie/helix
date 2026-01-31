@@ -534,6 +534,62 @@ impl<S, N> FormatEvent<S, N> for FilteringFormatter {
 
 ---
 
+## 2026-01-31: Dioxus 0.7 Migration and Reactivity Fixes
+
+### Progress
+- Migrated from Dioxus 0.6 to Dioxus 0.7
+- Fixed selection rendering bug caused by props losing reactivity in Dioxus 0.7
+- Fixed command prompt not displaying when pressing `:`
+
+### Issues Encountered
+
+**Selection appearing on arrow/hjkl keys in Normal mode**
+- Root cause: Multiple issues combined:
+  1. Dioxus 0.7 changed props to lose reactivity by default
+  2. Race condition between async command processing and UI rendering
+  3. Helix's selection-first model always has a 1-char selection internally
+- Solutions applied:
+  - Changed `version: usize` props to `version: ReadSignal<usize>`
+  - Added thread-local `EDITOR_CTX` for synchronous command processing
+  - Added `process_commands_sync()` to process commands before re-render
+  - Changed `has_selection` logic to only be true in Select mode
+
+**Command prompt not displaying when pressing `:`**
+- Root cause: App component created `version` signal but never read it
+- In Dioxus 0.7, components only re-render if they read a signal that changed
+- Child components (EditorView, BufferBar, StatusLine) re-rendered, but App didn't
+- Solution: Added `let _ = version();` to App component to subscribe to changes
+
+**Compilation errors during migration**
+- `ReadOnlySignal` deprecated → use `ReadSignal`
+- `lucide-dioxus` 0.1 requires Dioxus 0.6 → updated to version 2.563
+- `time` crate 0.3.46 requires Rust 1.88 → pinned to 0.3.36
+- `Key` import path changed → `dioxus::prelude::Key`
+
+### Decisions Made
+- Use `ReadSignal<usize>` for version props (passes signal reference, not value)
+- Use thread-local storage for synchronous editor access (avoids async race conditions)
+- Filter mouse events from logs (too noisy)
+- Log to file `/tmp/helix-dioxus.log` instead of stderr
+
+### Files Modified
+- `Cargo.toml` - Updated dioxus to 0.7, lucide-dioxus to 2.563
+- `src/main.rs` - Added thread-local EDITOR_CTX, process_commands_sync()
+- `src/app.rs` - Pass signals directly, read version to subscribe, call process_commands_sync()
+- `src/editor_view.rs` - Changed prop type to ReadSignal<usize>
+- `src/buffer_bar.rs` - Changed prop type to ReadSignal<usize>
+- `src/statusline.rs` - Changed prop type to ReadSignal<usize>
+- `src/input.rs` - Fixed Key import path
+- `src/state.rs` - Changed has_selection to only be true in Select mode
+- `src/tracing.rs` - Added mouse event filters, log to file
+
+### Technical Notes
+The key insight is that Dioxus 0.7's reactivity model requires components to explicitly read signals they depend on. Simply passing a signal as a prop doesn't create a subscription unless the component reads it.
+
+For the selection bug, Helix internally always has a 1-char selection (anchor and head differ by 1), but this should only be visually rendered in Select mode.
+
+---
+
 ## Planned Enhancements
 
 ### Buffer Bar

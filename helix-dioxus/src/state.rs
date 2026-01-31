@@ -1078,12 +1078,27 @@ impl EditorContext {
         let line_tokens = self.compute_syntax_tokens(doc, visible_start, visible_end);
 
         // Get selection range for highlighting
-        // Helix uses a selection-first model - selections are always visible, not just in select mode
         let primary_range = selection.primary();
         let sel_start = primary_range.from();
         let sel_end = primary_range.to();
-        // Show selection when it's more than a single character (not a point selection)
-        let has_selection = sel_end > sel_start;
+
+        // Only show selection highlighting in Select mode
+        // In Normal mode, the cursor is shown as a block, but we don't highlight the "selection"
+        // This avoids false positives from Helix's selection-first model where movements
+        // like 'w' create selections that persist until explicitly collapsed
+        let is_select_mode = self.editor.mode() == Mode::Select;
+        let has_selection = is_select_mode && sel_end > sel_start;
+
+        // Log at info level for easier debugging
+        log::info!(
+            "Selection: anchor={}, head={}, from={}, to={}, is_select_mode={}, has_selection={}",
+            primary_range.anchor,
+            primary_range.head,
+            sel_start,
+            sel_end,
+            is_select_mode,
+            has_selection
+        );
 
         // Extract is_modified before we release the doc borrow
         let is_modified = doc.is_modified();
@@ -1316,6 +1331,13 @@ impl EditorContext {
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
 
+        log::info!(
+            "move_cursor: direction={:?}, old selection anchor={}, head={}",
+            direction,
+            selection.primary().anchor,
+            selection.primary().head
+        );
+
         let new_selection = selection.transform(|range| {
             let cursor = range.cursor(text);
             let new_cursor = match direction {
@@ -1327,7 +1349,8 @@ impl EditorContext {
                 Direction::Up => {
                     let line = text.char_to_line(cursor);
                     if line == 0 {
-                        return range;
+                        // At first line, collapse to point at current cursor
+                        return helix_core::Range::point(cursor);
                     }
                     let col = cursor - text.line_to_char(line);
                     let new_line = line - 1;
@@ -1337,7 +1360,8 @@ impl EditorContext {
                 Direction::Down => {
                     let line = text.char_to_line(cursor);
                     if line >= text.len_lines().saturating_sub(1) {
-                        return range;
+                        // At last line, collapse to point at current cursor
+                        return helix_core::Range::point(cursor);
                     }
                     let col = cursor - text.line_to_char(line);
                     let new_line = line + 1;
@@ -1347,6 +1371,12 @@ impl EditorContext {
             };
             helix_core::Range::point(new_cursor)
         });
+
+        log::info!(
+            "move_cursor: new selection anchor={}, head={}",
+            new_selection.primary().anchor,
+            new_selection.primary().head
+        );
 
         doc.set_selection(view_id, new_selection);
     }
@@ -1845,6 +1875,7 @@ impl EditorContext {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 enum Direction {
     Left,
     Right,

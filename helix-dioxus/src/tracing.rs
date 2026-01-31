@@ -6,7 +6,9 @@
 //! Must be initialized BEFORE Dioxus launch to prevent dioxus-logger from
 //! setting its own subscriber.
 
+use std::fs::File;
 use std::io;
+use std::sync::Mutex;
 
 use tracing::{Event, Subscriber};
 use tracing_subscriber::{
@@ -22,8 +24,17 @@ use tracing_subscriber::{
 const SUPPRESSED_PATTERNS: &[&str] = &[
     "SelectionDidChange",
     "Dispatched unknown event",
+    "mousemove",
+    "mouseenter",
+    "mouseleave",
+    "pointermove",
+    "pointerenter",
+    "pointerleave",
     // Add more patterns here as needed
 ];
+
+/// Log file path
+const LOG_FILE: &str = "/tmp/helix-dioxus.log";
 
 /// Custom event formatter that filters out messages containing suppressed patterns.
 struct FilteringFormatter {
@@ -76,7 +87,7 @@ where
 /// This sets up:
 /// - Environment-based filtering via `RUST_LOG` (defaults to `info`)
 /// - Custom message filtering to suppress noisy webview events
-/// - Output to stderr
+/// - Output to file at `/tmp/helix-dioxus.log`
 ///
 /// # Panics
 ///
@@ -85,16 +96,33 @@ pub fn init() {
     // Create a base filter from RUST_LOG env var, defaulting to info level
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
-    // Create format layer with custom filtering formatter
-    let fmt_layer = fmt::layer()
-        .with_target(false)
-        .with_writer(io::stderr)
-        .event_format(FilteringFormatter::new());
+    // Try to create log file, fall back to stderr if it fails
+    if let Ok(log_file) = File::create(LOG_FILE) {
+        // Log to file
+        let fmt_layer = fmt::layer()
+            .with_target(false)
+            .with_ansi(false)
+            .with_writer(Mutex::new(log_file))
+            .event_format(FilteringFormatter::new());
 
-    tracing_subscriber::registry()
-        .with(env_filter)
-        .with(fmt_layer)
-        .init();
+        tracing_subscriber::registry()
+            .with(env_filter)
+            .with(fmt_layer)
+            .init();
+
+        eprintln!("Logging to {LOG_FILE}");
+    } else {
+        // Fall back to stderr
+        let fmt_layer = fmt::layer()
+            .with_target(false)
+            .with_writer(io::stderr)
+            .event_format(FilteringFormatter::new());
+
+        tracing_subscriber::registry()
+            .with(env_filter)
+            .with(fmt_layer)
+            .init();
+    }
 }
 
 #[cfg(test)]

@@ -20,6 +20,11 @@ use std::sync::mpsc;
 
 use anyhow::Result;
 
+// Thread-local storage for EditorContext to allow synchronous command processing
+thread_local! {
+    static EDITOR_CTX: RefCell<Option<Rc<RefCell<EditorContext>>>> = const { RefCell::new(None) };
+}
+
 mod app;
 mod buffer_bar;
 mod editor_view;
@@ -165,6 +170,11 @@ fn main() -> Result<()> {
     // Wrap editor context in Rc<RefCell> for single-threaded access
     let editor_ctx = Rc::new(RefCell::new(editor_ctx));
 
+    // Store in thread-local for synchronous command processing from Dioxus components
+    EDITOR_CTX.with(|ctx| {
+        *ctx.borrow_mut() = Some(editor_ctx.clone());
+    });
+
     // Create app state that can be shared with Dioxus
     // Note: AppState is Clone + Send + Sync because it only contains the command sender and snapshot
     let app_state = AppState {
@@ -219,6 +229,26 @@ impl AppState {
     /// Send a command to the editor.
     pub fn send_command(&self, cmd: EditorCommand) {
         let _ = self.command_tx.send(cmd);
+    }
+
+    /// Process pending commands and update the snapshot synchronously.
+    /// This should be called after sending commands but before triggering a re-render.
+    pub fn process_commands_sync(&self) {
+        EDITOR_CTX.with(|ctx| {
+            if let Some(ref editor_ctx) = *ctx.borrow() {
+                if let Ok(mut editor) = editor_ctx.try_borrow_mut() {
+                    editor.process_commands();
+                    let new_snapshot = editor.snapshot(40);
+
+                    // Check if we should quit
+                    if new_snapshot.should_quit {
+                        std::process::exit(0);
+                    }
+
+                    *self.snapshot.lock() = new_snapshot;
+                }
+            }
+        });
     }
 
     /// Get the current snapshot.

@@ -22,18 +22,29 @@ pub fn App() -> Element {
     // Track version for re-renders when editor state changes
     let mut version = use_signal(|| 0_usize);
 
+    // Read the signal to subscribe to changes and trigger re-render of this component
+    let _ = version();
+
     // Clone app_state for the closure
     let app_state_for_handler = app_state.clone();
 
     // Handle keyboard input at the app level
     let onkeydown = move |evt: KeyboardEvent| {
-        log::debug!("Key pressed: {:?}", evt.key());
+        log::info!("Key pressed: {:?}", evt.key());
 
         // Get current mode
         let snapshot = app_state_for_handler.get_snapshot();
 
         // Translate to helix key event
         if let Some(key_event) = translate_key_event(&evt) {
+            log::info!(
+                "Mode: {}, command_mode: {}, search_mode: {}, picker_visible: {}",
+                snapshot.mode,
+                snapshot.command_mode,
+                snapshot.search_mode,
+                snapshot.picker_visible
+            );
+
             // Handle input based on UI state first, then editor mode
             let commands = if snapshot.picker_visible {
                 handle_picker_mode(&key_event)
@@ -51,11 +62,15 @@ pub fn App() -> Element {
             };
 
             // Send commands to editor
+            log::info!("Commands: {:?}", commands);
             for cmd in commands {
                 app_state_for_handler.send_command(cmd);
             }
 
-            // Trigger re-render (snapshot will be refreshed by event handler)
+            // Process commands synchronously and update snapshot before triggering re-render
+            app_state_for_handler.process_commands_sync();
+
+            // Trigger re-render with updated snapshot
             version += 1;
 
             // Prevent default browser behavior for handled keys
@@ -66,6 +81,13 @@ pub fn App() -> Element {
     // Get snapshot for conditional rendering
     let snapshot = app_state.get_snapshot();
 
+    log::info!(
+        "Rendering App: command_mode={}, search_mode={}, picker_visible={}",
+        snapshot.command_mode,
+        snapshot.search_mode,
+        snapshot.picker_visible
+    );
+
     rsx! {
         div {
             class: "app-container",
@@ -75,7 +97,7 @@ pub fn App() -> Element {
 
             // Buffer bar at the top
             BufferBar {
-                version: version(),
+                version: version,
                 on_change: move |_| {
                     version += 1;
                 },
@@ -84,7 +106,7 @@ pub fn App() -> Element {
             // Editor view takes up most of the space
             div {
                 style: "flex: 1; overflow: hidden;",
-                EditorView { version: version() }
+                EditorView { version: version }
             }
 
             // Command prompt (shown when in command mode)
@@ -101,7 +123,7 @@ pub fn App() -> Element {
             }
 
             // Status line at the bottom
-            StatusLine { version: version() }
+            StatusLine { version: version }
 
             // Generic picker overlay (shown when picker is visible)
             if snapshot.picker_visible {

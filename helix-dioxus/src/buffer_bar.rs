@@ -13,9 +13,9 @@ const MAX_VISIBLE_TABS: usize = 8;
 
 /// Buffer bar component that displays open buffers as clickable tabs.
 #[component]
-pub fn BufferBar(version: usize, on_change: EventHandler<()>) -> Element {
-    // Suppress unused warning - version is used to trigger re-renders
-    let _ = version;
+pub fn BufferBar(version: ReadSignal<usize>, on_change: EventHandler<()>) -> Element {
+    // Read the signal to subscribe to changes
+    let _ = version();
 
     let app_state = use_context::<AppState>();
     let snapshot = app_state.get_snapshot();
@@ -64,6 +64,7 @@ pub fn BufferBar(version: usize, on_change: EventHandler<()>) -> Element {
                     direction: "left",
                     onclick: move |_| {
                         app_state_left.send_command(EditorCommand::BufferBarScrollLeft);
+                        app_state_left.process_commands_sync();
                         on_change.call(());
                     },
                 }
@@ -94,6 +95,7 @@ pub fn BufferBar(version: usize, on_change: EventHandler<()>) -> Element {
                     direction: "right",
                     onclick: move |_| {
                         app_state_right.send_command(EditorCommand::BufferBarScrollRight);
+                        app_state_right.process_commands_sync();
                         on_change.call(());
                     },
                 }
@@ -156,6 +158,7 @@ fn BufferTab(buffer: BufferInfo, on_action: EventHandler<()>) -> Element {
                 evt.stop_propagation();
                 log::info!("Buffer tab clicked: {:?}", doc_id);
                 app_state_switch.send_command(EditorCommand::SwitchToBuffer(doc_id));
+                app_state_switch.process_commands_sync();
                 on_action_switch.call(());
             },
 
@@ -196,6 +199,7 @@ fn BufferTab(buffer: BufferInfo, on_action: EventHandler<()>) -> Element {
                     evt.stop_propagation();
                     log::info!("Close button clicked: {:?}", doc_id_close);
                     app_state_close.send_command(EditorCommand::CloseBuffer(doc_id_close));
+                    app_state_close.process_commands_sync();
                     on_action_close.call(());
                 },
                 span {

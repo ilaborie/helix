@@ -9,7 +9,10 @@ use crate::AppState;
 
 /// Editor view component that renders the document content.
 #[component]
-pub fn EditorView(version: usize) -> Element {
+pub fn EditorView(version: ReadSignal<usize>) -> Element {
+    // Read the signal to subscribe to changes
+    let version = version();
+
     let app_state = use_context::<AppState>();
     let snapshot = app_state.get_snapshot();
 
@@ -17,7 +20,7 @@ pub fn EditorView(version: usize) -> Element {
 
     // Scroll cursor into view after each render when version changes
     // Use requestAnimationFrame to ensure DOM is updated before scrolling
-    use_effect(use_reactive!(|(version,)| {
+    use_effect(move || {
         // version is used to trigger the effect on each state change
         let _ = version;
         document::eval(
@@ -30,7 +33,7 @@ pub fn EditorView(version: usize) -> Element {
             });
         "#,
         );
-    }));
+    });
 
     rsx! {
         div {
@@ -70,12 +73,20 @@ pub fn EditorView(version: usize) -> Element {
                     overflow-x: auto;
                     overflow-y: auto;
                     white-space: pre;
+                    user-select: none;
                 ",
                 for line in &snapshot.lines {
-                    Line {
-                        key: "{line.line_number}",
-                        line: line.clone(),
-                        mode: mode.clone(),
+                    // Include version and selection state in key to force re-render
+                    {
+                        let has_sel = line.selection_range.is_some();
+                        let key = format!("{}-{}-{}", line.line_number, version, has_sel);
+                        rsx! {
+                            Line {
+                                key: "{key}",
+                                line: line.clone(),
+                                mode: mode.clone(),
+                            }
+                        }
                     }
                 }
             }
@@ -247,8 +258,9 @@ fn render_styled_content(
     if let Some(cursor) = cursor_pos {
         if cursor >= len {
             let style = cursor_style.to_string();
+            let cursor_key = "cursor-end";
             spans.push(
-                rsx! { span { key: "cursor-end", id: "editor-cursor", style: "{style}", " " } },
+                rsx! { span { key: "{cursor_key}", id: "editor-cursor", style: "{style}", " " } },
             );
         }
     }

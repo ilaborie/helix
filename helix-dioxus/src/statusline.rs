@@ -8,7 +8,10 @@ use crate::AppState;
 
 /// Status line component that shows editor state.
 #[component]
-pub fn StatusLine(version: usize) -> Element {
+pub fn StatusLine(version: ReadSignal<usize>) -> Element {
+    // Read the signal to subscribe to changes
+    let _ = version();
+
     let app_state = use_context::<AppState>();
     let snapshot = app_state.get_snapshot();
 
