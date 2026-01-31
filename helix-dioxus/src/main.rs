@@ -27,16 +27,14 @@ thread_local! {
 }
 
 mod app;
-mod buffer_bar;
-mod editor_view;
+mod components;
 mod input;
-mod picker;
-mod prompt;
+mod keybindings;
+mod operations;
 mod state;
-mod statusline;
 mod tracing;
 
-use crate::state::{EditorCommand, EditorContext, EditorSnapshot};
+use state::{EditorCommand, EditorContext, EditorSnapshot};
 
 /// Load the helix icon from embedded PNG.
 fn load_icon() -> Option<Icon> {

@@ -39,63 +39,34 @@ pub fn StatusLine(version: ReadSignal<usize>) -> Element {
     rsx! {
         div {
             class: "statusline",
-            style: "
-                display: flex;
-                align-items: center;
-                height: 24px;
-                background-color: #21252b;
-                border-top: 1px solid #181a1f;
-                font-size: 12px;
-                user-select: none;
-            ",
 
-            // Mode indicator
+            // Mode indicator (dynamic colors)
             div {
-                class: "mode",
-                style: "
-                    padding: 0 12px;
-                    height: 100%;
-                    display: flex;
-                    align-items: center;
-                    background-color: {mode_bg};
-                    color: {mode_fg};
-                    font-weight: 600;
-                ",
+                class: "statusline-mode",
+                style: "background-color: {mode_bg}; color: {mode_fg};",
                 "{mode}"
             }
 
             // File name
             div {
-                class: "filename",
-                style: "
-                    padding: 0 12px;
-                    color: #abb2bf;
-                ",
+                class: "statusline-filename",
                 "{file_name}{modified_indicator}"
             }
 
             // Spacer
             div {
-                style: "flex: 1;",
+                class: "statusline-spacer",
             }
 
             // Position info
             div {
-                class: "position",
-                style: "
-                    padding: 0 12px;
-                    color: #5c6370;
-                ",
+                class: "statusline-position",
                 "{line}:{col}"
             }
 
             // Line count / percentage
             div {
-                class: "lines",
-                style: "
-                    padding: 0 12px;
-                    color: #5c6370;
-                ",
+                class: "statusline-position",
                 "{percentage}% of {total_lines}L"
             }
         }

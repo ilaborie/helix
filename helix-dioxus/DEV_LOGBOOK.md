@@ -627,6 +627,60 @@ The window icon set via `with_window_icon()` does not display in the macOS dock.
 
 ---
 
+## 2026-01-31: Code Reorganization and CSS Extraction
+
+### Progress
+- Split picker component into folder structure:
+  - `picker/mod.rs` - Re-exports
+  - `picker/generic.rs` - Main GenericPicker container
+  - `picker/item.rs` - PickerItemRow component
+  - `picker/highlight.rs` - HighlightedText for fuzzy matches
+- Extracted CSS and JavaScript to `assets/head.html`:
+  - All static CSS classes (app-container, editor-view, gutter, buffer-bar, picker, prompt, etc.)
+  - JavaScript functions: `focusAppContainer()`, `scrollCursorIntoView()`
+- Fixed gutter line highlighting bug:
+  - Added version and cursor state to gutter key for proper Dioxus reactivity
+  - Gutter lines now correctly update when cursor moves
+- Updated CLAUDE.md with new module structure and assets pattern
+
+### Technical Notes
+
+**Picker Split Rationale:**
+- Original `picker.rs` was 441 lines with three components
+- Split allows for future specialized pickers while sharing common components
+- `HighlightedText` and `PickerItemRow` can be reused across picker variants
+
+**CSS Extraction Strategy:**
+- Static styles → CSS classes in `head.html`
+- Dynamic styles (with Rust variables) → Inline `style` attributes
+- JavaScript DOM manipulation → Functions in `head.html`, called via `document::eval()`
+
+**Gutter Reactivity Fix:**
+The gutter line div keys only included line number, causing Dioxus to reuse stale elements when cursor moved. Fixed by including `version` and `is_cursor` in the key:
+```rust
+let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
+```
+
+### Files Created
+- `src/components/picker/mod.rs`
+- `src/components/picker/generic.rs`
+- `src/components/picker/item.rs`
+- `src/components/picker/highlight.rs`
+
+### Files Modified
+- `assets/head.html` - Expanded with all CSS classes and JS functions
+- `src/app.rs` - Use CSS classes and JS function
+- `src/components/editor_view.rs` - CSS classes, gutter key fix
+- `src/components/statusline.rs` - CSS classes
+- `src/components/buffer_bar.rs` - CSS classes
+- `src/components/prompt.rs` - CSS classes
+- `CLAUDE.md` - Updated module structure and assets pattern
+
+### Files Deleted
+- `src/components/picker.rs` - Replaced by picker/ folder
+
+---
+
 ## Planned Enhancements
 
 ### Application Icon (macOS)

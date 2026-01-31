@@ -48,15 +48,6 @@ pub fn BufferBar(version: ReadSignal<usize>, on_change: EventHandler<()>) -> Ele
     rsx! {
         div {
             class: "buffer-bar",
-            style: "
-                display: flex;
-                align-items: center;
-                background-color: #21252b;
-                border-bottom: 1px solid #181a1f;
-                height: 32px;
-                padding: 0 4px;
-                flex-shrink: 0;
-            ",
 
             // Left scroll button
             if needs_left_scroll {
@@ -72,12 +63,7 @@ pub fn BufferBar(version: ReadSignal<usize>, on_change: EventHandler<()>) -> Ele
 
             // Buffer tabs
             div {
-                style: "
-                    display: flex;
-                    flex: 1;
-                    overflow: hidden;
-                    gap: 2px;
-                ",
+                class: "buffer-tabs",
                 for buffer in visible_buffers {
                     BufferTab {
                         key: "{buffer.id:?}",
@@ -140,18 +126,8 @@ fn BufferTab(buffer: BufferInfo, on_action: EventHandler<()>) -> Element {
     rsx! {
         div {
             class: "buffer-tab",
-            style: "
-                display: flex;
-                align-items: center;
-                padding: 4px 8px;
-                background-color: {bg_color};
-                border-bottom: {border_bottom};
-                cursor: pointer;
-                min-width: 80px;
-                max-width: 160px;
-                height: 28px;
-                box-sizing: border-box;
-            ",
+            // Dynamic styles for active/inactive state
+            style: "background-color: {bg_color}; border-bottom: {border_bottom};",
             // Tooltip with full name for truncated tabs
             title: "{buffer.name}",
             onmousedown: move |evt| {
@@ -162,39 +138,23 @@ fn BufferTab(buffer: BufferInfo, on_action: EventHandler<()>) -> Element {
                 on_action_switch.call(());
             },
 
-            // File icon - pointer-events: none so clicks pass through to parent
+            // File icon
             span {
-                style: "width: 14px; height: 14px; margin-right: 6px; display: flex; align-items: center; pointer-events: none;",
+                class: "icon-wrapper",
+                style: "width: 14px; height: 14px; margin-right: 6px;",
                 FileText { size: 14, color: text_color }
             }
 
-            // File name (truncated) - pointer-events: none so clicks pass through to parent
+            // File name (truncated)
             span {
-                style: "
-                    color: {text_color};
-                    font-size: 12px;
-                    flex: 1;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
-                    pointer-events: none;
-                ",
+                class: "buffer-tab-name",
+                style: "color: {text_color};",
                 "{buffer.name}{modified_indicator}"
             }
 
             // Close button
             div {
-                style: "
-                    width: 16px;
-                    height: 16px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    margin-left: 4px;
-                    border-radius: 3px;
-                    opacity: 0.6;
-                    cursor: pointer;
-                ",
+                style: "width: 16px; height: 16px; margin-left: 4px; border-radius: 3px; opacity: 0.6; cursor: pointer; display: flex; align-items: center; justify-content: center;",
                 onmousedown: move |evt| {
                     evt.stop_propagation();
                     log::info!("Close button clicked: {:?}", doc_id_close);
@@ -203,7 +163,7 @@ fn BufferTab(buffer: BufferInfo, on_action: EventHandler<()>) -> Element {
                     on_action_close.call(());
                 },
                 span {
-                    style: "pointer-events: none; display: flex; align-items: center; justify-content: center;",
+                    class: "icon-wrapper",
                     X { size: 12, color: text_color }
                 }
             }
@@ -218,23 +178,14 @@ fn ScrollButton(direction: &'static str, onclick: EventHandler<MouseEvent>) -> E
 
     rsx! {
         div {
-            style: "
-                width: 24px;
-                height: 24px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-                border-radius: 3px;
-                color: #5c6370;
-            ",
+            class: "scroll-button",
             onmousedown: move |evt| {
                 evt.stop_propagation();
                 log::info!("Scroll button clicked: {}", direction);
                 onclick.call(evt);
             },
             span {
-                style: "pointer-events: none; display: flex; align-items: center; justify-content: center;",
+                class: "icon-wrapper",
                 if is_left {
                     ChevronLeft { size: 16, color: "#5c6370" }
                 } else {

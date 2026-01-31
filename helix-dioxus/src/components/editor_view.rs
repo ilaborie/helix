@@ -4,7 +4,7 @@
 
 use dioxus::prelude::*;
 
-use crate::state::LineSnapshot;
+use crate::state::{LineSnapshot, TokenSpan};
 use crate::AppState;
 
 /// Editor view component that renders the document content.
@@ -19,47 +19,32 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
     let mode = &snapshot.mode;
 
     // Scroll cursor into view after each render when version changes
-    // Use requestAnimationFrame to ensure DOM is updated before scrolling
     use_effect(move || {
         // version is used to trigger the effect on each state change
         let _ = version;
-        document::eval(
-            r#"
-            requestAnimationFrame(() => {
-                const cursor = document.getElementById('editor-cursor');
-                if (cursor) {
-                    cursor.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-                }
-            });
-        "#,
-        );
+        document::eval("scrollCursorIntoView();");
     });
 
     rsx! {
         div {
             class: "editor-view",
-            style: "display: flex; height: 100%; overflow: hidden; font-size: 14px; line-height: 1.5;",
 
             // Line numbers gutter
             div {
                 class: "gutter",
-                style: "
-                    padding: 8px 12px 8px 8px;
-                    text-align: right;
-                    color: #5c6370;
-                    background-color: #21252b;
-                    user-select: none;
-                    min-width: 40px;
-                ",
                 for line in &snapshot.lines {
-                    div {
-                        key: "{line.line_number}",
-                        style: if line.is_cursor_line {
-                            "color: #abb2bf;"
-                        } else {
-                            ""
-                        },
-                        "{line.line_number}"
+                    // Include version and cursor state in key to force re-render
+                    {
+                        let is_cursor = line.is_cursor_line;
+                        let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
+                        let gutter_class = if is_cursor { "gutter-line-active" } else { "gutter-line" };
+                        rsx! {
+                            div {
+                                key: "{gutter_key}",
+                                class: "{gutter_class}",
+                                "{line.line_number}"
+                            }
+                        }
                     }
                 }
             }
@@ -67,14 +52,6 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
             // Document content
             div {
                 class: "content",
-                style: "
-                    flex: 1;
-                    padding: 8px;
-                    overflow-x: auto;
-                    overflow-y: auto;
-                    white-space: pre;
-                    user-select: none;
-                ",
                 for line in &snapshot.lines {
                     // Include version and selection state in key to force re-render
                     {
@@ -107,17 +84,17 @@ fn Line(line: LineSnapshot, mode: String) -> Element {
         _ => "background-color: #61afef; color: #282c34;", // Normal mode
     };
 
-    // Determine line background:
+    // Determine line class:
     // - Apply selection background at the LINE level to avoid gaps between lines
     // - Non-selected parts of the line will be masked with normal background in render_styled_content
     // - Cursor line gets highlight only if no selection
     let has_selection = line.selection_range.is_some();
-    let line_style = if has_selection {
-        "background-color: #3e4451; min-height: 1.5em;"
+    let line_class = if has_selection {
+        "line line-selected"
     } else if line.is_cursor_line {
-        "background-color: #2c313a; min-height: 1.5em;"
+        "line line-cursor"
     } else {
-        "min-height: 1.5em;"
+        "line"
     };
 
     // Build sorted list of styling events (token starts/ends and cursor position)
@@ -130,8 +107,7 @@ fn Line(line: LineSnapshot, mode: String) -> Element {
     // Render the line content with tokens, cursor, and selection highlighting
     rsx! {
         div {
-            class: "line",
-            style: "{line_style}",
+            class: "{line_class}",
             {render_styled_content(&chars, &line.tokens, cursor_pos, cursor_style, line.selection_range)}
         }
     }
@@ -140,7 +116,7 @@ fn Line(line: LineSnapshot, mode: String) -> Element {
 /// Render content with syntax highlighting tokens, cursor, and selection.
 fn render_styled_content(
     chars: &[char],
-    tokens: &[crate::state::TokenSpan],
+    tokens: &[TokenSpan],
     cursor_pos: Option<usize>,
     cursor_style: &str,
     selection_range: Option<(usize, usize)>,
