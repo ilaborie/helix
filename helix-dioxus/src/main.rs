@@ -128,12 +128,17 @@ impl AppState {
 fn setup_logging() -> Result<()> {
     fern::Dispatch::new()
         .format(|out, message, record| {
+            // Filter out noisy Dioxus webview "SelectionDidChange" errors
+            let msg = message.to_string();
+            if msg.contains("SelectionDidChange") {
+                return;
+            }
             out.finish(format_args!(
                 "{} [{}] {}",
                 chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
                 record.level(),
-                message
-            ))
+                msg
+            ));
         })
         .level(log::LevelFilter::Info)
         .chain(std::io::stderr())
