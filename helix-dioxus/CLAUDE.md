@@ -218,6 +218,12 @@ cargo clippy -p helix-dioxus --bins
 
 ## Troubleshooting
 
+### Test file with intentional error (examples/test_error.rs)
+- **DO NOT DELETE** this file - it contains an intentional type error for testing LSP diagnostics
+- Used to test: error lens, diagnostic underlines, gutter icons, code actions
+- When running `cargo test`, use `--bins` flag to skip examples: `cargo test -p helix-dioxus --bins`
+- Or exclude examples: `cargo test -p helix-dioxus --lib`
+
 ### Selection appears in Normal mode after movement
 - Cause: Helix always has 1-char selection internally
 - Solution: Only render selection in Select mode (`has_selection` tied to mode)
