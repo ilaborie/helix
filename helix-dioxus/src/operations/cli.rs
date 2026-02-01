@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use crate::operations::{BufferOps, PickerOps};
+use crate::operations::{BufferOps, EditingOps, PickerOps};
 use crate::state::{EditorContext, NotificationSeverity};
 
 /// Extension trait for CLI command operations.
@@ -92,6 +92,62 @@ impl CliOps for EditorContext {
             }
             "bd!" | "bdelete!" => {
                 self.close_current_buffer(true);
+            }
+
+            // Reload
+            "reload" | "rl" => {
+                self.reload_document();
+            }
+
+            // Write all
+            "write-all" | "wa" => {
+                self.write_all();
+            }
+
+            // Quit all
+            "quit-all" | "qa" => {
+                self.quit_all(false);
+            }
+            "quit-all!" | "qa!" => {
+                self.quit_all(true);
+            }
+
+            // Buffer close all
+            "buffer-close-all" | "bca" => {
+                self.buffer_close_all(false);
+            }
+            "buffer-close-all!" | "bca!" => {
+                self.buffer_close_all(true);
+            }
+
+            // Buffer close others
+            "buffer-close-others" | "bco" => {
+                self.buffer_close_others();
+            }
+
+            // Directory commands
+            "cd" | "change-current-directory" => {
+                if let Some(path_str) = args {
+                    self.change_directory(&PathBuf::from(path_str));
+                } else {
+                    // cd with no args goes to home
+                    if let Ok(home) = helix_stdx::path::home_dir() {
+                        self.change_directory(&home);
+                    }
+                }
+            }
+            "pwd" => {
+                self.print_working_directory();
+            }
+
+            // History navigation
+            "earlier" => {
+                let steps = args.and_then(|a| a.parse().ok()).unwrap_or(1);
+                self.earlier(steps);
+            }
+            "later" => {
+                let steps = args.and_then(|a| a.parse().ok()).unwrap_or(1);
+                self.later(steps);
             }
 
             _ => {

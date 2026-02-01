@@ -492,6 +492,34 @@ pub enum EditorCommand {
     GlobalSearchResults(Vec<GlobalSearchResult>),
     /// Global search completed.
     GlobalSearchComplete,
+
+    // Buffer management - additional commands
+    /// Reload the current document from disk.
+    ReloadDocument,
+    /// Save all modified buffers.
+    WriteAll,
+    /// Quit all buffers and exit.
+    QuitAll {
+        force: bool,
+    },
+    /// Close all buffers.
+    BufferCloseAll {
+        force: bool,
+    },
+    /// Close all buffers except the current one.
+    BufferCloseOthers,
+
+    // Directory commands
+    /// Change the current working directory.
+    ChangeDirectory(PathBuf),
+    /// Print the current working directory.
+    PrintWorkingDirectory,
+
+    // History navigation
+    /// Undo to an earlier state (multiple steps).
+    Earlier(usize),
+    /// Redo to a later state (multiple steps).
+    Later(usize),
 }
 
 /// Direction for cursor movement.

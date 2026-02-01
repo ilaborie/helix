@@ -794,6 +794,39 @@ impl EditorContext {
             EditorCommand::GlobalSearchComplete => {
                 self.global_search_running = false;
             }
+
+            // Buffer management - additional commands
+            EditorCommand::ReloadDocument => {
+                self.reload_document();
+            }
+            EditorCommand::WriteAll => {
+                self.write_all();
+            }
+            EditorCommand::QuitAll { force } => {
+                self.quit_all(force);
+            }
+            EditorCommand::BufferCloseAll { force } => {
+                self.buffer_close_all(force);
+            }
+            EditorCommand::BufferCloseOthers => {
+                self.buffer_close_others();
+            }
+
+            // Directory commands
+            EditorCommand::ChangeDirectory(path) => {
+                self.change_directory(&path);
+            }
+            EditorCommand::PrintWorkingDirectory => {
+                self.print_working_directory();
+            }
+
+            // History navigation
+            EditorCommand::Earlier(steps) => {
+                self.earlier(steps);
+            }
+            EditorCommand::Later(steps) => {
+                self.later(steps);
+            }
         }
     }
 

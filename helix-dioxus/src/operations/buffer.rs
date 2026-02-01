@@ -1,6 +1,6 @@
 //! Buffer management operations for the editor.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use helix_view::DocumentId;
 
@@ -20,6 +20,15 @@ pub trait BufferOps {
     fn try_quit(&mut self, force: bool);
     fn parse_document_id(&self, id_str: &str) -> Option<DocumentId>;
     fn create_new_buffer(&mut self);
+
+    // Additional buffer management operations
+    fn reload_document(&mut self);
+    fn write_all(&mut self);
+    fn quit_all(&mut self, force: bool);
+    fn buffer_close_all(&mut self, force: bool);
+    fn buffer_close_others(&mut self);
+    fn change_directory(&mut self, path: &Path);
+    fn print_working_directory(&mut self);
 }
 
 impl BufferOps for EditorContext {
@@ -264,5 +273,231 @@ impl BufferOps for EditorContext {
     /// Create a new scratch buffer.
     fn create_new_buffer(&mut self) {
         self.editor.new_file(helix_view::editor::Action::Replace);
+    }
+
+    /// Reload the current document from disk.
+    fn reload_document(&mut self) {
+        let view_id = self.editor.tree.focus;
+        let doc_id = self.editor.tree.get(view_id).doc;
+
+        if let Some(doc) = self.editor.document(doc_id) {
+            if let Some(path) = doc.path().cloned() {
+                match self.editor.open(&path, helix_view::editor::Action::Replace) {
+                    Ok(_) => {
+                        log::info!("Reloaded document from {:?}", path);
+                        self.show_notification(
+                            "File reloaded".to_string(),
+                            NotificationSeverity::Info,
+                        );
+                    }
+                    Err(e) => {
+                        log::error!("Failed to reload document: {}", e);
+                        self.show_notification(
+                            format!("Failed to reload: {}", e),
+                            NotificationSeverity::Error,
+                        );
+                    }
+                }
+            } else {
+                self.show_notification(
+                    "Cannot reload: buffer has no file path".to_string(),
+                    NotificationSeverity::Warning,
+                );
+            }
+        }
+    }
+
+    /// Save all modified buffers.
+    fn write_all(&mut self) {
+        let doc_ids: Vec<_> = self
+            .editor
+            .documents()
+            .filter(|d| d.is_modified())
+            .map(|d| d.id())
+            .collect();
+
+        if doc_ids.is_empty() {
+            self.show_notification(
+                "No modified buffers to save".to_string(),
+                NotificationSeverity::Info,
+            );
+            return;
+        }
+
+        let mut saved_count = 0;
+        let mut error_count = 0;
+
+        for doc_id in doc_ids {
+            // We need to save each document individually
+            // First flush pending changes to history
+            let view_id = self.editor.tree.focus;
+            {
+                let view = self.editor.tree.get_mut(view_id);
+                if let Some(doc) = self.editor.documents.get_mut(&doc_id) {
+                    doc.append_changes_to_history(view);
+                }
+            }
+
+            // Get the save future
+            let save_future = {
+                if let Some(doc) = self.editor.document_mut(doc_id) {
+                    if doc.path().is_none() {
+                        // Skip scratch buffers
+                        continue;
+                    }
+                    match doc.save::<PathBuf>(None, false) {
+                        Ok(future) => Some(future),
+                        Err(e) => {
+                            log::error!("Failed to initiate save for {:?}: {}", doc_id, e);
+                            error_count += 1;
+                            None
+                        }
+                    }
+                } else {
+                    None
+                }
+            };
+
+            // Block on the async save operation
+            if let Some(future) = save_future {
+                match futures::executor::block_on(future) {
+                    Ok(event) => {
+                        log::info!("Saved {:?}", event.path);
+                        if let Some(doc) = self.editor.document_mut(doc_id) {
+                            doc.set_last_saved_revision(event.revision, event.save_time);
+                        }
+                        saved_count += 1;
+                    }
+                    Err(e) => {
+                        log::error!("Save failed: {}", e);
+                        error_count += 1;
+                    }
+                }
+            }
+        }
+
+        if error_count > 0 {
+            self.show_notification(
+                format!("Saved {} files, {} errors", saved_count, error_count),
+                NotificationSeverity::Warning,
+            );
+        } else {
+            self.show_notification(
+                format!("Saved {} files", saved_count),
+                NotificationSeverity::Success,
+            );
+        }
+    }
+
+    /// Quit all buffers and exit.
+    fn quit_all(&mut self, force: bool) {
+        // Check for unsaved changes in any buffer
+        if !force {
+            let has_unsaved = self.editor.documents().any(|d| d.is_modified());
+            if has_unsaved {
+                // Count modified buffers
+                let modified_count = self.editor.documents().filter(|d| d.is_modified()).count();
+                self.confirmation_dialog = ConfirmationDialogSnapshot {
+                    title: "Unsaved Changes".to_string(),
+                    message: format!(
+                        "{} buffer(s) have unsaved changes. What would you like to do?",
+                        modified_count
+                    ),
+                    confirm_label: "Save All & Quit".to_string(),
+                    deny_label: Some("Discard All".to_string()),
+                    cancel_label: "Cancel".to_string(),
+                    action: ConfirmationAction::SaveAndQuit,
+                };
+                self.confirmation_dialog_visible = true;
+                return;
+            }
+        }
+
+        self.should_quit = true;
+        log::info!("Quit all command executed");
+    }
+
+    /// Close all buffers.
+    fn buffer_close_all(&mut self, force: bool) {
+        // Check for unsaved changes if not forcing
+        if !force {
+            let has_unsaved = self.editor.documents().any(|d| d.is_modified());
+            if has_unsaved {
+                self.show_notification(
+                    "Some buffers have unsaved changes. Use :bca! to force close.".to_string(),
+                    NotificationSeverity::Warning,
+                );
+                return;
+            }
+        }
+
+        let doc_ids: Vec<_> = self.editor.documents().map(|d| d.id()).collect();
+        for doc_id in doc_ids {
+            let _ = self.editor.close_document(doc_id, force);
+        }
+
+        // Create a new scratch buffer if all were closed
+        if self.editor.documents.is_empty() {
+            self.editor.new_file(helix_view::editor::Action::Replace);
+        }
+    }
+
+    /// Close all buffers except the current one.
+    fn buffer_close_others(&mut self) {
+        let view_id = self.editor.tree.focus;
+        let current_doc_id = self.editor.tree.get(view_id).doc;
+
+        let other_ids: Vec<_> = self
+            .editor
+            .documents()
+            .map(|d| d.id())
+            .filter(|&id| id != current_doc_id)
+            .collect();
+
+        let mut closed_count = 0;
+        for doc_id in other_ids {
+            if let Ok(()) = self.editor.close_document(doc_id, false) {
+                closed_count += 1;
+            }
+        }
+
+        if closed_count > 0 {
+            self.show_notification(
+                format!("Closed {} buffer(s)", closed_count),
+                NotificationSeverity::Info,
+            );
+        }
+    }
+
+    /// Change the current working directory.
+    fn change_directory(&mut self, path: &Path) {
+        match std::env::set_current_dir(path) {
+            Ok(()) => {
+                if let Ok(cwd) = std::env::current_dir() {
+                    self.show_notification(
+                        format!("Changed to {}", cwd.display()),
+                        NotificationSeverity::Info,
+                    );
+                }
+            }
+            Err(e) => {
+                self.show_notification(format!("Failed to cd: {}", e), NotificationSeverity::Error);
+            }
+        }
+    }
+
+    /// Print the current working directory.
+    fn print_working_directory(&mut self) {
+        match std::env::current_dir() {
+            Ok(cwd) => {
+                self.show_notification(cwd.display().to_string(), NotificationSeverity::Info);
+            }
+            Err(e) => {
+                self.show_notification(
+                    format!("Failed to get cwd: {}", e),
+                    NotificationSeverity::Error,
+                );
+            }
+        }
     }
 }

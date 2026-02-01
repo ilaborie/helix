@@ -1,5 +1,6 @@
 //! Text editing operations for the editor.
 
+use helix_core::history::UndoKind;
 use helix_view::{DocumentId, ViewId};
 
 use crate::state::EditorContext;
@@ -17,6 +18,8 @@ pub trait EditingOps {
     fn redo(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn toggle_line_comment(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn toggle_block_comment(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn earlier(&mut self, steps: usize);
+    fn later(&mut self, steps: usize);
 }
 
 impl EditingOps for EditorContext {
@@ -213,5 +216,29 @@ impl EditingOps for EditorContext {
             helix_core::comment::toggle_block_comments(doc.text(), &selection, tokens);
 
         doc.apply(&transaction, view_id);
+    }
+
+    /// Undo to an earlier state (multiple steps).
+    fn earlier(&mut self, steps: usize) {
+        let view_id = self.editor.tree.focus;
+        let view = self.editor.tree.get_mut(view_id);
+        let doc_id = view.doc;
+        let doc = self.editor.documents.get_mut(&doc_id).expect("doc exists");
+
+        if !doc.earlier(view, UndoKind::Steps(steps)) {
+            log::info!("Already at oldest change");
+        }
+    }
+
+    /// Redo to a later state (multiple steps).
+    fn later(&mut self, steps: usize) {
+        let view_id = self.editor.tree.focus;
+        let view = self.editor.tree.get_mut(view_id);
+        let doc_id = view.doc;
+        let doc = self.editor.documents.get_mut(&doc_id).expect("doc exists");
+
+        if !doc.later(view, UndoKind::Steps(steps)) {
+            log::info!("Already at newest change");
+        }
     }
 }

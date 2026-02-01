@@ -25,7 +25,10 @@ struct MarkerTooltip {
 #[derive(Debug, Clone, PartialEq)]
 enum MarkerKind {
     Search,
-    Diagnostic { severity: DiagnosticSeverity, message: String },
+    Diagnostic {
+        severity: DiagnosticSeverity,
+        message: String,
+    },
 }
 
 /// Custom scrollbar component that displays diagnostic markers.
@@ -82,7 +85,7 @@ pub fn Scrollbar(
 
         // Use JavaScript to get editor-view height (parent container)
         let height = document::eval(
-            r#"document.querySelector('.editor-view')?.getBoundingClientRect().height || 0"#
+            r#"document.querySelector('.editor-view')?.getBoundingClientRect().height || 0"#,
         );
 
         // Clone for the async block
@@ -101,7 +104,11 @@ pub fn Scrollbar(
 
                     let relative_y = click_y - track_top;
                     let ratio = (relative_y / track_height).clamp(0.0, 1.0);
-                    #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                    #[allow(
+                        clippy::cast_precision_loss,
+                        clippy::cast_possible_truncation,
+                        clippy::cast_sign_loss
+                    )]
                     let target_line = (ratio * total_lines as f64) as usize;
 
                     app_state_clone.send_command(EditorCommand::GoToLine(target_line));
@@ -136,7 +143,7 @@ pub fn Scrollbar(
 
         // Use JavaScript to get editor-view height (parent container)
         let height = document::eval(
-            r#"document.querySelector('.editor-view')?.getBoundingClientRect().height || 0"#
+            r#"document.querySelector('.editor-view')?.getBoundingClientRect().height || 0"#,
         );
 
         let app_state_clone = mousemove_app_state.clone();
@@ -152,8 +159,13 @@ pub fn Scrollbar(
                     let ratio_delta = delta_y / track_height;
                     let new_ratio = (start_ratio + ratio_delta).clamp(0.0, 1.0);
 
-                    #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-                    let target_line = (new_ratio * (total_lines.saturating_sub(viewport_lines)) as f64) as usize;
+                    #[allow(
+                        clippy::cast_precision_loss,
+                        clippy::cast_possible_truncation,
+                        clippy::cast_sign_loss
+                    )]
+                    let target_line =
+                        (new_ratio * (total_lines.saturating_sub(viewport_lines)) as f64) as usize;
 
                     app_state_clone.send_command(EditorCommand::ScrollToLine(target_line));
                     app_state_clone.process_commands_sync();

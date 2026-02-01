@@ -1241,10 +1241,65 @@ with many matches, consider pre-computing a byte-to-char lookup table. Added TOD
 
 ---
 
+## 2026-02-01: File-Type Icons & Missing Commands
+
+### Progress
+- Implemented file-type specific icons in buffer bar
+  - Icons are determined by file extension
+  - Supports 30+ file types with appropriate Lucide icons
+- Implemented 10 commonly-used missing commands
+
+### File-Type Icons (buffer_bar.rs)
+- Added `file_icon()` helper function that maps extensions to Lucide icons:
+  - **Code files**: `.rs`, `.js`, `.ts`, `.py`, `.go`, `.java`, etc. → `FileCode`
+  - **Config files**: `.toml`, `.yaml`, `.json` → `Braces`
+  - **Documentation**: `.md`, `.txt`, `.rst` → `FileText`
+  - **Web markup**: `.html`, `.xml`, `.svg` → `Code`
+  - **Stylesheets**: `.css`, `.scss`, `.sass` → `Palette`
+  - **Shell scripts**: `.sh`, `.bash`, `.zsh` → `Terminal`
+  - **Images**: `.png`, `.jpg`, `.gif` → `Image`
+  - **Git files**: `.gitignore`, `.gitattributes` → `GitBranch`
+  - **Lock files**: `.lock` → `Lock`
+  - **Default**: `FileText`
+
+### New Commands Implemented
+| Command | Aliases | Description |
+|---------|---------|-------------|
+| `:reload` | `:rl` | Reload file from disk |
+| `:write-all` | `:wa` | Save all modified buffers |
+| `:quit-all` | `:qa` | Close all buffers and quit |
+| `:quit-all!` | `:qa!` | Force close all and quit |
+| `:buffer-close-all` | `:bca` | Close all buffers |
+| `:buffer-close-all!` | `:bca!` | Force close all buffers |
+| `:buffer-close-others` | `:bco` | Close all except current |
+| `:cd` | `:change-current-directory` | Change working directory |
+| `:pwd` | - | Print working directory |
+| `:earlier` | - | Undo to earlier state (N steps) |
+| `:later` | - | Redo to later state (N steps) |
+
+### Files Modified
+- `src/components/buffer_bar.rs` - Added `file_icon()` function and new icon imports
+- `src/state/types.rs` - Added `EditorCommand` variants for new commands
+- `src/operations/cli.rs` - Added command parsing for all new commands
+- `src/operations/buffer.rs` - Added `BufferOps` implementations for buffer/directory commands
+- `src/operations/editing.rs` - Added `earlier()` and `later()` implementations using `UndoKind`
+- `src/state/mod.rs` - Added command handlers in `handle_command()`
+
+### Technical Notes
+- `:cd` with no arguments navigates to home directory using `helix_stdx::path::home_dir()`
+- `:earlier` and `:later` use `helix_core::history::UndoKind::Steps(n)` for multi-step undo/redo
+- `:wa` iterates through all modified documents and saves each one
+- `:qa` checks for unsaved changes and shows confirmation dialog if any exist
+
+---
+
 ## Planned Enhancements
 
 ### Helix Commands & Modes
-- [ ] Support missing helix commands (comprehensive coverage)
+- [x] Buffer management commands (`:reload`, `:wa`, `:qa`, `:bca`, `:bco`)
+- [x] Directory commands (`:cd`, `:pwd`)
+- [x] History navigation (`:earlier`, `:later`)
+- [ ] Support remaining helix commands (comprehensive coverage)
 - [ ] Space mode (leader key menu)
 - [ ] Goto mode (`g` prefix commands)
 - [ ] Match mode (`m` prefix - matching brackets, surround)
@@ -1294,7 +1349,7 @@ with many matches, consider pre-computing a byte-to-char lookup table. Added TOD
   - Similar to VSCode's command palette or helix's `:` menu
 
 ### Buffer Bar
-- [ ] File-type specific icons (use lucide icons based on extension)
+- [x] File-type specific icons (use lucide icons based on extension)
 - [ ] Option to hide buffer bar (add setting)
 - [ ] Context menu on right-click (close, close others, close all)
 

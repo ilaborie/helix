@@ -107,7 +107,9 @@ impl SearchOps for EditorContext {
             // Search forwards from cursor + 1 char
             let start_char = (cursor_char + 1).min(text.len_chars());
             let start_byte = text.char_to_byte(start_char);
-            text_str[start_byte..].find(pattern).map(|pos| pos + start_byte)
+            text_str[start_byte..]
+                .find(pattern)
+                .map(|pos| pos + start_byte)
         };
 
         // Determine final byte position (with wrap-around if needed)
