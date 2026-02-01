@@ -298,7 +298,7 @@ cargo clippy -p helix-dioxus --bins
 ### UI Improvements (RustRover-inspired)
 - [x] Severity-colored lightbulb indicator - change color based on diagnostic severity (red/yellow/blue/cyan)
 - [x] Code actions search box - filter input with count display, typing filters actions
-- [ ] Diagnostic scrollbar markers - show diagnostic positions on right scrollbar edge
+- [x] Diagnostic scrollbar markers - show diagnostic and search positions on right scrollbar edge
 - [ ] Code actions preview panel - show fix preview before applying (needs LSP resolve)
 - [ ] Dialog search mode setting - user setting to toggle between: (1) current behavior where typing filters directly (arrows for navigation), or (2) vim-style where j/k and arrows navigate, '/' toggles search input focus. Applies to pickers and inline dialogs (code actions, completion, etc.)
 

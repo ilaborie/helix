@@ -1136,6 +1136,7 @@ kbd {
 /* Custom editor scrollbar */
 .editor-scrollbar {
     width: 14px;
+    height: 100%;
     background-color: #21252b;
     flex-shrink: 0;
     cursor: pointer;
@@ -1162,11 +1163,27 @@ kbd {
     min-height: 20px;
     transition: background-color 0.1s;
     z-index: 0;
-    pointer-events: none;
+    cursor: grab;
 }
 
 .scrollbar-thumb:hover {
     background-color: rgba(108, 115, 128, 0.6);
+}
+
+.scrollbar-thumb-dragging {
+    background-color: rgba(128, 135, 148, 0.7);
+    cursor: grabbing;
+}
+
+/* Full-screen overlay for capturing drag events */
+.scrollbar-drag-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9999;
+    cursor: grabbing;
 }
 
 .scrollbar-marker {
@@ -1203,4 +1220,68 @@ kbd {
 .scrollbar-marker-error {
     background-color: #e06c75;
     z-index: 5;
+}
+
+/* Scrollbar marker tooltip */
+.scrollbar-tooltip {
+    position: absolute;
+    right: 100%;
+    /* top is set dynamically via inline style */
+    transform: translateY(-50%);
+    margin-right: 8px;
+    padding: 6px 10px;
+    background-color: #2c313a;
+    border: 1px solid #3e4451;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    max-width: 400px;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
+}
+
+.scrollbar-tooltip-header {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 2px;
+}
+
+.scrollbar-tooltip-severity {
+    font-weight: 600;
+}
+
+.scrollbar-tooltip-line {
+    color: #5c6370;
+    font-size: 11px;
+}
+
+.scrollbar-tooltip-message {
+    color: #abb2bf;
+    font-size: 11px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-width: 380px;
+}
+
+/* Tooltip severity colors */
+.scrollbar-tooltip-search .scrollbar-tooltip-severity {
+    color: #e5c07b;
+}
+
+.scrollbar-tooltip-error .scrollbar-tooltip-severity {
+    color: #e06c75;
+}
+
+.scrollbar-tooltip-warning .scrollbar-tooltip-severity {
+    color: #e5c07b;
+}
+
+.scrollbar-tooltip-info .scrollbar-tooltip-severity {
+    color: #61afef;
+}
+
+.scrollbar-tooltip-hint .scrollbar-tooltip-severity {
+    color: #56b6c2;
 }

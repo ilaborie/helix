@@ -12,7 +12,11 @@ use super::highlight::HighlightedText;
 
 /// Individual picker item row.
 #[component]
-pub fn PickerItemRow(item: PickerItem, is_selected: bool) -> Element {
+pub fn PickerItemRow(
+    item: PickerItem,
+    is_selected: bool,
+    #[props(default)] on_click: Option<EventHandler<MouseEvent>>,
+) -> Element {
     let item_class = if is_selected {
         "picker-item picker-item-selected"
     } else {
@@ -61,6 +65,11 @@ pub fn PickerItemRow(item: PickerItem, is_selected: bool) -> Element {
     rsx! {
         div {
             class: "{item_class}",
+            onclick: move |evt| {
+                if let Some(handler) = &on_click {
+                    handler.call(evt);
+                }
+            },
 
             // Selection indicator
             span {

@@ -5,7 +5,8 @@
 use dioxus::prelude::*;
 use lucide_dioxus::Search;
 
-use crate::state::{PickerItem, PickerMode};
+use crate::state::{EditorCommand, PickerItem, PickerMode};
+use crate::AppState;
 
 use super::item::PickerItemRow;
 
@@ -19,6 +20,8 @@ pub fn GenericPicker(
     mode: PickerMode,
     current_path: Option<String>,
 ) -> Element {
+    let app_state = use_context::<AppState>();
+
     // Calculate visible window (show 15 items max, centered on selection)
     let window_size = 15usize;
     let half_window = window_size / 2;
@@ -156,10 +159,21 @@ pub fn GenericPicker(
                         }
                     } else {
                         for (idx, item) in visible_items {
-                            PickerItemRow {
-                                key: "{idx}",
-                                item: item.clone(),
-                                is_selected: idx == selected,
+                            {
+                                let item_app_state = app_state.clone();
+                                let handle_click = move |evt: MouseEvent| {
+                                    evt.stop_propagation();
+                                    item_app_state.send_command(EditorCommand::PickerConfirmItem(idx));
+                                    item_app_state.process_commands_sync();
+                                };
+                                rsx! {
+                                    PickerItemRow {
+                                        key: "{idx}",
+                                        item: item.clone(),
+                                        is_selected: idx == selected,
+                                        on_click: handle_click,
+                                    }
+                                }
                             }
                         }
                     }

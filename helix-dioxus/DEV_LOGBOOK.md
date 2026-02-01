@@ -1153,6 +1153,94 @@ let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
 
 ---
 
+## 2026-02-01: Critical Bug Fix - Byte vs Char Position in Search
+
+### The Bug
+Search (`/pattern`) and next/previous match (`n`/`N`) were jumping to wrong positions in files
+containing multi-byte UTF-8 characters (like "→" arrows or emoji). The cursor would land
+at incorrect positions, making search unreliable.
+
+### Root Cause
+The `do_search()` function was mixing **byte positions** (from `String::find()`) with
+**char positions** (used by helix's `Selection`). In Rust:
+- `String::find()` returns byte offsets
+- `String::len()` returns byte length
+- But helix's Selection expects char positions
+
+For ASCII text, byte == char, so it worked. But UTF-8 multi-byte characters (like "→" = 3 bytes)
+caused the positions to diverge.
+
+### The Fix
+Use Rope's efficient conversion methods:
+- `rope.char_to_byte(char_pos)` - convert char index to byte index for string slicing
+- `rope.byte_to_char(byte_pos)` - convert search result back to char index for Selection
+- `pattern.chars().count()` instead of `pattern.len()` for char length
+
+These methods are O(log n) using Rope's internal structure, vs O(n) for manual iteration.
+
+### Key Learning: Byte vs Char in helix-dioxus
+When working with text in helix-dioxus, always be aware of the index type:
+
+| Source | Returns | Use For |
+|--------|---------|---------|
+| `String::find()` | byte position | String slicing only |
+| `String::len()` | byte length | String operations only |
+| `str.chars().count()` | char count | When you need char length |
+| `Selection::cursor()` | char position | Rope operations |
+| `Rope::char_to_byte()` | byte position | O(log n) conversion |
+| `Rope::byte_to_char()` | char position | O(log n) conversion |
+| `Rope::char_to_line()` | line number | Line-based operations |
+
+**Rule**: Never pass a byte position to Selection, and never slice a String with a char position.
+
+### Files Modified
+- `src/operations/search.rs` - Fixed `do_search()` to properly convert between byte and char positions
+
+### Performance Note
+`collect_search_match_lines()` still uses O(n) char counting per match. For very large documents
+with many matches, consider pre-computing a byte-to-char lookup table. Added TODO comment.
+
+---
+
+## 2026-02-01: Scrollbar Marker Click & Tooltip
+
+### Progress
+- Added click-to-navigate on scrollbar markers (both search and diagnostic markers)
+- Added hover tooltip showing marker details (severity, line number, message)
+- Changed click behavior to use `GoToLine` command (moves cursor) vs `ScrollToLine` (only scrolls)
+
+### Implementation Details
+- **New command**: `EditorCommand::GoToLine(usize)` - moves cursor to line and scrolls view
+- **Marker tooltip**: Shows on hover with severity (Error/Warning/Search match), line number, and message
+- **Tooltip positioning**: Positioned at the marker's vertical position, to the left of scrollbar
+- **Message truncation**: Long diagnostic messages truncated to 80 chars with "..."
+
+### Files Modified
+- `src/state/types.rs` - Added `GoToLine` command, added `message` field to `ScrollbarDiagnostic`
+- `src/state/mod.rs` - Handle `GoToLine` command, populate diagnostic message
+- `src/components/scrollbar.rs` - Added `MarkerTooltip` struct, hover handlers, tooltip rendering
+- `assets/styles.css` - Added scrollbar tooltip styles with severity-colored headers
+
+---
+
+## 2026-02-01: Picker Mouse Click Support
+
+### Progress
+- Added mouse click support to picker items for direct selection
+
+### Implementation Details
+- Added `on_click` prop to `PickerItemRow` component
+- `GenericPicker` passes click handlers that call `PickerConfirmItem(idx)`
+- New `EditorCommand::PickerConfirmItem(usize)` selects and confirms the item
+
+### Files Modified
+- `src/components/picker/item.rs` - Added `on_click` prop
+- `src/components/picker/generic.rs` - Pass click handlers to items
+- `src/state/types.rs` - Added `PickerConfirmItem` command
+- `src/state/mod.rs` - Handle `PickerConfirmItem` command
+
+---
+
 ## Planned Enhancements
 
 ### Helix Commands & Modes
@@ -1210,8 +1298,16 @@ let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
 - [ ] Option to hide buffer bar (add setting)
 - [ ] Context menu on right-click (close, close others, close all)
 
+### Scrollbar Interactions (Blocked)
+- [ ] Fix track click to scroll to position
+- [ ] Fix thumb drag to scroll document
+- **Blocker**: Cannot get scrollbar element height at runtime
+  - `onmounted` returns height=0 (element not laid out yet)
+  - `document::eval` with `getBoundingClientRect()` also returns 0
+  - Need to investigate Dioxus desktop element sizing or use different approach
+  - Possible solutions: delay height capture, use ResizeObserver, calculate from viewport
+
 ### Picker Infrastructure
-- [ ] Mouse click to select items
 - [ ] Scrollbar for long lists
 - [ ] Preview pane (file content preview)
 

@@ -329,6 +329,9 @@ impl EditorContext {
             EditorCommand::ScrollToLine(target_line) => {
                 self.scroll_to_line(doc_id, view_id, target_line);
             }
+            EditorCommand::GoToLine(line) => {
+                self.goto_line_column(line, 0);
+            }
 
             // Mode changes
             EditorCommand::EnterInsertMode => self.editor.mode = Mode::Insert,
@@ -474,6 +477,13 @@ impl EditorContext {
             EditorCommand::PickerBackspace => {
                 self.picker_filter.pop();
                 self.picker_selected = 0;
+            }
+            EditorCommand::PickerConfirmItem(idx) => {
+                let filtered = self.filtered_picker_items();
+                if idx < filtered.len() {
+                    self.picker_selected = idx;
+                    self.picker_confirm();
+                }
             }
 
             // Buffer navigation
@@ -1181,12 +1191,13 @@ impl EditorContext {
             })
             .count();
 
-        // Collect ALL diagnostics summary for scrollbar markers (line + severity only)
+        // Collect ALL diagnostics summary for scrollbar markers
         let all_diagnostics_summary: Vec<types::ScrollbarDiagnostic> = all_diagnostics
             .iter()
             .map(|d| types::ScrollbarDiagnostic {
                 line: d.line,
                 severity: d.severity.map(DiagnosticSeverity::from).unwrap_or_default(),
+                message: d.message.clone(),
             })
             .collect();
 

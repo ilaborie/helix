@@ -80,12 +80,14 @@ pub enum PickerMode {
 }
 
 /// Minimal diagnostic info for scrollbar markers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScrollbarDiagnostic {
     /// Line number (0-indexed).
     pub line: usize,
     /// Diagnostic severity.
     pub severity: DiagnosticSeverity,
+    /// Diagnostic message (truncated for display).
+    pub message: String,
 }
 
 /// A snapshot of the editor state for rendering.
@@ -244,6 +246,8 @@ pub enum EditorCommand {
     ScrollDown(usize),
     /// Scroll to make a specific line visible (0-indexed).
     ScrollToLine(usize),
+    /// Move cursor to a specific line (0-indexed) and scroll view.
+    GoToLine(usize),
 
     // Mode changes
     EnterInsertMode,
@@ -318,6 +322,8 @@ pub enum EditorCommand {
     PickerCancel,
     PickerInput(char),
     PickerBackspace,
+    /// Click on a picker item to select and confirm it.
+    PickerConfirmItem(usize),
 
     // Buffer navigation
     BufferBarScrollLeft,
