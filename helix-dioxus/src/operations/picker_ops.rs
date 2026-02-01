@@ -395,6 +395,24 @@ impl PickerOps for EditorContext {
                         }
                     }
                 }
+                PickerMode::References | PickerMode::Definitions => {
+                    // Extract location data before mutable borrow
+                    if let Ok(idx) = selected.id.parse::<usize>() {
+                        let location_data = self
+                            .locations
+                            .get(idx)
+                            .map(|loc| (loc.path.clone(), loc.line, loc.column));
+
+                        if let Some((path, line, column)) = location_data {
+                            // Open the file
+                            self.open_file(&path);
+                            // Navigate to position (1-indexed to 0-indexed)
+                            let line = line.saturating_sub(1);
+                            let column = column.saturating_sub(1);
+                            self.goto_line_column(line, column);
+                        }
+                    }
+                }
             }
         } else if self.picker_mode == PickerMode::GlobalSearch && !self.picker_filter.is_empty() {
             // No items selected but filter is present - execute search
@@ -411,6 +429,7 @@ impl PickerOps for EditorContext {
         self.symbols.clear();
         self.picker_diagnostics.clear();
         self.global_search_results.clear();
+        self.locations.clear();
         self.cancel_global_search();
     }
 }
@@ -524,6 +543,84 @@ impl EditorContext {
                 }
             })
             .collect();
+    }
+
+    /// Update picker items from locations (used by References mode).
+    pub(crate) fn update_references_picker_items(&mut self) {
+        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+
+        self.picker_items = self
+            .locations
+            .iter()
+            .enumerate()
+            .map(|(idx, loc)| {
+                let relative_path = loc
+                    .path
+                    .strip_prefix(&cwd)
+                    .unwrap_or(&loc.path)
+                    .to_string_lossy();
+
+                let display = format!("{}:{}:{}", relative_path, loc.line, loc.column);
+                let secondary = loc.preview.clone();
+
+                PickerItem {
+                    id: idx.to_string(),
+                    display,
+                    icon: PickerIcon::Reference,
+                    match_indices: vec![],
+                    secondary,
+                }
+            })
+            .collect();
+    }
+
+    /// Show references in the generic picker.
+    pub(crate) fn show_references_picker(&mut self) {
+        self.update_references_picker_items();
+        self.picker_filter.clear();
+        self.picker_selected = 0;
+        self.picker_visible = true;
+        self.picker_mode = PickerMode::References;
+        self.picker_current_path = None;
+    }
+
+    /// Update picker items from locations (used by Definitions mode).
+    pub(crate) fn update_definitions_picker_items(&mut self) {
+        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+
+        self.picker_items = self
+            .locations
+            .iter()
+            .enumerate()
+            .map(|(idx, loc)| {
+                let relative_path = loc
+                    .path
+                    .strip_prefix(&cwd)
+                    .unwrap_or(&loc.path)
+                    .to_string_lossy();
+
+                let display = format!("{}:{}:{}", relative_path, loc.line, loc.column);
+                let secondary = loc.preview.clone();
+
+                PickerItem {
+                    id: idx.to_string(),
+                    display,
+                    icon: PickerIcon::Definition,
+                    match_indices: vec![],
+                    secondary,
+                }
+            })
+            .collect();
+    }
+
+    /// Show definitions in the generic picker.
+    pub(crate) fn show_definitions_picker(&mut self) {
+        self.update_definitions_picker_items();
+        self.picker_filter.clear();
+        self.picker_selected = 0;
+        self.picker_visible = true;
+        self.picker_mode = PickerMode::Definitions;
+        self.picker_current_path = None;
     }
 }
 

@@ -2,8 +2,8 @@
 
 use dioxus::prelude::*;
 use lucide_dioxus::{
-    Blocks, Braces, ChevronRight, CircleX, Code, Component, File, FileText, Folder, Hash, Info,
-    Layers, Lightbulb, Package, SquareFunction, TextSearch, TriangleAlert, Variable,
+    Blocks, Braces, ChevronRight, CircleX, Code, Component, File, FileCode, FileText, Folder, Hash,
+    Info, Layers, Lightbulb, Link2, Package, SquareFunction, TextSearch, TriangleAlert, Variable,
 };
 
 use crate::state::{PickerIcon, PickerItem};
@@ -39,7 +39,10 @@ pub fn PickerItemRow(item: PickerItem, is_selected: bool) -> Element {
         PickerIcon::DiagnosticInfo => "#61afef",    // Blue
         PickerIcon::DiagnosticHint => "#56b6c2",    // Cyan
         // Search result
-        PickerIcon::SearchResult => "#98c379",      // Green
+        PickerIcon::SearchResult => "#98c379", // Green
+        // Location icons
+        PickerIcon::Reference => "#61afef",  // Blue
+        PickerIcon::Definition => "#c678dd", // Purple
         // Default colors
         PickerIcon::File | PickerIcon::Buffer => "#abb2bf", // Default gray
     };
@@ -50,7 +53,7 @@ pub fn PickerItemRow(item: PickerItem, is_selected: bool) -> Element {
         | PickerIcon::DiagnosticWarning
         | PickerIcon::DiagnosticInfo
         | PickerIcon::DiagnosticHint => "#abb2bf", // Neutral for diagnostics
-        _ => icon_color,                           // Same as icon for others
+        _ => icon_color, // Same as icon for others
     };
 
     let indicator_opacity = if is_selected { "1" } else { "0" };
@@ -92,6 +95,8 @@ pub fn PickerItemRow(item: PickerItem, is_selected: bool) -> Element {
                     PickerIcon::DiagnosticInfo => rsx! { Info { size: 16, color: icon_color } },
                     PickerIcon::DiagnosticHint => rsx! { Lightbulb { size: 16, color: icon_color } },
                     PickerIcon::SearchResult => rsx! { TextSearch { size: 16, color: icon_color } },
+                    PickerIcon::Reference => rsx! { Link2 { size: 16, color: icon_color } },
+                    PickerIcon::Definition => rsx! { FileCode { size: 16, color: icon_color } },
                 }}
             }
 

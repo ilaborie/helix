@@ -52,6 +52,8 @@ pub fn GenericPicker(
         PickerMode::DocumentDiagnostics => "Document Diagnostics",
         PickerMode::WorkspaceDiagnostics => "Workspace Diagnostics",
         PickerMode::GlobalSearch => "Global Search",
+        PickerMode::References => "References",
+        PickerMode::Definitions => "Definitions",
     };
 
     rsx! {

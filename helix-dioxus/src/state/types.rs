@@ -48,6 +48,9 @@ pub enum PickerIcon {
     DiagnosticHint,
     // Search result icon
     SearchResult,
+    // Location icons
+    Reference,
+    Definition,
 }
 
 /// Generic picker item with match highlighting.
@@ -72,6 +75,8 @@ pub enum PickerMode {
     DocumentDiagnostics,
     WorkspaceDiagnostics,
     GlobalSearch,
+    References,
+    Definitions,
 }
 
 /// A snapshot of the editor state for rendering.

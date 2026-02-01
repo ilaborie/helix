@@ -1053,6 +1053,40 @@ let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
 
 ---
 
+## 2026-02-01: LSP References & Definitions Picker
+
+### Progress
+- Converted LSP References (`gr`) and Definitions (`gd`) from using the standalone `LocationPicker`
+  component to using the `GenericPicker` infrastructure
+- Both now have fuzzy filtering, match highlighting, count display, and windowing (15 visible items)
+
+### Features
+- **References picker** (`gr`): Shows all references to symbol under cursor
+  - Blue Link2 icon for reference locations
+  - Title: "References"
+- **Definitions picker** (`gd`): Shows definitions when multiple exist
+  - Purple FileCode icon for definition locations
+  - Title: "Definitions"
+- **Single result optimization**: If only one location is found, jumps directly without showing picker
+- **Consistent UI**: Same look and feel as other pickers (symbols, diagnostics, global search)
+
+### Files Modified
+- `src/state/types.rs` - Added `PickerMode::References`, `PickerMode::Definitions`,
+  `PickerIcon::Reference`, `PickerIcon::Definition`
+- `src/state/mod.rs` - Modified `LspResponse::References` and `LspResponse::GotoDefinition`
+  handling to use GenericPicker instead of LocationPicker
+- `src/operations/picker_ops.rs` - Added `update_references_picker_items()`, `show_references_picker()`,
+  `update_definitions_picker_items()`, `show_definitions_picker()`, combined handling in `picker_confirm()`
+- `src/components/picker/item.rs` - Added `Link2` and `FileCode` icon imports and rendering
+- `src/components/picker/generic.rs` - Added "References" and "Definitions" titles
+
+### Technical Notes
+- References and Definitions share the same confirm handler logic since both use the `locations` field
+- The `LocationPicker` component is now unused for these features (could be deprecated)
+- Display format: `relative/path/file.rs:line:column` with preview text as secondary
+
+---
+
 ## Planned Enhancements
 
 ### Helix Commands & Modes
@@ -1120,7 +1154,8 @@ let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
 - [x] Workspace symbol picker (project-wide symbols)
 - [x] Global search picker (grep-based, `Space+/`)
 - [x] Diagnostics picker (jump to errors/warnings)
-- [ ] References picker (LSP references)
+- [x] References picker (LSP references, `gr`)
+- [x] Definitions picker (LSP definitions, `gd`)
 - [ ] Command picker (all available commands)
 - [ ] Theme picker (preview and switch themes)
 - [ ] Jumplist picker (navigation history)

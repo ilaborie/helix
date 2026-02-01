@@ -811,11 +811,9 @@ impl EditorContext {
                     self.location_selected = 0;
                     self.jump_to_location();
                 } else if !locations.is_empty() {
-                    // Multiple locations - show picker
+                    // Multiple locations - show GenericPicker
                     self.locations = locations;
-                    self.location_selected = 0;
-                    self.location_picker_title = "Definitions".to_string();
-                    self.location_picker_visible = true;
+                    self.show_definitions_picker();
                 }
             }
             LspResponse::References(locations) => {
@@ -825,11 +823,9 @@ impl EditorContext {
                     self.location_selected = 0;
                     self.jump_to_location();
                 } else if !locations.is_empty() {
-                    // Multiple locations - show picker
+                    // Multiple locations - show GenericPicker
                     self.locations = locations;
-                    self.location_selected = 0;
-                    self.location_picker_title = "References".to_string();
-                    self.location_picker_visible = true;
+                    self.show_references_picker();
                 }
             }
             LspResponse::CodeActions(actions) => {
@@ -2664,10 +2660,7 @@ impl EditorContext {
                     start_col,
                     end_col,
                     message: d.message.clone(),
-                    severity: d
-                        .severity
-                        .map(DiagnosticSeverity::from)
-                        .unwrap_or_default(),
+                    severity: d.severity.map(DiagnosticSeverity::from).unwrap_or_default(),
                     source: d.source.clone(),
                     code: convert_diagnostic_code(&d.code),
                 };
@@ -2719,10 +2712,7 @@ impl EditorContext {
                     start_col,
                     end_col,
                     message: d.message.clone(),
-                    severity: d
-                        .severity
-                        .map(DiagnosticSeverity::from)
-                        .unwrap_or_default(),
+                    severity: d.severity.map(DiagnosticSeverity::from).unwrap_or_default(),
                     source: d.source.clone(),
                     code: convert_diagnostic_code(&d.code),
                 };
@@ -2799,7 +2789,10 @@ impl EditorContext {
                 // Truncate message to fit (accounting for prefix)
                 let max_msg_len = 70usize.saturating_sub(prefix.len());
                 let message = if entry.diagnostic.message.len() > max_msg_len {
-                    format!("{}...", &entry.diagnostic.message[..max_msg_len.saturating_sub(3)])
+                    format!(
+                        "{}...",
+                        &entry.diagnostic.message[..max_msg_len.saturating_sub(3)]
+                    )
                 } else {
                     entry.diagnostic.message.clone()
                 };
