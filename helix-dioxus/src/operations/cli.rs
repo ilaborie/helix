@@ -43,6 +43,20 @@ impl CliOps for EditorContext {
             }
             "w" | "write" => {
                 let path = args.map(PathBuf::from);
+                if path.is_none() {
+                    // Check if current document is a scratch buffer (no path)
+                    let view_id = self.editor.tree.focus;
+                    let doc_id = self.editor.tree.get(view_id).doc;
+                    if let Some(doc) = self.editor.document(doc_id) {
+                        if doc.path().is_none() {
+                            // Show Save As dialog instead of erroring
+                            self.show_save_as_dialog();
+                            self.command_mode = false;
+                            self.command_input.clear();
+                            return;
+                        }
+                    }
+                }
                 self.save_document(path, false);
             }
             "w!" | "write!" => {
@@ -56,6 +70,11 @@ impl CliOps for EditorContext {
             "wq!" | "x!" => {
                 self.save_document(None, true);
                 self.try_quit(true);
+            }
+
+            // New file command
+            "n" | "new" => {
+                self.create_new_buffer();
             }
 
             // Buffer commands

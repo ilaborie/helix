@@ -299,6 +299,8 @@ pub enum EditorCommand {
 
     // File operations
     OpenFile(PathBuf),
+    /// Save document to a specific path (used by Save As dialog).
+    SaveDocumentToPath(PathBuf),
 
     // LSP - Completion
     /// Trigger completion popup manually.

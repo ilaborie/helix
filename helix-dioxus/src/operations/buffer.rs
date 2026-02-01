@@ -19,6 +19,7 @@ pub trait BufferOps {
     fn save_document(&mut self, path: Option<PathBuf>, force: bool);
     fn try_quit(&mut self, force: bool);
     fn parse_document_id(&self, id_str: &str) -> Option<DocumentId>;
+    fn create_new_buffer(&mut self);
 }
 
 impl BufferOps for EditorContext {
@@ -183,8 +184,10 @@ impl BufferOps for EditorContext {
         match futures::executor::block_on(save_future) {
             Ok(event) => {
                 log::info!("Saved to {:?}", event.path);
-                // Update the document's modified state
+                // Update the document's path and modified state
                 if let Some(doc) = self.editor.document_mut(doc_id) {
+                    // Set the document path (important for Save As on scratch buffers)
+                    doc.set_path(Some(&event.path));
                     doc.set_last_saved_revision(event.revision, event.save_time);
                 }
                 // Use relative path if shorter than absolute path
@@ -256,5 +259,10 @@ impl BufferOps for EditorContext {
             }
         }
         None
+    }
+
+    /// Create a new scratch buffer.
+    fn create_new_buffer(&mut self) {
+        self.editor.new_file(helix_view::editor::Action::Replace);
     }
 }

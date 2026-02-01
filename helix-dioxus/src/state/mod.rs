@@ -477,6 +477,9 @@ impl EditorContext {
             EditorCommand::OpenFile(path) => {
                 self.open_file(&path);
             }
+            EditorCommand::SaveDocumentToPath(path) => {
+                self.save_document(Some(path), false);
+            }
 
             // LSP - Completion
             EditorCommand::TriggerCompletion => {
@@ -2287,6 +2290,31 @@ impl EditorContext {
                 self.execute_rename_symbol(&value);
             }
         }
+    }
+
+    /// Show the native Save As dialog for scratch buffers.
+    /// Uses the system file dialog via rfd crate (async to avoid blocking UI).
+    pub(crate) fn show_save_as_dialog(&mut self) {
+        use rfd::AsyncFileDialog;
+
+        // Get current working directory for default location
+        let start_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+
+        let tx = self.command_tx.clone();
+        tokio::spawn(async move {
+            // Show native save dialog asynchronously
+            let file_handle = AsyncFileDialog::new()
+                .set_directory(&start_dir)
+                .set_file_name("untitled")
+                .save_file()
+                .await;
+
+            if let Some(handle) = file_handle {
+                let path = handle.path().to_path_buf();
+                let _ = tx.send(EditorCommand::SaveDocumentToPath(path));
+            }
+            // If user cancelled, do nothing
+        });
     }
 
     /// Handle confirmation dialog confirm button (yes/save action).

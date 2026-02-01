@@ -56,6 +56,9 @@ ignore = "0.4"
 # Glob pattern matching
 glob = "0.3"
 
+# Native file dialogs
+rfd = "0.15"
+
 [build-dependencies]
 helix-loader = { path = "../helix-loader" }
 

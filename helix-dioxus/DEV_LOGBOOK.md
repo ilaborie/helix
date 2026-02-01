@@ -923,6 +923,44 @@ let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
 
 ---
 
+## 2026-02-01: Save As Dialog and New File Command
+
+### Progress
+- Implemented `:new` / `:n` command to create scratch buffers
+- Implemented Save As dialog using native OS file picker
+  - Opens when running `:w` on a scratch buffer (no path)
+  - Uses `rfd` crate's `AsyncFileDialog` for non-blocking native dialog
+  - Properly updates buffer name and path after saving
+
+### Implementation Details
+
+**New File Command (`:new` / `:n`):**
+- Added `create_new_buffer()` method to `BufferOps` trait
+- Calls `editor.new_file(Action::Replace)` to create scratch buffer
+- Buffer shows as "[scratch]" in buffer bar
+
+**Save As Dialog:**
+- Added `rfd = "0.15"` dependency for native file dialogs
+- Used async dialog to avoid blocking UI thread
+- Flow: `:w` → detect scratch buffer → spawn async dialog → send `SaveDocumentToPath` command
+- After save, `doc.set_path()` updates the document's internal path
+
+### Files Modified
+- `Cargo.toml` - Added `rfd` dependency
+- `src/state/types.rs` - Added `SaveDocumentToPath(PathBuf)` command
+- `src/state/mod.rs` - Added `show_save_as_dialog()` method, handled new command
+- `src/operations/buffer.rs` - Added `create_new_buffer()`, call `set_path()` after save
+- `src/operations/cli.rs` - Added `:new`/`:n` command, modified `:w` for scratch buffers
+
+### Technical Notes
+- Using `AsyncFileDialog` instead of `FileDialog` to avoid blocking the main thread
+- The async result is sent back via `command_tx.send(EditorCommand::SaveDocumentToPath(path))`
+- `doc.set_path()` is called after save to update the document's path, which:
+  - Updates the buffer name in the buffer bar
+  - Prevents Save As dialog from showing on subsequent `:w` calls
+
+---
+
 ## Planned Enhancements
 
 ### Helix Commands & Modes
