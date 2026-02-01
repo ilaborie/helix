@@ -41,6 +41,11 @@ pub enum PickerIcon {
     SymbolField,
     SymbolModule,
     SymbolOther,
+    // Diagnostic icons
+    DiagnosticError,
+    DiagnosticWarning,
+    DiagnosticInfo,
+    DiagnosticHint,
 }
 
 /// Generic picker item with match highlighting.
@@ -62,6 +67,8 @@ pub enum PickerMode {
     Buffers,
     DocumentSymbols,
     WorkspaceSymbols,
+    DocumentDiagnostics,
+    WorkspaceDiagnostics,
 }
 
 /// A snapshot of the editor state for rendering.
@@ -359,6 +366,10 @@ pub enum EditorCommand {
     NextDiagnostic,
     /// Jump to previous diagnostic.
     PrevDiagnostic,
+    /// Show document diagnostics picker.
+    ShowDocumentDiagnostics,
+    /// Show workspace diagnostics picker.
+    ShowWorkspaceDiagnostics,
 
     // LSP - Format
     /// Format the current document.

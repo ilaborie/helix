@@ -961,6 +961,52 @@ let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
 
 ---
 
+## 2026-02-01: Diagnostics Picker
+
+### Progress
+- Implemented document diagnostics picker (`Space+d`)
+  - Shows all diagnostics for the current file
+  - Sorted by line number
+  - Navigate and jump to diagnostic location
+- Implemented workspace diagnostics picker (`Space+D`)
+  - Shows diagnostics from all open files
+  - Sorted by severity (errors first), then file, then line
+  - Opens file and jumps to diagnostic on selection
+- Display format includes severity badge and diagnostic code:
+  - `[error E0308] mismatched types expected 'String', found integer`
+  - `[warn] unused variable 'x'`
+  - `[hint] expected due to this`
+
+### Bug Fix: Picker Fuzzy Match Highlighting
+- Fixed bug where fuzzy match highlighting showed wrong characters
+- Root cause: When secondary field (e.g., `test_error.rs:7`) had better match score than display,
+  the code incorrectly applied secondary's indices to display text
+- Example: Search "to" in secondary `test_error.rs:7` gave indices [0, 8],
+  which highlighted `[` and `0` in the display `[error E0308]...`
+- Fix: When secondary match wins, still use display's match indices for highlighting
+- This was a pre-existing bug that affected all pickers (file, buffer, symbol, diagnostic)
+
+### Files Modified
+- `src/state/types.rs` - Added `PickerMode::DocumentDiagnostics/WorkspaceDiagnostics`,
+  `PickerIcon::DiagnosticError/Warning/Info/Hint`, `EditorCommand::Show*Diagnostics`
+- `src/lsp/types.rs` - Added `DiagnosticPickerEntry` struct
+- `src/lsp/mod.rs` - Exported `DiagnosticPickerEntry`
+- `src/state/mod.rs` - Added `picker_diagnostics` field, `show_*_diagnostics_picker()` methods,
+  `populate_diagnostic_picker_items()`, helper functions
+- `src/operations/picker_ops.rs` - Added diagnostic picker confirm handling, fixed highlight bug
+- `src/keybindings/normal.rs` - Added `Space+d` and `Space+D` bindings
+- `src/components/picker/item.rs` - Added diagnostic icons and colors (icon uses severity color,
+  text uses neutral for better highlight visibility)
+- `src/components/picker/generic.rs` - Added picker titles for diagnostic modes
+
+### Technical Notes
+- Diagnostics are collected from `doc.diagnostics()` and converted to `DiagnosticPickerEntry`
+- Severity sorting uses helper function `get_severity_sort_key()` (Error=0, Warning=1, Info=2, Hint=3)
+- Diagnostic code conversion handles `NumberOrString` enum from helix-core
+- Icon color reflects severity, text uses neutral `#abb2bf` so fuzzy highlighting is visible
+
+---
+
 ## Planned Enhancements
 
 ### Helix Commands & Modes
@@ -1027,7 +1073,7 @@ let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
 - [x] Symbol picker (document symbols via LSP)
 - [x] Workspace symbol picker (project-wide symbols)
 - [ ] Global search picker (ripgrep integration)
-- [ ] Diagnostics picker (jump to errors/warnings)
+- [x] Diagnostics picker (jump to errors/warnings)
 - [ ] References picker (LSP references)
 - [ ] Command picker (all available commands)
 - [ ] Theme picker (preview and switch themes)

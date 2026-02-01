@@ -49,6 +49,8 @@ pub fn GenericPicker(
         PickerMode::Buffers => "Switch Buffer",
         PickerMode::DocumentSymbols => "Document Symbols",
         PickerMode::WorkspaceSymbols => "Workspace Symbols",
+        PickerMode::DocumentDiagnostics => "Document Diagnostics",
+        PickerMode::WorkspaceDiagnostics => "Workspace Diagnostics",
     };
 
     rsx! {

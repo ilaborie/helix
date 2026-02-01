@@ -2,8 +2,8 @@
 
 use dioxus::prelude::*;
 use lucide_dioxus::{
-    Blocks, Braces, ChevronRight, Code, Component, File, FileText, Folder, Hash, Layers, Package,
-    SquareFunction, Variable,
+    Blocks, Braces, ChevronRight, CircleX, Code, Component, File, FileText, Folder, Hash, Info,
+    Layers, Lightbulb, Package, SquareFunction, TriangleAlert, Variable,
 };
 
 use crate::state::{PickerIcon, PickerItem};
@@ -19,7 +19,8 @@ pub fn PickerItemRow(item: PickerItem, is_selected: bool) -> Element {
         "picker-item"
     };
 
-    let text_color = match item.icon {
+    // Icon color based on type
+    let icon_color = match item.icon {
         PickerIcon::Folder => "#61afef",         // Blue for directories
         PickerIcon::BufferModified => "#e5c07b", // Yellow for modified buffers
         // Symbol colors (matching LSP completion icons in code_actions.rs and completion.rs)
@@ -32,7 +33,21 @@ pub fn PickerItemRow(item: PickerItem, is_selected: bool) -> Element {
         PickerIcon::SymbolConstant => "#d19a66",                            // Orange
         PickerIcon::SymbolModule => "#c678dd",                              // Purple
         PickerIcon::SymbolOther => "#abb2bf",                               // Gray
-        _ => "#abb2bf",                                                     // Default text color
+        // Diagnostic colors by severity (for icon only)
+        PickerIcon::DiagnosticError => "#e06c75",   // Red
+        PickerIcon::DiagnosticWarning => "#e5c07b", // Yellow
+        PickerIcon::DiagnosticInfo => "#61afef",    // Blue
+        PickerIcon::DiagnosticHint => "#56b6c2",    // Cyan
+        _ => "#abb2bf",                             // Default color
+    };
+
+    // Text color - use neutral for diagnostics so highlighting is visible
+    let text_color = match item.icon {
+        PickerIcon::DiagnosticError
+        | PickerIcon::DiagnosticWarning
+        | PickerIcon::DiagnosticInfo
+        | PickerIcon::DiagnosticHint => "#abb2bf", // Neutral for diagnostics
+        _ => icon_color,                           // Same as icon for others
     };
 
     let indicator_opacity = if is_selected { "1" } else { "0" };
@@ -53,21 +68,26 @@ pub fn PickerItemRow(item: PickerItem, is_selected: bool) -> Element {
                 class: "icon-wrapper",
                 style: "width: 16px; height: 16px; margin-right: 8px; flex-shrink: 0;",
                 {match item.icon {
-                    PickerIcon::Folder => rsx! { Folder { size: 16, color: text_color } },
-                    PickerIcon::File => rsx! { File { size: 16, color: text_color } },
-                    PickerIcon::Buffer | PickerIcon::BufferModified => rsx! { FileText { size: 16, color: text_color } },
+                    PickerIcon::Folder => rsx! { Folder { size: 16, color: icon_color } },
+                    PickerIcon::File => rsx! { File { size: 16, color: icon_color } },
+                    PickerIcon::Buffer | PickerIcon::BufferModified => rsx! { FileText { size: 16, color: icon_color } },
                     // Symbol icons
-                    PickerIcon::SymbolFunction => rsx! { SquareFunction { size: 16, color: text_color } },
-                    PickerIcon::SymbolMethod => rsx! { Code { size: 16, color: text_color } },
-                    PickerIcon::SymbolClass => rsx! { Blocks { size: 16, color: text_color } },
-                    PickerIcon::SymbolStruct => rsx! { Braces { size: 16, color: text_color } },
-                    PickerIcon::SymbolEnum => rsx! { Layers { size: 16, color: text_color } },
-                    PickerIcon::SymbolInterface => rsx! { Component { size: 16, color: text_color } },
-                    PickerIcon::SymbolVariable => rsx! { Variable { size: 16, color: text_color } },
-                    PickerIcon::SymbolConstant => rsx! { Hash { size: 16, color: text_color } },
-                    PickerIcon::SymbolField => rsx! { Code { size: 16, color: text_color } },
-                    PickerIcon::SymbolModule => rsx! { Package { size: 16, color: text_color } },
-                    PickerIcon::SymbolOther => rsx! { Code { size: 16, color: text_color } },
+                    PickerIcon::SymbolFunction => rsx! { SquareFunction { size: 16, color: icon_color } },
+                    PickerIcon::SymbolMethod => rsx! { Code { size: 16, color: icon_color } },
+                    PickerIcon::SymbolClass => rsx! { Blocks { size: 16, color: icon_color } },
+                    PickerIcon::SymbolStruct => rsx! { Braces { size: 16, color: icon_color } },
+                    PickerIcon::SymbolEnum => rsx! { Layers { size: 16, color: icon_color } },
+                    PickerIcon::SymbolInterface => rsx! { Component { size: 16, color: icon_color } },
+                    PickerIcon::SymbolVariable => rsx! { Variable { size: 16, color: icon_color } },
+                    PickerIcon::SymbolConstant => rsx! { Hash { size: 16, color: icon_color } },
+                    PickerIcon::SymbolField => rsx! { Code { size: 16, color: icon_color } },
+                    PickerIcon::SymbolModule => rsx! { Package { size: 16, color: icon_color } },
+                    PickerIcon::SymbolOther => rsx! { Code { size: 16, color: icon_color } },
+                    // Diagnostic icons
+                    PickerIcon::DiagnosticError => rsx! { CircleX { size: 16, color: icon_color } },
+                    PickerIcon::DiagnosticWarning => rsx! { TriangleAlert { size: 16, color: icon_color } },
+                    PickerIcon::DiagnosticInfo => rsx! { Info { size: 16, color: icon_color } },
+                    PickerIcon::DiagnosticHint => rsx! { Lightbulb { size: 16, color: icon_color } },
                 }}
             }
 

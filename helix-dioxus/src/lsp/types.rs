@@ -62,6 +62,17 @@ pub struct DiagnosticSnapshot {
     pub code: Option<String>,
 }
 
+/// A diagnostic entry for the picker with document info.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct DiagnosticPickerEntry {
+    /// The diagnostic snapshot.
+    pub diagnostic: DiagnosticSnapshot,
+    /// Document ID (for workspace diagnostics).
+    pub doc_id: Option<helix_view::DocumentId>,
+    /// File path (for workspace diagnostics).
+    pub path: Option<std::path::PathBuf>,
+}
+
 /// Kind of completion item for icon display.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CompletionItemKind {

@@ -124,6 +124,10 @@ pub fn handle_space_leader(key: &KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('c') => vec![EditorCommand::ToggleLineComment],
         // Space C - toggle block comment
         KeyCode::Char('C') => vec![EditorCommand::ToggleBlockComment],
+        // Space d - document diagnostics
+        KeyCode::Char('d') => vec![EditorCommand::ShowDocumentDiagnostics],
+        // Space D - workspace diagnostics
+        KeyCode::Char('D') => vec![EditorCommand::ShowWorkspaceDiagnostics],
         // Space f - format document
         KeyCode::Char('f') => vec![EditorCommand::FormatDocument],
         // Space i - toggle inlay hints

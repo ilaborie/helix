@@ -236,24 +236,27 @@ impl PickerOps for EditorContext {
                     .as_ref()
                     .and_then(|s| fuzzy_match_with_indices(s, &self.picker_filter));
 
-                // Use the better match
+                // Use the better match - only highlight display indices, not secondary
                 match (display_match, secondary_match) {
                     (Some((score1, indices)), Some((score2, _))) if score1 >= score2 => {
+                        // Display match is better or equal - use display indices
                         let mut new_item = item.clone();
                         new_item.match_indices = indices;
                         Some((score1, new_item))
                     }
                     (Some((score, indices)), None) => {
+                        // Only display match - use its indices
                         let mut new_item = item.clone();
                         new_item.match_indices = indices;
                         Some((score, new_item))
                     }
                     (None, Some((score, _))) => {
-                        // Match in secondary, no indices for display
+                        // Only secondary match - no indices for display
                         Some((score, item.clone()))
                     }
-                    (Some((score1, _)), Some((score2, indices))) if score2 > score1 => {
-                        // Secondary match is better
+                    (Some((score1, indices)), Some((score2, _))) if score2 > score1 => {
+                        // Secondary match is better - use its score but display's indices
+                        // (secondary indices don't apply to display text)
                         let mut new_item = item.clone();
                         new_item.match_indices = indices;
                         Some((score2, new_item))
@@ -338,6 +341,34 @@ impl PickerOps for EditorContext {
                         }
                     }
                 }
+                PickerMode::DocumentDiagnostics | PickerMode::WorkspaceDiagnostics => {
+                    // Extract diagnostic data before mutable borrow
+                    if let Ok(idx) = selected.id.parse::<usize>() {
+                        let diag_data = self.picker_diagnostics.get(idx).map(|entry| {
+                            (
+                                entry.doc_id,
+                                entry.path.clone(),
+                                entry.diagnostic.line,
+                                entry.diagnostic.start_col,
+                            )
+                        });
+
+                        if let Some((doc_id, path, line, column)) = diag_data {
+                            // For workspace diagnostics, switch to the file first
+                            if self.picker_mode == PickerMode::WorkspaceDiagnostics {
+                                if let Some(ref path) = path {
+                                    self.open_file(path);
+                                } else if let Some(doc_id) = doc_id {
+                                    self.switch_to_buffer(doc_id);
+                                }
+                            }
+
+                            // Navigate to diagnostic position
+                            let line = line.saturating_sub(1);
+                            self.goto_line_column(line, column);
+                        }
+                    }
+                }
             }
         }
 
@@ -348,6 +379,7 @@ impl PickerOps for EditorContext {
         self.picker_mode = PickerMode::default();
         self.picker_current_path = None;
         self.symbols.clear();
+        self.picker_diagnostics.clear();
     }
 }
 

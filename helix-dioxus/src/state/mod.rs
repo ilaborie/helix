@@ -31,10 +31,10 @@ use helix_view::document::Mode;
 use crate::lsp::{
     convert_code_actions, convert_completion_response, convert_document_symbols,
     convert_goto_response, convert_hover, convert_inlay_hints, convert_references_response,
-    convert_signature_help, convert_workspace_symbols, CompletionItemSnapshot, DiagnosticSeverity,
-    DiagnosticSnapshot, HoverSnapshot, InlayHintSnapshot, LocationSnapshot, LspResponse,
-    LspServerSnapshot, LspServerStatus, SignatureHelpSnapshot, StoredCodeAction, SymbolKind,
-    SymbolSnapshot,
+    convert_signature_help, convert_workspace_symbols, CompletionItemSnapshot,
+    DiagnosticPickerEntry, DiagnosticSeverity, DiagnosticSnapshot, HoverSnapshot,
+    InlayHintSnapshot, LocationSnapshot, LspResponse, LspServerSnapshot, LspServerStatus,
+    SignatureHelpSnapshot, StoredCodeAction, SymbolKind, SymbolSnapshot,
 };
 use crate::operations::{
     BufferOps, CliOps, ClipboardOps, EditingOps, LspOps, MovementOps, PickerOps, SearchOps,
@@ -116,6 +116,10 @@ pub struct EditorContext {
     // Symbol picker state - pub(crate) for operations access
     /// Symbols for symbol picker.
     pub(crate) symbols: Vec<SymbolSnapshot>,
+
+    // Diagnostic picker state - pub(crate) for operations access
+    /// Diagnostics for diagnostic picker.
+    pub(crate) picker_diagnostics: Vec<DiagnosticPickerEntry>,
 
     // LSP dialog state - pub(crate) for operations access
     /// Whether the LSP dialog is visible.
@@ -246,6 +250,8 @@ impl EditorContext {
             location_picker_title: String::new(),
             // Symbol picker state
             symbols: Vec::new(),
+            // Diagnostic picker state
+            picker_diagnostics: Vec::new(),
             // LSP dialog state
             lsp_dialog_visible: false,
             lsp_server_selected: 0,
@@ -594,6 +600,12 @@ impl EditorContext {
             }
             EditorCommand::PrevDiagnostic => {
                 self.prev_diagnostic(doc_id, view_id);
+            }
+            EditorCommand::ShowDocumentDiagnostics => {
+                self.show_document_diagnostics_picker();
+            }
+            EditorCommand::ShowWorkspaceDiagnostics => {
+                self.show_workspace_diagnostics_picker();
             }
 
             // LSP - Format
@@ -2592,6 +2604,199 @@ impl EditorContext {
         });
     }
 
+    /// Show the document diagnostics picker.
+    fn show_document_diagnostics_picker(&mut self) {
+        let view_id = self.editor.tree.focus;
+        let view = self.editor.tree.get(view_id);
+        let doc_id = view.doc;
+
+        let Some(doc) = self.editor.document(doc_id) else {
+            log::warn!("No document for document diagnostics");
+            return;
+        };
+
+        let text = doc.text();
+
+        // Collect diagnostics from the current document
+        let mut entries: Vec<DiagnosticPickerEntry> = doc
+            .diagnostics()
+            .iter()
+            .map(|d| {
+                let line = text.char_to_line(d.range.start);
+                let line_start = text.line_to_char(line);
+                let start_col = d.range.start - line_start;
+                let end_col = d.range.end - line_start;
+
+                let snapshot = DiagnosticSnapshot {
+                    line: line + 1, // 1-indexed
+                    start_col,
+                    end_col,
+                    message: d.message.clone(),
+                    severity: d
+                        .severity
+                        .map(DiagnosticSeverity::from)
+                        .unwrap_or_default(),
+                    source: d.source.clone(),
+                    code: convert_diagnostic_code(&d.code),
+                };
+
+                DiagnosticPickerEntry {
+                    diagnostic: snapshot,
+                    doc_id: Some(doc_id),
+                    path: None,
+                }
+            })
+            .collect();
+
+        // Sort by line number
+        entries.sort_by_key(|e| e.diagnostic.line);
+
+        self.picker_diagnostics = entries;
+        self.populate_diagnostic_picker_items();
+
+        // Set up picker state
+        self.picker_mode = PickerMode::DocumentDiagnostics;
+        self.picker_visible = true;
+        self.picker_filter.clear();
+        self.picker_selected = 0;
+        self.picker_current_path = None;
+
+        log::info!(
+            "Showing {} document diagnostics",
+            self.picker_diagnostics.len()
+        );
+    }
+
+    /// Show the workspace diagnostics picker.
+    fn show_workspace_diagnostics_picker(&mut self) {
+        // Collect diagnostics from all open documents
+        let mut entries: Vec<DiagnosticPickerEntry> = Vec::new();
+
+        for (&doc_id, doc) in self.editor.documents.iter() {
+            let text = doc.text();
+            let path = doc.path().map(|p| p.to_path_buf());
+
+            for d in doc.diagnostics() {
+                let line = text.char_to_line(d.range.start);
+                let line_start = text.line_to_char(line);
+                let start_col = d.range.start - line_start;
+                let end_col = d.range.end - line_start;
+
+                let snapshot = DiagnosticSnapshot {
+                    line: line + 1, // 1-indexed
+                    start_col,
+                    end_col,
+                    message: d.message.clone(),
+                    severity: d
+                        .severity
+                        .map(DiagnosticSeverity::from)
+                        .unwrap_or_default(),
+                    source: d.source.clone(),
+                    code: convert_diagnostic_code(&d.code),
+                };
+
+                entries.push(DiagnosticPickerEntry {
+                    diagnostic: snapshot,
+                    doc_id: Some(doc_id),
+                    path: path.clone(),
+                });
+            }
+        }
+
+        // Sort by severity (errors first), then by file, then by line
+        entries.sort_by(|a, b| {
+            // Compare severity (Error > Warning > Info > Hint)
+            let sev_a = get_severity_sort_key(a.diagnostic.severity);
+            let sev_b = get_severity_sort_key(b.diagnostic.severity);
+            match sev_a.cmp(&sev_b) {
+                std::cmp::Ordering::Equal => {
+                    // Then by path
+                    match (&a.path, &b.path) {
+                        (Some(pa), Some(pb)) => match pa.cmp(pb) {
+                            std::cmp::Ordering::Equal => a.diagnostic.line.cmp(&b.diagnostic.line),
+                            ord => ord,
+                        },
+                        (Some(_), None) => std::cmp::Ordering::Less,
+                        (None, Some(_)) => std::cmp::Ordering::Greater,
+                        (None, None) => a.diagnostic.line.cmp(&b.diagnostic.line),
+                    }
+                }
+                ord => ord,
+            }
+        });
+
+        self.picker_diagnostics = entries;
+        self.populate_diagnostic_picker_items();
+
+        // Set up picker state
+        self.picker_mode = PickerMode::WorkspaceDiagnostics;
+        self.picker_visible = true;
+        self.picker_filter.clear();
+        self.picker_selected = 0;
+        self.picker_current_path = None;
+
+        log::info!(
+            "Showing {} workspace diagnostics",
+            self.picker_diagnostics.len()
+        );
+    }
+
+    /// Populate picker items from diagnostics.
+    fn populate_diagnostic_picker_items(&mut self) {
+        self.picker_items = self
+            .picker_diagnostics
+            .iter()
+            .enumerate()
+            .map(|(idx, entry)| {
+                let icon = get_diagnostic_icon(entry.diagnostic.severity);
+
+                // Build display with severity badge and optional code
+                let severity_label = match entry.diagnostic.severity {
+                    DiagnosticSeverity::Error => "error",
+                    DiagnosticSeverity::Warning => "warn",
+                    DiagnosticSeverity::Info => "info",
+                    DiagnosticSeverity::Hint => "hint",
+                };
+
+                // Format: "[error] message" or "[error E0308] message"
+                let prefix = match &entry.diagnostic.code {
+                    Some(code) => format!("[{} {}]", severity_label, code),
+                    None => format!("[{}]", severity_label),
+                };
+
+                // Truncate message to fit (accounting for prefix)
+                let max_msg_len = 70usize.saturating_sub(prefix.len());
+                let message = if entry.diagnostic.message.len() > max_msg_len {
+                    format!("{}...", &entry.diagnostic.message[..max_msg_len.saturating_sub(3)])
+                } else {
+                    entry.diagnostic.message.clone()
+                };
+
+                let display = format!("{} {}", prefix, message);
+
+                // Secondary: "filename:line" for workspace, "Line N" for document
+                let secondary = match &entry.path {
+                    Some(path) => {
+                        let filename = path
+                            .file_name()
+                            .map(|n| n.to_string_lossy().to_string())
+                            .unwrap_or_else(|| "unknown".to_string());
+                        Some(format!("{}:{}", filename, entry.diagnostic.line))
+                    }
+                    None => Some(format!("Line {}", entry.diagnostic.line)),
+                };
+
+                PickerItem {
+                    id: idx.to_string(),
+                    display,
+                    icon,
+                    match_indices: vec![],
+                    secondary,
+                }
+            })
+            .collect();
+    }
+
     /// Populate picker items from symbols.
     fn populate_symbol_picker_items(&mut self) {
         self.picker_items = self
@@ -2638,6 +2843,36 @@ fn symbol_kind_to_picker_icon(kind: SymbolKind) -> PickerIcon {
         }
         _ => PickerIcon::SymbolOther,
     }
+}
+
+/// Convert DiagnosticSeverity to PickerIcon.
+fn get_diagnostic_icon(severity: DiagnosticSeverity) -> PickerIcon {
+    match severity {
+        DiagnosticSeverity::Error => PickerIcon::DiagnosticError,
+        DiagnosticSeverity::Warning => PickerIcon::DiagnosticWarning,
+        DiagnosticSeverity::Info => PickerIcon::DiagnosticInfo,
+        DiagnosticSeverity::Hint => PickerIcon::DiagnosticHint,
+    }
+}
+
+/// Get sort key for diagnostic severity (lower = higher priority).
+fn get_severity_sort_key(severity: DiagnosticSeverity) -> u8 {
+    match severity {
+        DiagnosticSeverity::Error => 0,
+        DiagnosticSeverity::Warning => 1,
+        DiagnosticSeverity::Info => 2,
+        DiagnosticSeverity::Hint => 3,
+    }
+}
+
+/// Convert diagnostic code from NumberOrString to Option<String>.
+fn convert_diagnostic_code(
+    code: &Option<helix_core::diagnostic::NumberOrString>,
+) -> Option<String> {
+    code.as_ref().map(|c| match c {
+        helix_core::diagnostic::NumberOrString::Number(n) => n.to_string(),
+        helix_core::diagnostic::NumberOrString::String(s) => s.clone(),
+    })
 }
 
 /// Convert a helix Color to a CSS color string.
