@@ -5,6 +5,7 @@
 //! - Error Lens style inline messages at end of lines
 
 use dioxus::prelude::*;
+use lucide_dioxus::{Circle, CircleX, Info, Lightbulb, TriangleAlert};
 
 use crate::lsp::{DiagnosticSeverity, DiagnosticSnapshot};
 
@@ -12,13 +13,16 @@ use crate::lsp::{DiagnosticSeverity, DiagnosticSnapshot};
 #[component]
 pub fn DiagnosticMarker(severity: DiagnosticSeverity) -> Element {
     let color = severity.css_color();
-    let icon = severity.gutter_icon();
 
     rsx! {
         span {
-            class: "diagnostic-marker",
-            style: "color: {color};",
-            "{icon}"
+            class: "diagnostic-marker icon-wrapper",
+            match severity {
+                DiagnosticSeverity::Error => rsx! { CircleX { size: 14, color: color } },
+                DiagnosticSeverity::Warning => rsx! { TriangleAlert { size: 14, color: color } },
+                DiagnosticSeverity::Info => rsx! { Info { size: 14, color: color } },
+                DiagnosticSeverity::Hint => rsx! { Lightbulb { size: 14, color: color } },
+            }
         }
     }
 }
@@ -42,7 +46,18 @@ pub fn ErrorLens(diagnostic: DiagnosticSnapshot) -> Element {
         span {
             class: "error-lens",
             style: "color: {color};",
-            " ● {message}"
+            // Separator to distinguish from code
+            span {
+                class: "error-lens-separator",
+                style: "opacity: 0.5; margin-right: 6px;",
+                "//"
+            }
+            span {
+                class: "icon-wrapper",
+                style: "margin-right: 4px;",
+                Circle { size: 8, color: color }
+            }
+            "{message}"
         }
     }
 }
@@ -55,17 +70,23 @@ pub fn DiagnosticUnderline(
     end_col: usize,
     severity: DiagnosticSeverity,
 ) -> Element {
-    let color = severity.css_color();
     let width = end_col.saturating_sub(start_col).max(1);
     let left_offset = start_col;
 
-    // Use CSS to position the underline
-    let style =
-        format!("left: {left_offset}ch; width: {width}ch; border-bottom: 2px wavy {color};");
+    // Use CSS class for severity-specific underline style
+    let severity_class = match severity {
+        DiagnosticSeverity::Error => "diagnostic-underline-error",
+        DiagnosticSeverity::Warning => "diagnostic-underline-warning",
+        DiagnosticSeverity::Info => "diagnostic-underline-info",
+        DiagnosticSeverity::Hint => "diagnostic-underline-hint",
+    };
+
+    // Position via inline style, color via CSS class
+    let style = format!("left: {left_offset}ch; width: {width}ch;");
 
     rsx! {
         span {
-            class: "diagnostic-underline",
+            class: "diagnostic-underline {severity_class}",
             style: "{style}",
         }
     }

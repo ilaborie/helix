@@ -10,6 +10,7 @@ mod editor_view;
 mod hover;
 mod inlay_hints;
 mod location_picker;
+mod lsp_dialog;
 mod picker;
 mod prompt;
 mod signature_help;
@@ -19,13 +20,15 @@ pub use buffer_bar::BufferBar;
 pub use code_actions::CodeActionsMenu;
 pub use completion::CompletionPopup;
 pub use diagnostics::{
-    first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker, ErrorLens,
+    first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker, DiagnosticUnderline,
+    ErrorLens,
 };
 pub use editor_view::EditorView;
 pub use hover::HoverPopup;
 // Note: inlay_hints utilities (format_hint, hints_for_line) are available
 // but not re-exported until LSP client integration is complete.
 pub use location_picker::LocationPicker;
+pub use lsp_dialog::LspStatusDialog;
 pub use picker::GenericPicker;
 pub use prompt::{CommandPrompt, SearchPrompt};
 pub use signature_help::SignatureHelpPopup;

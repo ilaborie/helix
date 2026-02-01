@@ -5,7 +5,8 @@
 use dioxus::prelude::*;
 
 use crate::components::{
-    first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker, ErrorLens,
+    first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker, DiagnosticUnderline,
+    ErrorLens,
 };
 use crate::lsp::DiagnosticSnapshot;
 use crate::state::{LineSnapshot, TokenSpan};
@@ -78,12 +79,31 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
             // Document content
             div {
                 class: "content",
-                for line in &snapshot.lines {
+                for (idx, line) in snapshot.lines.iter().enumerate() {
                     // Include version and selection state in key to force re-render
                     {
                         let has_sel = line.selection_range.is_some();
                         let line_num = line.line_number;
                         let line_diag = first_diagnostic_for_line(diagnostics, line_num).cloned();
+
+                        // Check if the next line is empty and has a diagnostic we should show here
+                        let next_line_diag = if idx + 1 < snapshot.lines.len() {
+                            let next_line = &snapshot.lines[idx + 1];
+                            let next_content = next_line.content.trim();
+                            // If next line is empty/whitespace and has a diagnostic, show it on this line
+                            if next_content.is_empty() {
+                                first_diagnostic_for_line(diagnostics, next_line.line_number).cloned()
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
+
+                        // Use next line's diagnostic for ErrorLens if this line has content but no diagnostic
+                        // and the next line is empty with a diagnostic
+                        let error_lens_diag = line_diag.clone().or(next_line_diag);
+
                         let key = format!("{}-{}-{}", line_num, version, has_sel);
                         rsx! {
                             Line {
@@ -91,6 +111,7 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                                 line: line.clone(),
                                 mode: mode.clone(),
                                 diagnostic: line_diag,
+                                error_lens_diagnostic: error_lens_diag,
                             }
                         }
                     }
@@ -101,8 +122,16 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
 }
 
 /// Individual line component with cursor and syntax highlighting rendering.
+///
+/// - `diagnostic`: The diagnostic for THIS line (used for underline)
+/// - `error_lens_diagnostic`: The diagnostic to show as ErrorLens (may be from next empty line)
 #[component]
-fn Line(line: LineSnapshot, mode: String, diagnostic: Option<DiagnosticSnapshot>) -> Element {
+fn Line(
+    line: LineSnapshot,
+    mode: String,
+    diagnostic: Option<DiagnosticSnapshot>,
+    error_lens_diagnostic: Option<DiagnosticSnapshot>,
+) -> Element {
     // Remove trailing newline for display
     let display_content = line.content.trim_end_matches('\n');
     let chars: Vec<char> = display_content.chars().collect();
@@ -133,14 +162,28 @@ fn Line(line: LineSnapshot, mode: String, diagnostic: Option<DiagnosticSnapshot>
         None
     };
 
+    // Only show ErrorLens if this line has content (not empty/whitespace)
+    // This prevents showing ErrorLens on empty lines - it will be shown on the previous line instead
+    let show_error_lens = !display_content.trim().is_empty();
+
     // Render the line content with tokens, cursor, and selection highlighting
     rsx! {
         div {
             class: "{line_class}",
             {render_styled_content(&chars, &line.tokens, cursor_pos, cursor_style, line.selection_range)}
-            // Error Lens: Show diagnostic message at end of line
-            if let Some(diag) = diagnostic {
-                ErrorLens { diagnostic: diag }
+            // Diagnostic underline (wavy red line under error)
+            if let Some(ref diag) = diagnostic {
+                DiagnosticUnderline {
+                    start_col: diag.start_col,
+                    end_col: diag.end_col,
+                    severity: diag.severity,
+                }
+            }
+            // Error Lens: Show diagnostic message at end of line (only if line has content)
+            if show_error_lens {
+                if let Some(diag) = error_lens_diagnostic {
+                    ErrorLens { diagnostic: diag }
+                }
             }
         }
     }

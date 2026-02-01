@@ -31,27 +31,6 @@ impl DiagnosticSeverity {
         }
     }
 
-    /// Returns the gutter icon character for this severity.
-    #[must_use]
-    pub fn gutter_icon(&self) -> &'static str {
-        match self {
-            Self::Error => "●",   // Filled circle
-            Self::Warning => "▲", // Triangle
-            Self::Info => "●",    // Filled circle
-            Self::Hint => "○",    // Empty circle
-        }
-    }
-
-    /// Returns the status bar icon character for this severity.
-    #[must_use]
-    pub fn status_icon(&self) -> &'static str {
-        match self {
-            Self::Error => "✕",   // Cross
-            Self::Warning => "⚠", // Warning sign
-            Self::Info => "ℹ",    // Info
-            Self::Hint => "💡",   // Lightbulb
-        }
-    }
 }
 
 impl From<helix_core::diagnostic::Severity> for DiagnosticSeverity {
@@ -338,6 +317,43 @@ pub struct StoredCodeAction {
     pub language_server_id: helix_lsp::LanguageServerId,
     /// The offset encoding for this language server.
     pub offset_encoding: helix_lsp::OffsetEncoding,
+}
+
+/// Status of a language server.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LspServerStatus {
+    /// Server is starting up.
+    #[default]
+    Starting,
+    /// Server is running and ready.
+    Running,
+    /// Server has stopped.
+    Stopped,
+}
+
+impl LspServerStatus {
+    /// Returns the CSS color for this status.
+    #[must_use]
+    pub fn css_color(&self) -> &'static str {
+        match self {
+            Self::Starting => "#e5c07b", // Yellow
+            Self::Running => "#98c379",  // Green
+            Self::Stopped => "#5c6370",  // Gray
+        }
+    }
+}
+
+/// Snapshot of a language server for UI display.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct LspServerSnapshot {
+    /// The server name (e.g., "rust-analyzer").
+    pub name: String,
+    /// Current status of the server.
+    pub status: LspServerStatus,
+    /// Document types this server handles (e.g., "rust", "python").
+    pub languages: Vec<String>,
+    /// Whether this server is active for the current document.
+    pub active_for_current: bool,
 }
 
 /// Response types from async LSP operations.

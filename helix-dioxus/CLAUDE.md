@@ -188,10 +188,19 @@ cargo clippy -p helix-dioxus --bins
 - [ ] Command panel as picker-style UI with fuzzy search
 - [ ] File-type specific icons in buffer bar
 - [ ] Mouse click support in picker
-- [x] ~~LSP integration for diagnostics and completions~~ Diagnostics display with gutter icons, error lens, and status bar counts
+- [x] ~~LSP integration for diagnostics and completions~~ Diagnostics display with gutter icons, error lens, wavy underlines, and status bar counts
 - [ ] Multiple splits/views support
 - [ ] System clipboard integration
 - [ ] Extract theme colors to `theme.rs` or `colors.rs`
 - [ ] Add custom hooks (`use_editor_state`, `use_keybinding`)
 - [x] ~~Consider splitting picker into `FilePicker`, `BufferPicker` components~~ Split into picker/ folder
 - [ ] Add integration tests for key operations
+
+### LSP Improvements
+- [ ] Investigate rust-analyzer diagnostic line reporting - diagnostics may be reported on the line where parsing fails rather than where the actual error is (e.g., unterminated string reports on the next line). Consider requesting upstream fix or mapping diagnostic positions back to the originating code
+
+### Recently Completed
+- [x] Replaced unicode/emoji icons with Lucide icons throughout (statusline, LSP dialog, diagnostics)
+- [x] Implemented LSP server restart functionality via `Registry::restart_server()`
+- [x] Added diagnostic wavy underlines using CSS gradients
+- [x] Error Lens now shows on previous non-empty line when diagnostic is on empty line

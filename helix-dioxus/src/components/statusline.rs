@@ -3,12 +3,56 @@
 //! Displays mode, file name, cursor position, and other editor state.
 
 use dioxus::prelude::*;
+use lucide_dioxus::{CircleCheck, CircleX, LoaderCircle, Plug, TriangleAlert};
 
+use crate::lsp::{LspServerSnapshot, LspServerStatus};
+use crate::state::EditorCommand;
 use crate::AppState;
+
+/// LSP status block component for the status line.
+#[component]
+fn LspStatusBlock(servers: Vec<LspServerSnapshot>, on_click: EventHandler<MouseEvent>) -> Element {
+    let server_count = servers.len();
+
+    // Don't show anything if no servers are connected
+    if server_count == 0 {
+        return rsx! {};
+    }
+
+    // Determine overall status
+    let all_running = servers.iter().all(|s| s.status == LspServerStatus::Running);
+    let color = if all_running { "#98c379" } else { "#e5c07b" };
+
+    rsx! {
+        div {
+            class: "statusline-lsp",
+            style: "color: {color}; cursor: pointer;",
+            onmousedown: move |evt| {
+                evt.stop_propagation();
+                on_click.call(evt);
+            },
+            span {
+                class: "icon-wrapper",
+                style: "margin-right: 4px;",
+                Plug { size: 14, color: color }
+            }
+            span {
+                class: "icon-wrapper",
+                style: "margin-right: 4px;",
+                if all_running {
+                    CircleCheck { size: 12, color: "#98c379" }
+                } else {
+                    LoaderCircle { size: 12, color: "#e5c07b" }
+                }
+            }
+            "{server_count}"
+        }
+    }
+}
 
 /// Status line component that shows editor state.
 #[component]
-pub fn StatusLine(version: ReadSignal<usize>) -> Element {
+pub fn StatusLine(version: ReadSignal<usize>, on_change: EventHandler<()>) -> Element {
     // Read the signal to subscribe to changes
     let _ = version();
 
@@ -22,6 +66,7 @@ pub fn StatusLine(version: ReadSignal<usize>) -> Element {
     let total_lines = snapshot.total_lines;
     let error_count = snapshot.error_count;
     let warning_count = snapshot.warning_count;
+    let lsp_servers = snapshot.lsp_servers.clone();
 
     // Mode-specific colors
     let (mode_bg, mode_fg) = match mode.as_str() {
@@ -62,8 +107,13 @@ pub fn StatusLine(version: ReadSignal<usize>) -> Element {
                     if error_count > 0 {
                         span {
                             class: "statusline-errors",
-                            style: "color: #e06c75;",
-                            "✕ {error_count}"
+                            style: "color: #e06c75; display: flex; align-items: center;",
+                            span {
+                                class: "icon-wrapper",
+                                style: "margin-right: 4px;",
+                                CircleX { size: 14, color: "#e06c75" }
+                            }
+                            "{error_count}"
                         }
                     }
                     if error_count > 0 && warning_count > 0 {
@@ -72,11 +122,26 @@ pub fn StatusLine(version: ReadSignal<usize>) -> Element {
                     if warning_count > 0 {
                         span {
                             class: "statusline-warnings",
-                            style: "color: #e5c07b;",
-                            "⚠ {warning_count}"
+                            style: "color: #e5c07b; display: flex; align-items: center;",
+                            span {
+                                class: "icon-wrapper",
+                                style: "margin-right: 4px;",
+                                TriangleAlert { size: 14, color: "#e5c07b" }
+                            }
+                            "{warning_count}"
                         }
                     }
                 }
+            }
+
+            // LSP status indicator
+            LspStatusBlock {
+                servers: lsp_servers,
+                on_click: move |_| {
+                    app_state.send_command(EditorCommand::ToggleLspDialog);
+                    app_state.process_commands_sync();
+                    on_change.call(());
+                },
             }
 
             // Spacer

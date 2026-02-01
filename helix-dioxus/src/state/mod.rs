@@ -31,7 +31,8 @@ use crate::lsp::{
     convert_code_actions, convert_completion_response, convert_goto_response, convert_hover,
     convert_inlay_hints, convert_references_response, convert_signature_help,
     CompletionItemSnapshot, DiagnosticSeverity, DiagnosticSnapshot, HoverSnapshot,
-    InlayHintSnapshot, LocationSnapshot, LspResponse, SignatureHelpSnapshot, StoredCodeAction,
+    InlayHintSnapshot, LocationSnapshot, LspResponse, LspServerSnapshot, LspServerStatus,
+    SignatureHelpSnapshot, StoredCodeAction,
 };
 use crate::operations::{
     BufferOps, CliOps, ClipboardOps, EditingOps, LspOps, MovementOps, PickerOps, SearchOps,
@@ -102,6 +103,12 @@ pub struct EditorContext {
     pub(crate) location_selected: usize,
     /// Location picker title.
     pub(crate) location_picker_title: String,
+
+    // LSP dialog state - pub(crate) for operations access
+    /// Whether the LSP dialog is visible.
+    pub(crate) lsp_dialog_visible: bool,
+    /// Selected server index in dialog.
+    pub(crate) lsp_server_selected: usize,
 
     // Application state - pub(crate) for operations access
     pub(crate) should_quit: bool,
@@ -193,6 +200,9 @@ impl EditorContext {
             locations: Vec::new(),
             location_selected: 0,
             location_picker_title: String::new(),
+            // LSP dialog state
+            lsp_dialog_visible: false,
+            lsp_server_selected: 0,
             should_quit: false,
             snapshot_version: 0,
         })
@@ -544,6 +554,38 @@ impl EditorContext {
             EditorCommand::LspResponse(response) => {
                 self.handle_lsp_response(response);
             }
+
+            // LSP Dialog
+            EditorCommand::ToggleLspDialog => {
+                self.lsp_dialog_visible = !self.lsp_dialog_visible;
+                if self.lsp_dialog_visible {
+                    self.lsp_server_selected = 0;
+                }
+            }
+            EditorCommand::CloseLspDialog => {
+                self.lsp_dialog_visible = false;
+            }
+            EditorCommand::LspDialogUp => {
+                if self.lsp_server_selected > 0 {
+                    self.lsp_server_selected -= 1;
+                }
+            }
+            EditorCommand::LspDialogDown => {
+                let servers = self.collect_lsp_servers();
+                if self.lsp_server_selected + 1 < servers.len() {
+                    self.lsp_server_selected += 1;
+                }
+            }
+            EditorCommand::RestartSelectedLsp => {
+                let servers = self.collect_lsp_servers();
+                if let Some(server) = servers.get(self.lsp_server_selected) {
+                    let name = server.name.clone();
+                    self.restart_lsp_server(&name);
+                }
+            }
+            EditorCommand::RestartLspServer(name) => {
+                self.restart_lsp_server(&name);
+            }
         }
     }
 
@@ -611,6 +653,136 @@ impl EditorContext {
                 log::error!("LSP error: {}", msg);
             }
         }
+    }
+
+    /// Collect snapshots of all language servers.
+    fn collect_lsp_servers(&self) -> Vec<LspServerSnapshot> {
+        let view_id = self.editor.tree.focus;
+        let view = self.editor.tree.get(view_id);
+        let current_doc = self.editor.document(view.doc);
+
+        // Get the current document's language server IDs for comparison
+        let current_ls_ids: Vec<_> = current_doc
+            .map(|doc| doc.language_servers().map(|ls| ls.id()).collect())
+            .unwrap_or_default();
+
+        // Iterate through all clients in the language server registry
+        let mut servers: Vec<LspServerSnapshot> = self
+            .editor
+            .language_servers
+            .iter_clients()
+            .map(|client| {
+                let name = client.name().to_string();
+                let is_initialized = client.is_initialized();
+
+                // Determine status based on initialization
+                let status = if is_initialized {
+                    LspServerStatus::Running
+                } else {
+                    LspServerStatus::Starting
+                };
+
+                // Get supported languages from client capabilities
+                // Note: helix-lsp doesn't expose this directly, so we track it differently
+                let languages = Vec::new(); // Will be populated from document associations
+
+                // Check if this server is active for current document
+                let active_for_current = current_ls_ids.contains(&client.id());
+
+                LspServerSnapshot {
+                    name,
+                    status,
+                    languages,
+                    active_for_current,
+                }
+            })
+            .collect();
+
+        // Sort by name for consistent ordering
+        servers.sort_by(|a, b| a.name.cmp(&b.name));
+
+        servers
+    }
+
+    /// Restart a language server by name.
+    fn restart_lsp_server(&mut self, name: &str) {
+        log::info!("Restarting LSP server: {}", name);
+
+        // Get the current document and its language config
+        let view_id = self.editor.tree.focus;
+        let view = self.editor.tree.get(view_id);
+        let doc_id = view.doc;
+
+        // Extract necessary data from the document before mutable operations
+        // Clone the Arc<LanguageConfiguration> so we can release the borrow on editor
+        let (doc_path, lang_config) = {
+            let Some(doc) = self.editor.document(doc_id) else {
+                log::warn!("No document for LSP restart");
+                return;
+            };
+
+            let Some(lang_config) = doc.language.clone() else {
+                log::warn!("No language config for document");
+                return;
+            };
+
+            (doc.path().map(|p| p.to_path_buf()), lang_config)
+        };
+
+        // Get editor config for workspace roots and snippets
+        let editor_config = self.editor.config();
+        let root_dirs = editor_config.workspace_lsp_roots.clone();
+        let enable_snippets = editor_config.lsp.snippets;
+
+        // Restart the server via registry
+        match self.editor.language_servers.restart_server(
+            name,
+            &lang_config,
+            doc_path.as_ref(),
+            &root_dirs,
+            enable_snippets,
+        ) {
+            Some(Ok(_client)) => {
+                log::info!("LSP server '{}' restarted successfully", name);
+            }
+            Some(Err(e)) => {
+                log::error!("Failed to restart LSP server '{}': {}", name, e);
+                return;
+            }
+            None => {
+                log::warn!("LSP server '{}' not found in registry", name);
+                return;
+            }
+        }
+
+        // Collect all document IDs that use this server
+        let document_ids_to_refresh: Vec<helix_view::DocumentId> = self
+            .editor
+            .documents()
+            .filter_map(|doc| {
+                doc.language_config().and_then(|config| {
+                    let uses_this_server = config
+                        .language_servers
+                        .iter()
+                        .any(|ls| ls.name == name);
+                    if uses_this_server {
+                        Some(doc.id())
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect();
+
+        // Refresh language servers for all affected documents
+        for document_id in &document_ids_to_refresh {
+            self.editor.refresh_language_servers(*document_id);
+        }
+
+        log::info!(
+            "Refreshed {} documents after restart",
+            document_ids_to_refresh.len()
+        );
     }
 
     /// Create a snapshot of the current editor state.
@@ -790,6 +962,10 @@ impl EditorContext {
             locations: self.locations.clone(),
             location_selected: self.location_selected,
             location_picker_title: self.location_picker_title.clone(),
+            // LSP dialog state
+            lsp_dialog_visible: self.lsp_dialog_visible,
+            lsp_servers: self.collect_lsp_servers(),
+            lsp_server_selected: self.lsp_server_selected,
             should_quit: self.should_quit,
         }
     }
