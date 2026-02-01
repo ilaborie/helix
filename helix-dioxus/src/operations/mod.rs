@@ -20,5 +20,5 @@ pub use editing::EditingOps;
 pub use lsp::LspOps;
 pub use movement::MovementOps;
 pub use picker_ops::PickerOps;
-pub use search::SearchOps;
+pub use search::{collect_search_match_lines, SearchOps};
 pub use selection::SelectionOps;

@@ -1157,15 +1157,16 @@ kbd {
     position: absolute;
     left: 0;
     right: 0;
-    background-color: #5c6370;
+    background-color: rgba(92, 99, 112, 0.5);
     border-radius: 4px;
     min-height: 20px;
     transition: background-color 0.1s;
-    z-index: 1;
+    z-index: 0;
+    pointer-events: none;
 }
 
 .scrollbar-thumb:hover {
-    background-color: #6c7380;
+    background-color: rgba(108, 115, 128, 0.6);
 }
 
 .scrollbar-marker {
@@ -1174,10 +1175,16 @@ kbd {
     right: 2px;
     height: 3px;
     border-radius: 1px;
-    pointer-events: none;
+    cursor: pointer;
 }
 
 /* Z-index by severity: higher severity = higher z-index so errors render on top */
+/* Markers are above thumb (z-index: 0) for visibility and future click handling */
+.scrollbar-marker-search {
+    background-color: #e5c07b;
+    z-index: 1;
+}
+
 .scrollbar-marker-hint {
     background-color: #56b6c2;
     z-index: 2;

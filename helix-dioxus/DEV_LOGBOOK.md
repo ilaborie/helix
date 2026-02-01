@@ -1119,6 +1119,40 @@ let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
 
 ---
 
+## 2026-02-01: Scrollbar Search Result Markers
+
+### Progress
+- Implemented search result markers in the scrollbar when using `/` search
+- Yellow markers appear at positions where search matches are found
+- Markers provide visual overview of all match locations across the document
+
+### Implementation Details
+- **Search match collection**: Added `collect_search_match_lines()` function that finds all lines
+  containing matches for the current search pattern (case-insensitive)
+- **Deduplicated markers**: Only one marker per line, even with multiple matches on the same line
+- **Z-index hierarchy**: Search markers (z-index: 1) render below diagnostic markers
+  (hint=2, info=3, warning=4, error=5) so important diagnostics remain visible
+- **Semi-transparent thumb**: Scrollbar thumb is now 50% transparent so markers are always visible
+- **Click-ready**: Markers have `pointer-events` enabled and `cursor: pointer` for future
+  click-to-navigate functionality
+
+### Files Modified
+- `src/operations/search.rs` - Added `collect_search_match_lines()` public function
+- `src/operations/mod.rs` - Exported the new function
+- `src/state/types.rs` - Added `search_match_lines: Vec<usize>` to `EditorSnapshot`
+- `src/state/mod.rs` - Collect and pass search match lines to snapshot
+- `src/components/scrollbar.rs` - Added `search_match_lines` prop and search marker rendering
+- `src/components/editor_view.rs` - Pass `search_match_lines` to Scrollbar component
+- `assets/styles.css` - Added `.scrollbar-marker-search` styling, made thumb semi-transparent
+
+### Design Decisions
+- **Color**: Yellow/gold (`#e5c07b`) matches existing search theme colors
+- **Timing**: Markers appear after search is executed (Enter), not during typing
+- **Thumb transparency**: 50% opacity allows markers to show through while maintaining
+  visual indication of viewport position
+
+---
+
 ## Planned Enhancements
 
 ### Helix Commands & Modes

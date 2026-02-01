@@ -38,8 +38,8 @@ use crate::lsp::{
     SignatureHelpSnapshot, StoredCodeAction, SymbolKind, SymbolSnapshot,
 };
 use crate::operations::{
-    BufferOps, CliOps, ClipboardOps, EditingOps, LspOps, MovementOps, PickerOps, SearchOps,
-    SelectionOps,
+    collect_search_match_lines, BufferOps, CliOps, ClipboardOps, EditingOps, LspOps, MovementOps,
+    PickerOps, SearchOps, SelectionOps,
 };
 
 use lsp_events::LspEventOps;
@@ -1190,6 +1190,13 @@ impl EditorContext {
             })
             .collect();
 
+        // Collect search match lines for scrollbar markers (before releasing doc borrow)
+        let search_match_lines = if self.last_search.is_empty() {
+            Vec::new()
+        } else {
+            collect_search_match_lines(text, &self.last_search)
+        };
+
         let (open_buffers, buffer_scroll_offset) = self.buffer_bar_snapshot();
 
         // Increment snapshot version for change detection
@@ -1210,6 +1217,7 @@ impl EditorContext {
             search_mode: self.search_mode,
             search_backwards: self.search_backwards,
             search_input: self.search_input.clone(),
+            search_match_lines,
             picker_visible: self.picker_visible,
             picker_items: self.filtered_picker_items(),
             picker_filter: self.picker_filter.clone(),

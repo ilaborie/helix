@@ -158,6 +158,7 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                 visible_start: snapshot.visible_start,
                 viewport_lines: 40,
                 all_diagnostics: snapshot.all_diagnostics_summary.clone(),
+                search_match_lines: snapshot.search_match_lines.clone(),
             }
         }
     }

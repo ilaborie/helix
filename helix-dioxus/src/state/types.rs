@@ -110,6 +110,8 @@ pub struct EditorSnapshot {
     pub search_mode: bool,
     pub search_backwards: bool,
     pub search_input: String,
+    /// Line numbers with search matches (for scrollbar markers).
+    pub search_match_lines: Vec<usize>,
 
     // Picker state
     pub picker_visible: bool,

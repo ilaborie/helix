@@ -1,8 +1,36 @@
 //! Search operations for the editor.
 
+use helix_core::ropey::Rope;
 use helix_view::{DocumentId, ViewId};
 
 use crate::state::EditorContext;
+
+/// Collect all line numbers containing matches for the given pattern.
+/// Used for scrollbar markers. Case-insensitive search.
+pub fn collect_search_match_lines(text: &Rope, pattern: &str) -> Vec<usize> {
+    if pattern.is_empty() {
+        return Vec::new();
+    }
+
+    let text_str: String = text.slice(..).into();
+    let pattern_lower = pattern.to_lowercase();
+    let text_lower = text_str.to_lowercase();
+    let mut match_lines = Vec::new();
+    let mut last_line = usize::MAX;
+
+    for (byte_idx, _) in text_lower.match_indices(&pattern_lower) {
+        // Convert byte index to char index for rope
+        let char_idx = text_str[..byte_idx].chars().count();
+        let line = text.char_to_line(char_idx);
+        // Deduplicate: only add each line once
+        if line != last_line {
+            match_lines.push(line);
+            last_line = line;
+        }
+    }
+
+    match_lines
+}
 
 /// Extension trait for search operations.
 pub trait SearchOps {

@@ -22,6 +22,8 @@ pub fn Scrollbar(
     viewport_lines: usize,
     /// All diagnostics in the document (for markers).
     all_diagnostics: Vec<ScrollbarDiagnostic>,
+    /// Line numbers with search matches.
+    search_match_lines: Vec<usize>,
 ) -> Element {
     let app_state = use_context::<AppState>();
 
@@ -89,6 +91,25 @@ pub fn Scrollbar(
             div {
                 class: "scrollbar-track",
 
+                // Search markers first (so diagnostics render on top)
+                for (idx, &line) in search_match_lines.iter().enumerate() {
+                    {
+                        #[allow(clippy::cast_precision_loss)]
+                        let marker_top = if needs_scrollbar {
+                            format!("{}%", (line as f64 / total_lines.max(1) as f64) * 100.0)
+                        } else {
+                            format!("{}px", CONTENT_PADDING + (line as f64 * LINE_HEIGHT))
+                        };
+                        rsx! {
+                            div {
+                                key: "search-{idx}",
+                                class: "scrollbar-marker scrollbar-marker-search",
+                                style: "top: {marker_top};",
+                            }
+                        }
+                    }
+                }
+
                 // Diagnostic markers (sorted by severity so errors render on top)
                 for (idx, diag) in sorted_diagnostics.iter().enumerate() {
                     {
@@ -111,7 +132,7 @@ pub fn Scrollbar(
                         };
                         rsx! {
                             div {
-                                key: "{idx}",
+                                key: "diag-{idx}",
                                 class: "{marker_class}",
                                 style: "top: {marker_top};",
                             }
