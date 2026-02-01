@@ -10,6 +10,7 @@ use lucide_dioxus::{Circle, CircleX, Info, Lightbulb, TriangleAlert};
 use crate::lsp::{DiagnosticSeverity, DiagnosticSnapshot};
 
 /// Renders a diagnostic marker icon in the gutter.
+/// Uses small icons (10px) to fit in the compact indicator gutter.
 #[component]
 pub fn DiagnosticMarker(severity: DiagnosticSeverity) -> Element {
     let color = severity.css_color();
@@ -18,10 +19,10 @@ pub fn DiagnosticMarker(severity: DiagnosticSeverity) -> Element {
         span {
             class: "diagnostic-marker icon-wrapper",
             match severity {
-                DiagnosticSeverity::Error => rsx! { CircleX { size: 14, color: color } },
-                DiagnosticSeverity::Warning => rsx! { TriangleAlert { size: 14, color: color } },
-                DiagnosticSeverity::Info => rsx! { Info { size: 14, color: color } },
-                DiagnosticSeverity::Hint => rsx! { Lightbulb { size: 14, color: color } },
+                DiagnosticSeverity::Error => rsx! { CircleX { size: 10, color: color } },
+                DiagnosticSeverity::Warning => rsx! { TriangleAlert { size: 10, color: color } },
+                DiagnosticSeverity::Info => rsx! { Info { size: 10, color: color } },
+                DiagnosticSeverity::Hint => rsx! { Lightbulb { size: 10, color: color } },
             }
         }
     }
@@ -115,4 +116,10 @@ pub fn first_diagnostic_for_line(
         .iter()
         .filter(|diag| diag.line == line)
         .max_by_key(|diag| diag.severity)
+}
+
+/// Get all diagnostics for a line (for underlines).
+/// Returns all diagnostics on the given line.
+pub fn diagnostics_for_line(diagnostics: &[DiagnosticSnapshot], line: usize) -> Vec<&DiagnosticSnapshot> {
+    diagnostics.iter().filter(|diag| diag.line == line).collect()
 }

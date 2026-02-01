@@ -21,8 +21,8 @@ pub use buffer_bar::BufferBar;
 pub use code_actions::CodeActionsMenu;
 pub use completion::CompletionPopup;
 pub use diagnostics::{
-    first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker, DiagnosticUnderline,
-    ErrorLens,
+    diagnostics_for_line, first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker,
+    DiagnosticUnderline, ErrorLens,
 };
 pub use editor_view::EditorView;
 pub use hover::HoverPopup;

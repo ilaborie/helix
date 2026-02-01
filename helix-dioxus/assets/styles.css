@@ -374,27 +374,19 @@ kbd {
     /* The line is a container for absolutely positioned indicators */
 }
 
-/* Code action indicator (top-right corner) */
-.indicator-code-action {
-    position: absolute;
-    top: 0;
-    right: 1px;
-    cursor: pointer;
-    opacity: 0.9;
-    transition: opacity 0.15s ease;
-    z-index: 2;
-}
-
-.indicator-code-action:hover {
-    opacity: 1;
-}
-
-/* Diagnostic indicator (bottom-right corner) */
+/* Indicator (bottom-right corner) - used for diagnostics and code actions lightbulb */
 .indicator-diagnostic {
     position: absolute;
     bottom: 0;
     right: 1px;
     z-index: 1;
+    cursor: pointer;
+    opacity: 0.9;
+    transition: opacity 0.15s ease;
+}
+
+.indicator-diagnostic:hover {
+    opacity: 1;
 }
 
 /* Breakpoint indicator (center) - for future use */

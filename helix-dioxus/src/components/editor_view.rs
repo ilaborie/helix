@@ -3,10 +3,11 @@
 //! Renders the document content with syntax highlighting and cursor display.
 
 use dioxus::prelude::*;
+use lucide_dioxus::Lightbulb;
 
 use crate::components::{
-    first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker, DiagnosticUnderline,
-    ErrorLens,
+    diagnostics_for_line, first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker,
+    DiagnosticUnderline, ErrorLens,
 };
 use crate::lsp::DiagnosticSnapshot;
 use crate::state::{LineSnapshot, TokenSpan};
@@ -31,25 +32,50 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
         document::eval("scrollCursorIntoView();");
     });
 
+    let has_code_actions = snapshot.has_code_actions;
+    let cursor_line = snapshot.cursor_line;
+
     rsx! {
         div {
             class: "editor-view",
 
-            // Diagnostic gutter (for severity icons)
+            // Unified indicator gutter (breakpoints, diagnostics, code actions)
+            // Uses absolute positioning to allow multiple overlapping indicators
             div {
-                class: "diagnostic-gutter",
+                class: "indicator-gutter",
                 for line in &snapshot.lines {
                     {
                         let line_num = line.line_number;
+                        let show_lightbulb = has_code_actions && line_num == cursor_line;
                         let severity = highest_severity_for_line(diagnostics, line_num);
-                        let key = format!("diag-{}-{}", line_num, version);
+                        let key = format!("ind-{}-{}-{}-{}", line_num, version, show_lightbulb, severity.is_some());
+                        // Use diagnostic severity color if available, otherwise yellow
+                        let lightbulb_color = severity
+                            .map(|s| s.css_color())
+                            .unwrap_or("#e5c07b");
                         rsx! {
                             div {
                                 key: "{key}",
-                                class: "diagnostic-gutter-line",
-                                if let Some(sev) = severity {
-                                    DiagnosticMarker { severity: sev }
+                                class: "indicator-gutter-line",
+
+                                // Single indicator at bottom-right:
+                                // - Lightbulb (severity-colored) when code actions available
+                                // - Diagnostic marker when no code actions but has diagnostic
+                                if show_lightbulb {
+                                    span {
+                                        class: "indicator-diagnostic icon-wrapper",
+                                        title: "Code actions available (Ctrl+Space)",
+                                        Lightbulb { size: 10, color: lightbulb_color }
+                                    }
+                                } else if let Some(sev) = severity {
+                                    span {
+                                        class: "indicator-diagnostic",
+                                        DiagnosticMarker { severity: sev }
+                                    }
                                 }
+
+                                // Future: Breakpoint indicator (center)
+                                // Future: Jumplist number (bottom-left)
                             }
                         }
                     }
@@ -84,7 +110,15 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                     {
                         let has_sel = line.selection_range.is_some();
                         let line_num = line.line_number;
-                        let line_diag = first_diagnostic_for_line(diagnostics, line_num).cloned();
+                        // Get all diagnostics for this line (for underlines)
+                        // Sort by severity ascending so higher severity renders last (on top)
+                        let mut line_diags: Vec<_> = diagnostics_for_line(diagnostics, line_num)
+                            .into_iter()
+                            .cloned()
+                            .collect();
+                        line_diags.sort_by_key(|d| d.severity);
+                        // Get highest severity diagnostic for ErrorLens
+                        let primary_diag = first_diagnostic_for_line(diagnostics, line_num).cloned();
 
                         // Check if the next line is empty and has a diagnostic we should show here
                         let next_line_diag = if idx + 1 < snapshot.lines.len() {
@@ -102,7 +136,7 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
 
                         // Use next line's diagnostic for ErrorLens if this line has content but no diagnostic
                         // and the next line is empty with a diagnostic
-                        let error_lens_diag = line_diag.clone().or(next_line_diag);
+                        let error_lens_diag = primary_diag.or(next_line_diag);
 
                         let key = format!("{}-{}-{}", line_num, version, has_sel);
                         rsx! {
@@ -110,7 +144,7 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                                 key: "{key}",
                                 line: line.clone(),
                                 mode: mode.clone(),
-                                diagnostic: line_diag,
+                                diagnostics: line_diags,
                                 error_lens_diagnostic: error_lens_diag,
                             }
                         }
@@ -123,13 +157,13 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
 
 /// Individual line component with cursor and syntax highlighting rendering.
 ///
-/// - `diagnostic`: The diagnostic for THIS line (used for underline)
+/// - `diagnostics`: All diagnostics for THIS line (used for underlines)
 /// - `error_lens_diagnostic`: The diagnostic to show as ErrorLens (may be from next empty line)
 #[component]
 fn Line(
     line: LineSnapshot,
     mode: String,
-    diagnostic: Option<DiagnosticSnapshot>,
+    diagnostics: Vec<DiagnosticSnapshot>,
     error_lens_diagnostic: Option<DiagnosticSnapshot>,
 ) -> Element {
     // Remove trailing newline for display
@@ -171,9 +205,10 @@ fn Line(
         div {
             class: "{line_class}",
             {render_styled_content(&chars, &line.tokens, cursor_pos, cursor_style, line.selection_range)}
-            // Diagnostic underline (wavy red line under error)
-            if let Some(ref diag) = diagnostic {
+            // Diagnostic underlines (wavy lines under errors/warnings)
+            for (idx, diag) in diagnostics.iter().enumerate() {
                 DiagnosticUnderline {
+                    key: "{idx}",
                     start_col: diag.start_col,
                     end_col: diag.end_col,
                     severity: diag.severity,

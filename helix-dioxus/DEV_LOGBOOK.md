@@ -807,6 +807,39 @@ let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
 
 ---
 
+## 2026-02-01: Diagnostic Indicator Improvements
+
+### Progress
+- Implemented severity-colored lightbulb indicator
+  - Lightbulb color now reflects the highest diagnostic severity on the cursor line
+  - Error: `#e06c75` (red), Warning: `#e5c07b` (yellow), Info: `#61afef` (blue), Hint: `#56b6c2` (cyan)
+  - Falls back to yellow when code actions exist but no diagnostic
+- Consolidated indicator gutter to single position
+  - Both lightbulb and diagnostic marker now use bottom-right position
+  - Removed separate `indicator-code-action` CSS class
+  - Cleaner code with `else if` logic
+- Fixed multiple diagnostics per line not showing underlines
+  - Added `diagnostics_for_line()` function to get all diagnostics for a line
+  - Changed `Line` component to accept `Vec<DiagnosticSnapshot>` instead of `Option`
+  - All diagnostics on a line now render their own underline
+- Added severity-based rendering order for overlapping diagnostics
+  - Diagnostics sorted by severity (ascending) before rendering
+  - Higher severity underlines render last (on top)
+  - Ensures error underlines are visible over warning underlines when they overlap
+
+### Files Modified
+- `src/components/diagnostics.rs` - Added `diagnostics_for_line()` function
+- `src/components/mod.rs` - Exported new function
+- `src/components/editor_view.rs` - Consolidated indicator, multiple underlines, severity sorting
+- `assets/styles.css` - Removed unused `indicator-code-action`, added hover to `indicator-diagnostic`
+
+### Technical Notes
+- The `DiagnosticSeverity` enum is ordered Hint < Info < Warning < Error
+- Sorting ascending means Error renders last (appears on top in CSS stacking)
+- ErrorLens still shows only the highest severity diagnostic message per line
+
+---
+
 ## Planned Enhancements
 
 ### Helix Commands & Modes

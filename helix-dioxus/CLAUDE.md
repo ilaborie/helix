@@ -256,7 +256,7 @@ cargo clippy -p helix-dioxus --bins
 - [ ] Add integration tests for key operations
 
 ### UI Improvements (RustRover-inspired)
-- [ ] Severity-colored lightbulb indicator - change color based on diagnostic severity (red/yellow/blue/cyan)
+- [x] Severity-colored lightbulb indicator - change color based on diagnostic severity (red/yellow/blue/cyan)
 - [ ] Code actions search box - add filter input to code actions dialog
 - [ ] Diagnostic scrollbar markers - show diagnostic positions on right scrollbar edge
 - [ ] Code actions preview panel - show fix preview before applying (needs LSP resolve)
