@@ -17,6 +17,7 @@ mod lsp_dialog;
 mod notification;
 mod picker;
 mod prompt;
+mod scrollbar;
 mod signature_help;
 mod statusline;
 
@@ -39,5 +40,6 @@ pub use lsp_dialog::LspStatusDialog;
 pub use notification::NotificationContainer;
 pub use picker::GenericPicker;
 pub use prompt::{CommandPrompt, SearchPrompt};
+pub use scrollbar::Scrollbar;
 pub use signature_help::SignatureHelpPopup;
 pub use statusline::StatusLine;

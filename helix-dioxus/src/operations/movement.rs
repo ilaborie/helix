@@ -17,6 +17,7 @@ pub trait MovementOps {
     fn page_down(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn scroll_up(&mut self, doc_id: DocumentId, view_id: ViewId, lines: usize);
     fn scroll_down(&mut self, doc_id: DocumentId, view_id: ViewId, lines: usize);
+    fn scroll_to_line(&mut self, doc_id: DocumentId, view_id: ViewId, target_line: usize);
 }
 
 impl MovementOps for EditorContext {
@@ -202,6 +203,20 @@ impl MovementOps for EditorContext {
 
         // Set the new anchor to the start of the new line
         offset.anchor = text.line_to_char(new_line);
+        doc.set_view_offset(view_id, offset);
+    }
+
+    fn scroll_to_line(&mut self, doc_id: DocumentId, view_id: ViewId, target_line: usize) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+
+        // Clamp target to valid range
+        let last_line = text.len_lines().saturating_sub(1);
+        let target = target_line.min(last_line);
+
+        // Get current view offset and update anchor
+        let mut offset = doc.view_offset(view_id);
+        offset.anchor = text.line_to_char(target);
         doc.set_view_offset(view_id, offset);
     }
 }

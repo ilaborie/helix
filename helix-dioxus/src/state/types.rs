@@ -8,8 +8,8 @@ use std::path::PathBuf;
 use helix_view::DocumentId;
 
 use crate::lsp::{
-    CodeActionSnapshot, CompletionItemSnapshot, DiagnosticSnapshot, HoverSnapshot,
-    InlayHintSnapshot, LocationSnapshot, LspServerSnapshot, SignatureHelpSnapshot,
+    CodeActionSnapshot, CompletionItemSnapshot, DiagnosticSeverity, DiagnosticSnapshot,
+    HoverSnapshot, InlayHintSnapshot, LocationSnapshot, LspServerSnapshot, SignatureHelpSnapshot,
 };
 
 /// Buffer info for the tab bar.
@@ -79,6 +79,15 @@ pub enum PickerMode {
     Definitions,
 }
 
+/// Minimal diagnostic info for scrollbar markers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScrollbarDiagnostic {
+    /// Line number (0-indexed).
+    pub line: usize,
+    /// Diagnostic severity.
+    pub severity: DiagnosticSeverity,
+}
+
 /// A snapshot of the editor state for rendering.
 /// This is Clone + Send + Sync so it can be used with Dioxus.
 #[derive(Debug, Clone, Default)]
@@ -116,8 +125,10 @@ pub struct EditorSnapshot {
     pub buffer_scroll_offset: usize,
 
     // LSP state
-    /// Diagnostics for the current document, grouped by line.
+    /// Diagnostics for the current document (visible lines only).
     pub diagnostics: Vec<DiagnosticSnapshot>,
+    /// All diagnostics summary for scrollbar markers (line + severity only).
+    pub all_diagnostics_summary: Vec<ScrollbarDiagnostic>,
     /// Total error count in the current document.
     pub error_count: usize,
     /// Total warning count in the current document.
@@ -229,6 +240,8 @@ pub enum EditorCommand {
     PageDown,
     ScrollUp(usize),
     ScrollDown(usize),
+    /// Scroll to make a specific line visible (0-indexed).
+    ScrollToLine(usize),
 
     // Mode changes
     EnterInsertMode,

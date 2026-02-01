@@ -16,7 +16,8 @@ mod types;
 pub use types::{
     BufferInfo, ConfirmationAction, ConfirmationDialogSnapshot, Direction, EditorCommand,
     EditorSnapshot, GlobalSearchResult, InputDialogKind, InputDialogSnapshot, LineSnapshot,
-    NotificationSeverity, NotificationSnapshot, PickerIcon, PickerItem, PickerMode, TokenSpan,
+    NotificationSeverity, NotificationSnapshot, PickerIcon, PickerItem, PickerMode,
+    ScrollbarDiagnostic, TokenSpan,
 };
 
 use std::path::PathBuf;
@@ -325,6 +326,9 @@ impl EditorContext {
             EditorCommand::PageDown => self.page_down(doc_id, view_id),
             EditorCommand::ScrollUp(lines) => self.scroll_up(doc_id, view_id, lines),
             EditorCommand::ScrollDown(lines) => self.scroll_down(doc_id, view_id, lines),
+            EditorCommand::ScrollToLine(target_line) => {
+                self.scroll_to_line(doc_id, view_id, target_line);
+            }
 
             // Mode changes
             EditorCommand::EnterInsertMode => self.editor.mode = Mode::Insert,
@@ -1177,6 +1181,15 @@ impl EditorContext {
             })
             .count();
 
+        // Collect ALL diagnostics summary for scrollbar markers (line + severity only)
+        let all_diagnostics_summary: Vec<types::ScrollbarDiagnostic> = all_diagnostics
+            .iter()
+            .map(|d| types::ScrollbarDiagnostic {
+                line: d.line,
+                severity: d.severity.map(DiagnosticSeverity::from).unwrap_or_default(),
+            })
+            .collect();
+
         let (open_buffers, buffer_scroll_offset) = self.buffer_bar_snapshot();
 
         // Increment snapshot version for change detection
@@ -1211,6 +1224,7 @@ impl EditorContext {
             buffer_scroll_offset,
             // LSP state
             diagnostics,
+            all_diagnostics_summary,
             error_count,
             warning_count,
             completion_visible: self.completion_visible,

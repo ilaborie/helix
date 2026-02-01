@@ -1087,6 +1087,38 @@ let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
 
 ---
 
+## 2026-02-01: Scrollbar Diagnostic Marker Improvements
+
+### Progress
+- Fixed issue where error markers were hidden behind hint markers in the scrollbar
+- Added conditional thumb rendering for small files that fit in the viewport
+- Implemented line-aligned marker positioning for small files
+
+### Issues Fixed
+- **Error marker not visible**: Multiple diagnostics at similar positions caused lower-severity
+  markers (hint) to render on top of higher-severity markers (error)
+- **Unnecessary scrollbar thumb**: Small files showed a scrollbar thumb even when content fit in viewport
+
+### Implementation Details
+- **Severity ordering**: Diagnostics are now sorted by severity (ascending) before rendering,
+  so errors render last and appear on top in the DOM
+- **CSS z-index by severity**: Each severity level has its own z-index (hint=2, info=3, warning=4, error=5)
+  providing a double-layered approach to ensure errors are always visible
+- **Conditional thumb**: Thumb only renders when `total_lines > viewport_lines`
+- **Line-aligned positioning**: For small files, markers use pixel-based positioning (`8px + line * 21px`)
+  to align with actual editor line positions; large files continue to use percentage-based positioning
+
+### Files Modified
+- `src/components/scrollbar.rs` - Added severity sorting, conditional thumb, line-aligned positioning
+- `assets/styles.css` - Added severity-specific z-index values for scrollbar markers
+
+### Technical Notes
+- Line height constant: `21.0px` (1.5em at 14px font-size)
+- Content padding constant: `8.0px` (matches `.content` padding)
+- `DiagnosticSeverity` already implements `Ord` with Hint < Info < Warning < Error
+
+---
+
 ## Planned Enhancements
 
 ### Helix Commands & Modes

@@ -7,7 +7,7 @@ use lucide_dioxus::Lightbulb;
 
 use crate::components::{
     diagnostics_for_line, first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker,
-    DiagnosticUnderline, ErrorLens,
+    DiagnosticUnderline, ErrorLens, Scrollbar,
 };
 use crate::lsp::DiagnosticSnapshot;
 use crate::state::{LineSnapshot, TokenSpan};
@@ -150,6 +150,14 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                         }
                     }
                 }
+            }
+
+            // Scrollbar on the right edge
+            Scrollbar {
+                total_lines: snapshot.total_lines,
+                visible_start: snapshot.visible_start,
+                viewport_lines: 40,
+                all_diagnostics: snapshot.all_diagnostics_summary.clone(),
             }
         }
     }
