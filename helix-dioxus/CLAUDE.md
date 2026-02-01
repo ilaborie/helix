@@ -28,11 +28,19 @@ helix-dioxus/src/
 │   ├── editor_view.rs          # Document rendering with syntax highlighting
 │   ├── buffer_bar.rs           # Tab bar with scroll buttons
 │   ├── statusline.rs           # Mode, filename, position display
-│   ├── picker/                 # Picker components
+│   ├── picker/                 # Picker components (overlay dialogs)
 │   │   ├── mod.rs              # Re-exports GenericPicker
 │   │   ├── generic.rs          # Main picker container
 │   │   ├── item.rs             # PickerItemRow component
 │   │   └── highlight.rs        # HighlightedText for fuzzy matches
+│   ├── inline_dialog/          # Inline dialog components (cursor-positioned)
+│   │   ├── mod.rs              # Re-exports InlineDialogContainer, InlineListDialog
+│   │   ├── container.rs        # Base container with positioning logic
+│   │   └── list.rs             # List dialog with selection support
+│   ├── code_actions.rs         # Code actions menu (uses InlineListDialog)
+│   ├── completion.rs           # Completion popup (uses InlineListDialog)
+│   ├── hover.rs                # Hover popup (uses InlineDialogContainer)
+│   ├── signature_help.rs       # Signature help (uses InlineDialogContainer)
 │   └── prompt.rs               # Command/search prompts
 │
 ├── state/                      # State Management
@@ -131,6 +139,51 @@ Functions defined in `script.js`:
 - Mode colors: `style: "background-color: {mode_bg};"`
 - Active state: `style: "color: {text_color};"`
 
+### Inline Dialog Pattern
+
+Cursor-positioned popups use the generic inline dialog components:
+
+```rust
+// Content dialog (hover, signature help)
+use super::inline_dialog::{DialogConstraints, DialogPosition, InlineDialogContainer};
+
+InlineDialogContainer {
+    cursor_line,
+    cursor_col,
+    position: DialogPosition::Above,  // or Below
+    class: "my-popup",
+    constraints: DialogConstraints { min_width: None, max_width: Some(500), max_height: Some(300) },
+    // content as children
+}
+
+// List dialog (completion, code actions)
+use super::inline_dialog::{InlineListDialog, InlineListItem};
+
+InlineListDialog {
+    cursor_line,
+    cursor_col,
+    selected,
+    empty_message: "No items",
+    class: "my-list-popup",
+    has_items: !items.is_empty(),
+
+    for (idx, item) in items.iter().enumerate() {
+        InlineListItem {
+            key: "{idx}",
+            is_selected: idx == selected,
+            // item content
+        }
+    }
+}
+```
+
+CSS classes:
+- `.inline-dialog` - Base styles for all inline dialogs
+- `.inline-dialog-list` - List variant with padding
+- `.inline-dialog-item` - Selectable list item
+- `.inline-dialog-item-selected` - Selected state
+- `.inline-dialog-empty` - Empty state message
+
 ### Coding Conventions
 
 - Keep components under 300 lines
@@ -196,6 +249,12 @@ cargo clippy -p helix-dioxus --bins
 - [x] ~~Consider splitting picker into `FilePicker`, `BufferPicker` components~~ Split into picker/ folder
 - [ ] Add integration tests for key operations
 
+### UI Improvements (RustRover-inspired)
+- [ ] Severity-colored lightbulb indicator - change color based on diagnostic severity (red/yellow/blue/cyan)
+- [ ] Code actions search box - add filter input to code actions dialog
+- [ ] Diagnostic scrollbar markers - show diagnostic positions on right scrollbar edge
+- [ ] Code actions preview panel - show fix preview before applying (needs LSP resolve)
+
 ### LSP Improvements
 - [ ] Investigate rust-analyzer diagnostic line reporting - diagnostics may be reported on the line where parsing fails rather than where the actual error is (e.g., unterminated string reports on the next line). Consider requesting upstream fix or mapping diagnostic positions back to the originating code
 
@@ -204,3 +263,7 @@ cargo clippy -p helix-dioxus --bins
 - [x] Implemented LSP server restart functionality via `Registry::restart_server()`
 - [x] Added diagnostic wavy underlines using CSS gradients
 - [x] Error Lens now shows on previous non-empty line when diagnostic is on empty line
+- [x] LSP progress tracking - status bar shows "Indexing" (blue) when LSP is still loading/indexing the project
+- [x] Generic inline dialog components - `InlineDialogContainer` and `InlineListDialog` for cursor-positioned popups
+- [x] Code actions color fix - icon and kind badge colored, title uses normal text color
+- [x] LSP dialog shows progress message below server name (e.g., "Loading workspace", "Building proc-macros")

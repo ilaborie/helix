@@ -9,6 +9,7 @@ mod diagnostics;
 mod editor_view;
 mod hover;
 mod inlay_hints;
+mod inline_dialog;
 mod location_picker;
 mod lsp_dialog;
 mod picker;
@@ -25,6 +26,7 @@ pub use diagnostics::{
 };
 pub use editor_view::EditorView;
 pub use hover::HoverPopup;
+pub use inline_dialog::{DialogConstraints, DialogPosition, InlineDialogContainer, InlineListDialog, InlineListItem};
 // Note: inlay_hints utilities (format_hint, hints_for_line) are available
 // but not re-exported until LSP client integration is complete.
 pub use location_picker::LocationPicker;

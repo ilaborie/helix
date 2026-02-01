@@ -325,6 +325,8 @@ pub enum LspServerStatus {
     /// Server is starting up.
     #[default]
     Starting,
+    /// Server is initialized but still indexing/loading the project.
+    Indexing,
     /// Server is running and ready.
     Running,
     /// Server has stopped.
@@ -337,6 +339,7 @@ impl LspServerStatus {
     pub fn css_color(&self) -> &'static str {
         match self {
             Self::Starting => "#e5c07b", // Yellow
+            Self::Indexing => "#61afef", // Blue (indexing)
             Self::Running => "#98c379",  // Green
             Self::Stopped => "#5c6370",  // Gray
         }
@@ -354,6 +357,8 @@ pub struct LspServerSnapshot {
     pub languages: Vec<String>,
     /// Whether this server is active for the current document.
     pub active_for_current: bool,
+    /// Current progress message (e.g., "Loading workspace", "Building proc-macros").
+    pub progress_message: Option<String>,
 }
 
 /// Response types from async LSP operations.
@@ -373,6 +378,9 @@ pub enum LspResponse {
     References(Vec<LocationSnapshot>),
     /// Code actions received (with full data for execution).
     CodeActions(Vec<StoredCodeAction>),
+    /// Code actions availability check result (for lightbulb indicator).
+    /// Contains whether actions are available and the cached actions.
+    CodeActionsAvailable(bool, Vec<StoredCodeAction>),
     /// Diagnostics updated.
     DiagnosticsUpdated,
     /// Format edits received (applied directly).

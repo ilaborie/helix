@@ -4,58 +4,8 @@
 
 use dioxus::prelude::*;
 
+use super::inline_dialog::{DialogConstraints, DialogPosition, InlineDialogContainer};
 use crate::lsp::SignatureHelpSnapshot;
-
-/// Signature help popup that displays function signatures.
-#[component]
-pub fn SignatureHelpPopup(
-    signature_help: SignatureHelpSnapshot,
-    cursor_line: usize,
-    cursor_col: usize,
-) -> Element {
-    // Position the popup above the cursor
-    let top = cursor_line.saturating_sub(1) * 21 + 40;
-    let left = cursor_col * 8 + 60;
-
-    let style = format!("top: {}px; left: {}px;", top.max(40), left.min(500));
-
-    // Get the active signature
-    let active_sig = signature_help
-        .signatures
-        .get(signature_help.active_signature)
-        .or_else(|| signature_help.signatures.first());
-
-    rsx! {
-        div {
-            class: "signature-help-popup",
-            style: "{style}",
-
-            if let Some(sig) = active_sig {
-                // Signature label with highlighted active parameter
-                div {
-                    class: "signature-label",
-                    {render_signature_label(&sig.label, &sig.parameters, signature_help.active_parameter)}
-                }
-
-                // Documentation
-                if let Some(ref docs) = sig.documentation {
-                    div {
-                        class: "signature-docs",
-                        "{docs}"
-                    }
-                }
-
-                // Show signature index if multiple signatures
-                if signature_help.signatures.len() > 1 {
-                    div {
-                        style: "color: #5c6370; font-size: 11px; margin-top: 4px;",
-                        "Signature {signature_help.active_signature + 1} of {signature_help.signatures.len()}"
-                    }
-                }
-            }
-        }
-    }
-}
 
 /// Render the signature label with the active parameter highlighted.
 fn render_signature_label(
@@ -92,4 +42,58 @@ fn render_signature_label(
 
     // Fallback: just render the label
     rsx! { span { "{label}" } }
+}
+
+/// Signature help popup that displays function signatures.
+#[component]
+pub fn SignatureHelpPopup(
+    signature_help: SignatureHelpSnapshot,
+    cursor_line: usize,
+    cursor_col: usize,
+) -> Element {
+    let constraints = DialogConstraints {
+        min_width: None,
+        max_width: Some(600),
+        max_height: None,
+    };
+
+    // Get the active signature
+    let active_sig = signature_help
+        .signatures
+        .get(signature_help.active_signature)
+        .or_else(|| signature_help.signatures.first());
+
+    rsx! {
+        InlineDialogContainer {
+            cursor_line,
+            cursor_col,
+            position: DialogPosition::Above,
+            class: "signature-help-popup",
+            constraints,
+
+            if let Some(sig) = active_sig {
+                // Signature label with highlighted active parameter
+                div {
+                    class: "signature-label",
+                    {render_signature_label(&sig.label, &sig.parameters, signature_help.active_parameter)}
+                }
+
+                // Documentation
+                if let Some(ref docs) = sig.documentation {
+                    div {
+                        class: "signature-docs",
+                        "{docs}"
+                    }
+                }
+
+                // Show signature index if multiple signatures
+                if signature_help.signatures.len() > 1 {
+                    div {
+                        style: "color: #5c6370; font-size: 11px; margin-top: 4px;",
+                        "Signature {signature_help.active_signature + 1} of {signature_help.signatures.len()}"
+                    }
+                }
+            }
+        }
+    }
 }

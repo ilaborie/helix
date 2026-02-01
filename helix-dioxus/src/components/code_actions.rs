@@ -3,8 +3,101 @@
 //! Displays available code actions (quick fixes, refactors) at cursor position.
 
 use dioxus::prelude::*;
+use lucide_dioxus::{FileCode, Lightbulb, PackagePlus, Star, Wrench};
 
+use super::inline_dialog::{DialogConstraints, InlineListDialog, InlineListItem};
 use crate::lsp::CodeActionSnapshot;
+
+/// Get the icon and color for a code action kind.
+fn action_kind_style(kind: Option<&str>, is_preferred: bool) -> (&'static str, Element) {
+    if is_preferred {
+        return ("#e5c07b", rsx! { Star { size: 12, color: "#e5c07b" } });
+    }
+
+    match kind {
+        Some(k) if k.starts_with("quickfix") => {
+            ("#98c379", rsx! { Wrench { size: 12, color: "#98c379" } })
+        }
+        Some(k) if k.starts_with("refactor.extract") => {
+            ("#61afef", rsx! { PackagePlus { size: 12, color: "#61afef" } })
+        }
+        Some(k) if k.starts_with("refactor") => {
+            ("#c678dd", rsx! { FileCode { size: 12, color: "#c678dd" } })
+        }
+        Some(k) if k.starts_with("source") => {
+            ("#56b6c2", rsx! { FileCode { size: 12, color: "#56b6c2" } })
+        }
+        _ => ("#abb2bf", rsx! { Lightbulb { size: 12, color: "#abb2bf" } }),
+    }
+}
+
+/// Get a short display name for a code action kind.
+fn kind_short_name(kind: &str) -> &'static str {
+    match kind {
+        k if k.starts_with("quickfix") => "fix",
+        k if k.starts_with("refactor.extract") => "extract",
+        k if k.starts_with("refactor.inline") => "inline",
+        k if k.starts_with("refactor.rewrite") => "rewrite",
+        k if k.starts_with("refactor") => "refactor",
+        k if k.starts_with("source.organizeImports") => "imports",
+        k if k.starts_with("source") => "source",
+        _ => "",
+    }
+}
+
+/// A single code action item in the menu.
+#[component]
+fn CodeActionItem(action: CodeActionSnapshot, is_selected: bool) -> Element {
+    let is_disabled = action.disabled.is_some();
+
+    // Get icon and color based on action kind
+    let (kind_color, icon) = action_kind_style(action.kind.as_deref(), action.is_preferred);
+
+    // Check if this is a quickfix action
+    let is_quickfix = action
+        .kind
+        .as_deref()
+        .is_some_and(|k| k.starts_with("quickfix"));
+
+    let mut item_class = String::new();
+    if is_disabled {
+        item_class.push_str("code-action-disabled");
+    }
+    if is_quickfix {
+        if !item_class.is_empty() {
+            item_class.push(' ');
+        }
+        item_class.push_str("code-action-quickfix");
+    }
+
+    rsx! {
+        InlineListItem {
+            is_selected,
+            class: if item_class.is_empty() { None } else { Some(item_class) },
+
+            // Action type icon (colored)
+            span {
+                class: "code-action-icon icon-wrapper",
+                {icon}
+            }
+
+            // Action title (normal text color)
+            span {
+                class: "code-action-title",
+                "{action.title}"
+            }
+
+            // Kind indicator (colored to match icon)
+            if let Some(ref kind) = action.kind {
+                span {
+                    class: "code-action-kind",
+                    style: "color: {kind_color}; border-color: {kind_color};",
+                    "{kind_short_name(kind)}"
+                }
+            }
+        }
+    }
+}
 
 /// Code actions menu that displays available fixes and refactors.
 #[component]
@@ -14,72 +107,27 @@ pub fn CodeActionsMenu(
     cursor_line: usize,
     cursor_col: usize,
 ) -> Element {
-    // Position the menu near the cursor
-    let top = cursor_line * 21 + 60;
-    let left = cursor_col * 8 + 60;
-
-    let style = format!("top: {}px; left: {}px;", top.min(400), left.min(500));
+    let constraints = DialogConstraints {
+        min_width: Some(220),
+        max_width: Some(450),
+        max_height: Some(300),
+    };
 
     rsx! {
-        div {
+        InlineListDialog {
+            cursor_line,
+            cursor_col,
+            selected,
+            empty_message: "No code actions available",
             class: "code-actions-menu",
-            style: "{style}",
+            constraints,
+            has_items: !actions.is_empty(),
 
             for (idx, action) in actions.iter().enumerate() {
-                {
-                    let is_selected = idx == selected;
-                    let is_disabled = action.disabled.is_some();
-
-                    let mut item_class = String::from("code-action-item");
-                    if is_selected {
-                        item_class.push_str(" code-action-item-selected");
-                    }
-                    if is_disabled {
-                        item_class.push_str(" code-action-disabled");
-                    }
-
-                    let title_class = if action.is_preferred {
-                        "code-action-title code-action-preferred"
-                    } else {
-                        "code-action-title"
-                    };
-
-                    rsx! {
-                        div {
-                            key: "{idx}",
-                            class: "{item_class}",
-
-                            // Preferred indicator
-                            if action.is_preferred {
-                                span {
-                                    style: "color: #e5c07b; margin-right: 4px;",
-                                    "★"
-                                }
-                            }
-
-                            // Action title
-                            span {
-                                class: "{title_class}",
-                                "{action.title}"
-                            }
-
-                            // Kind indicator (if available)
-                            if let Some(ref kind) = action.kind {
-                                span {
-                                    style: "color: #5c6370; font-size: 11px; margin-left: 8px;",
-                                    "[{kind}]"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Empty state
-            if actions.is_empty() {
-                div {
-                    style: "padding: 12px; color: #5c6370; text-align: center;",
-                    "No code actions available"
+                CodeActionItem {
+                    key: "{idx}",
+                    action: action.clone(),
+                    is_selected: idx == selected,
                 }
             }
         }

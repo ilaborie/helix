@@ -9,6 +9,37 @@ use crate::lsp::{LspServerSnapshot, LspServerStatus};
 use crate::state::EditorCommand;
 use crate::AppState;
 
+/// Determine the aggregate status for display.
+fn aggregate_lsp_status(servers: &[LspServerSnapshot]) -> LspServerStatus {
+    // Priority: Starting > Indexing > Running > Stopped
+    // If any server is starting, show starting
+    // If any server is indexing, show indexing
+    // If all are running, show running
+    // Otherwise show stopped
+    let mut has_starting = false;
+    let mut has_indexing = false;
+    let mut has_running = false;
+
+    for server in servers {
+        match server.status {
+            LspServerStatus::Starting => has_starting = true,
+            LspServerStatus::Indexing => has_indexing = true,
+            LspServerStatus::Running => has_running = true,
+            LspServerStatus::Stopped => {}
+        }
+    }
+
+    if has_starting {
+        LspServerStatus::Starting
+    } else if has_indexing {
+        LspServerStatus::Indexing
+    } else if has_running {
+        LspServerStatus::Running
+    } else {
+        LspServerStatus::Stopped
+    }
+}
+
 /// LSP status block component for the status line.
 #[component]
 fn LspStatusBlock(servers: Vec<LspServerSnapshot>, on_click: EventHandler<MouseEvent>) -> Element {
@@ -20,8 +51,8 @@ fn LspStatusBlock(servers: Vec<LspServerSnapshot>, on_click: EventHandler<MouseE
     }
 
     // Determine overall status
-    let all_running = servers.iter().all(|s| s.status == LspServerStatus::Running);
-    let color = if all_running { "#98c379" } else { "#e5c07b" };
+    let status = aggregate_lsp_status(&servers);
+    let color = status.css_color();
 
     rsx! {
         div {
@@ -39,10 +70,10 @@ fn LspStatusBlock(servers: Vec<LspServerSnapshot>, on_click: EventHandler<MouseE
             span {
                 class: "icon-wrapper",
                 style: "margin-right: 4px;",
-                if all_running {
-                    CircleCheck { size: 12, color: "#98c379" }
-                } else {
-                    LoaderCircle { size: 12, color: "#e5c07b" }
+                match status {
+                    LspServerStatus::Running => rsx! { CircleCheck { size: 12, color: color } },
+                    LspServerStatus::Starting | LspServerStatus::Indexing => rsx! { LoaderCircle { size: 12, color: color } },
+                    LspServerStatus::Stopped => rsx! { CircleX { size: 12, color: color } },
                 }
             }
             "{server_count}"

@@ -4,22 +4,25 @@
 
 use dioxus::prelude::*;
 
+use super::inline_dialog::{DialogConstraints, DialogPosition, InlineDialogContainer};
 use crate::lsp::HoverSnapshot;
 
 /// Hover popup that displays documentation and type info.
 #[component]
 pub fn HoverPopup(hover: HoverSnapshot, cursor_line: usize, cursor_col: usize) -> Element {
-    // Position the popup above the cursor
-    // TODO: Calculate actual pixel position based on cursor
-    let top = cursor_line.saturating_sub(1) * 21 + 40; // Above cursor line
-    let left = cursor_col * 8 + 60;
-
-    let style = format!("top: {}px; left: {}px;", top.max(40), left.min(500));
+    let constraints = DialogConstraints {
+        min_width: None,
+        max_width: Some(600),
+        max_height: Some(400),
+    };
 
     rsx! {
-        div {
+        InlineDialogContainer {
+            cursor_line,
+            cursor_col,
+            position: DialogPosition::Above,
             class: "hover-popup",
-            style: "{style}",
+            constraints,
 
             // Render the hover content
             // For now, just render as pre-formatted text

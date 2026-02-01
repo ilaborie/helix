@@ -95,6 +95,11 @@ pub struct EditorContext {
     pub(crate) code_actions: Vec<StoredCodeAction>,
     /// Selected code action index.
     pub(crate) code_action_selected: usize,
+    /// Whether code actions are available at the current cursor position.
+    /// This is checked proactively to show a lightbulb indicator.
+    pub(crate) has_code_actions: bool,
+    /// Last position where we checked for code actions (to avoid repeated checks).
+    code_actions_check_position: Option<(helix_view::DocumentId, usize, usize)>,
     /// Whether location picker is visible.
     pub(crate) location_picker_visible: bool,
     /// Locations for picker.
@@ -109,6 +114,8 @@ pub struct EditorContext {
     pub(crate) lsp_dialog_visible: bool,
     /// Selected server index in dialog.
     pub(crate) lsp_server_selected: usize,
+    /// LSP progress tracking for indexing status.
+    pub(crate) lsp_progress: helix_lsp::LspProgressMap,
 
     // Application state - pub(crate) for operations access
     pub(crate) should_quit: bool,
@@ -196,6 +203,8 @@ impl EditorContext {
             code_actions_visible: false,
             code_actions: Vec::new(),
             code_action_selected: 0,
+            has_code_actions: false,
+            code_actions_check_position: None,
             location_picker_visible: false,
             locations: Vec::new(),
             location_selected: 0,
@@ -203,6 +212,7 @@ impl EditorContext {
             // LSP dialog state
             lsp_dialog_visible: false,
             lsp_server_selected: 0,
+            lsp_progress: helix_lsp::LspProgressMap::new(),
             should_quit: false,
             snapshot_version: 0,
         })
@@ -216,6 +226,9 @@ impl EditorContext {
 
         // Poll for LSP events (diagnostics, progress, etc.)
         self.poll_lsp_events();
+
+        // Check for code actions at cursor (for lightbulb indicator)
+        self.check_code_actions_available();
 
         // Ensure cursor stays visible in viewport after any cursor movements
         let view_id = self.editor.tree.focus;
@@ -481,7 +494,14 @@ impl EditorContext {
 
             // LSP - Code Actions
             EditorCommand::ShowCodeActions => {
-                self.trigger_code_actions();
+                // If we already have cached code actions from the proactive check, show them
+                if self.has_code_actions && !self.code_actions.is_empty() {
+                    self.code_actions_visible = true;
+                    self.code_action_selected = 0;
+                } else {
+                    // Otherwise trigger a fresh request
+                    self.trigger_code_actions();
+                }
             }
             EditorCommand::CodeActionUp => {
                 if self.code_action_selected > 0 {
@@ -642,6 +662,15 @@ impl EditorContext {
                 self.code_actions = actions;
                 self.code_action_selected = 0;
                 self.code_actions_visible = !self.code_actions.is_empty();
+                self.has_code_actions = !self.code_actions.is_empty();
+            }
+            LspResponse::CodeActionsAvailable(has_actions, cached_actions) => {
+                self.has_code_actions = has_actions;
+                // Cache the actions for quick access when menu is opened
+                if has_actions && !cached_actions.is_empty() {
+                    self.code_actions = cached_actions;
+                    self.code_action_selected = 0;
+                }
             }
             LspResponse::DiagnosticsUpdated => {
                 // Diagnostics are pulled from the document in snapshot()
@@ -657,6 +686,8 @@ impl EditorContext {
 
     /// Collect snapshots of all language servers.
     fn collect_lsp_servers(&self) -> Vec<LspServerSnapshot> {
+        use helix_lsp::lsp::WorkDoneProgress;
+
         let view_id = self.editor.tree.focus;
         let view = self.editor.tree.get(view_id);
         let current_doc = self.editor.document(view.doc);
@@ -674,13 +705,36 @@ impl EditorContext {
             .map(|client| {
                 let name = client.name().to_string();
                 let is_initialized = client.is_initialized();
+                let is_progressing = self.lsp_progress.is_progressing(client.id());
 
-                // Determine status based on initialization
-                let status = if is_initialized {
-                    LspServerStatus::Running
-                } else {
+                // Determine status based on initialization and progress
+                let status = if !is_initialized {
                     LspServerStatus::Starting
+                } else if is_progressing {
+                    LspServerStatus::Indexing
+                } else {
+                    LspServerStatus::Running
                 };
+
+                // Get progress message if available
+                let progress_message = self
+                    .lsp_progress
+                    .progress_map(client.id())
+                    .and_then(|tokens| {
+                        // Get the most recent progress with a message
+                        tokens.values().find_map(|status| {
+                            status.progress().and_then(|p| match p {
+                                WorkDoneProgress::Begin(begin) => {
+                                    Some(begin.title.clone())
+                                }
+                                WorkDoneProgress::Report(report) => {
+                                    // Prefer message over title if available
+                                    report.message.clone()
+                                }
+                                WorkDoneProgress::End(_) => None,
+                            })
+                        })
+                    });
 
                 // Get supported languages from client capabilities
                 // Note: helix-lsp doesn't expose this directly, so we track it differently
@@ -694,6 +748,7 @@ impl EditorContext {
                     status,
                     languages,
                     active_for_current,
+                    progress_message,
                 }
             })
             .collect();
@@ -958,6 +1013,7 @@ impl EditorContext {
                 .map(|a| a.snapshot.clone())
                 .collect(),
             code_action_selected: self.code_action_selected,
+            has_code_actions: self.has_code_actions,
             location_picker_visible: self.location_picker_visible,
             locations: self.locations.clone(),
             location_selected: self.location_selected,
@@ -1660,23 +1716,192 @@ impl EditorContext {
             lsp::CodeActionOrCommand::CodeAction(code_action) => {
                 log::info!("Applying code action: {}", code_action.title);
 
+                // Resolve code action if edit or command is missing.
+                // Many LSP servers don't include the full edit in the initial response
+                // and require a "codeAction/resolve" request to get the workspace edit.
+                let resolved_code_action = if code_action.edit.is_none()
+                    || code_action.command.is_none()
+                {
+                    if let Some(ls) = self.editor.language_server_by_id(action.language_server_id) {
+                        if let Some(future) = ls.resolve_code_action(code_action) {
+                            match helix_lsp::block_on(future) {
+                                Ok(resolved) => {
+                                    log::info!(
+                                        "Resolved code action, edit present: {}",
+                                        resolved.edit.is_some()
+                                    );
+                                    Some(resolved)
+                                }
+                                Err(e) => {
+                                    log::error!("Failed to resolve code action: {}", e);
+                                    None
+                                }
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        log::warn!("Language server not found for code action");
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                let resolved = resolved_code_action.as_ref().unwrap_or(code_action);
+
                 // Apply workspace edit if present
-                if let Some(ref workspace_edit) = code_action.edit {
+                if let Some(ref workspace_edit) = resolved.edit {
+                    log::info!(
+                        "Applying workspace edit (has changes: {}, has document_changes: {})",
+                        workspace_edit.changes.is_some(),
+                        workspace_edit.document_changes.is_some()
+                    );
                     if let Err(e) = self
                         .editor
                         .apply_workspace_edit(action.offset_encoding, workspace_edit)
                     {
                         log::error!("Failed to apply workspace edit: {:?}", e);
                     }
+                } else {
+                    log::warn!("Code action has no workspace edit after resolution");
                 }
 
                 // Execute command if present (after edit)
-                if let Some(command) = &code_action.command {
+                if let Some(command) = &resolved.command {
                     self.editor
                         .execute_lsp_command(command.clone(), action.language_server_id);
                 }
             }
         }
+    }
+
+    /// Check if code actions are available at the current cursor position.
+    /// This is called proactively to update the lightbulb indicator.
+    pub(crate) fn check_code_actions_available(&mut self) {
+        let view_id = self.editor.tree.focus;
+        let view = self.editor.tree.get(view_id);
+        let doc_id = view.doc;
+
+        let Some(doc) = self.editor.document(doc_id) else {
+            self.has_code_actions = false;
+            return;
+        };
+
+        // Get cursor position
+        let text = doc.text();
+        let selection = doc.selection(view_id);
+        let cursor = selection.primary().cursor(text.slice(..));
+        let cursor_line = text.char_to_line(cursor);
+        let line_start = text.line_to_char(cursor_line);
+        let cursor_col = cursor - line_start;
+
+        // Check if position changed since last check
+        let current_pos = (doc_id, cursor_line, cursor_col);
+        if self.code_actions_check_position == Some(current_pos) {
+            // Position unchanged, skip check
+            return;
+        }
+        self.code_actions_check_position = Some(current_pos);
+
+        // Get language server with code actions support
+        let ls = match doc
+            .language_servers_with_feature(LanguageServerFeature::CodeAction)
+            .next()
+        {
+            Some(ls) => ls,
+            None => {
+                self.has_code_actions = false;
+                return;
+            }
+        };
+
+        let offset_encoding = ls.offset_encoding();
+        let language_server_id = ls.id();
+
+        // Create range for the cursor position
+        let range = lsp::Range {
+            start: lsp::Position {
+                line: cursor_line as u32,
+                character: cursor_col as u32,
+            },
+            end: lsp::Position {
+                line: cursor_line as u32,
+                character: cursor_col as u32,
+            },
+        };
+
+        // Get diagnostics at cursor position for context
+        let diagnostics: Vec<lsp::Diagnostic> = doc
+            .diagnostics()
+            .iter()
+            .filter(|d| d.line == cursor_line)
+            .filter_map(|d| {
+                Some(lsp::Diagnostic {
+                    range: lsp::Range {
+                        start: lsp::Position {
+                            line: d.line as u32,
+                            character: (d.range.start - line_start) as u32,
+                        },
+                        end: lsp::Position {
+                            line: d.line as u32,
+                            character: (d.range.end - line_start) as u32,
+                        },
+                    },
+                    message: d.message.clone(),
+                    severity: d.severity.map(|s| match s {
+                        helix_core::diagnostic::Severity::Error => lsp::DiagnosticSeverity::ERROR,
+                        helix_core::diagnostic::Severity::Warning => {
+                            lsp::DiagnosticSeverity::WARNING
+                        }
+                        helix_core::diagnostic::Severity::Info => {
+                            lsp::DiagnosticSeverity::INFORMATION
+                        }
+                        helix_core::diagnostic::Severity::Hint => lsp::DiagnosticSeverity::HINT,
+                    }),
+                    ..Default::default()
+                })
+            })
+            .collect();
+
+        let context = lsp::CodeActionContext {
+            diagnostics,
+            only: None,
+            trigger_kind: Some(lsp::CodeActionTriggerKind::AUTOMATIC),
+        };
+
+        let doc_id = doc.identifier();
+
+        let Some(future) = ls.code_actions(doc_id, range, context) else {
+            self.has_code_actions = false;
+            return;
+        };
+
+        let tx = self.command_tx.clone();
+        tokio::spawn(async move {
+            match future.await {
+                Ok(Some(actions)) => {
+                    let has_actions = !actions.is_empty();
+                    // Send response to update has_code_actions state
+                    let stored_actions =
+                        convert_code_actions(actions, language_server_id, offset_encoding);
+                    let _ = tx.send(EditorCommand::LspResponse(
+                        LspResponse::CodeActionsAvailable(has_actions, stored_actions),
+                    ));
+                }
+                Ok(None) => {
+                    let _ = tx.send(EditorCommand::LspResponse(
+                        LspResponse::CodeActionsAvailable(false, Vec::new()),
+                    ));
+                }
+                Err(e) => {
+                    log::debug!("Code actions check failed: {}", e);
+                    let _ = tx.send(EditorCommand::LspResponse(
+                        LspResponse::CodeActionsAvailable(false, Vec::new()),
+                    ));
+                }
+            }
+        });
     }
 
     /// Refresh inlay hints for the visible viewport.

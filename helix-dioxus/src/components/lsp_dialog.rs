@@ -120,14 +120,29 @@ fn LspServerRow(
                 match server.status {
                     LspServerStatus::Running => rsx! { CircleCheck { size: 14, color: status_color } },
                     LspServerStatus::Starting => rsx! { LoaderCircle { size: 14, color: status_color } },
+                    LspServerStatus::Indexing => rsx! { LoaderCircle { size: 14, color: status_color } },
                     LspServerStatus::Stopped => rsx! { CircleX { size: 14, color: status_color } },
                 }
             }
 
-            // Server name
-            span {
-                class: "lsp-server-name",
-                "{server.name}"
+            // Server info (name + progress message)
+            div {
+                class: "lsp-server-info",
+
+                // Server name
+                span {
+                    class: "lsp-server-name",
+                    "{server.name}"
+                }
+
+                // Progress message (if indexing)
+                if let Some(ref msg) = server.progress_message {
+                    span {
+                        class: "lsp-server-progress",
+                        style: "color: {status_color};",
+                        "{msg}"
+                    }
+                }
             }
 
             // Languages badge (if any)

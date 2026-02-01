@@ -146,32 +146,36 @@ impl LspEventOps for EditorContext {
             );
         }
 
-        self.editor.handle_lsp_diagnostics(
-            &provider,
-            uri,
-            params.version,
-            params.diagnostics,
-        );
+        self.editor
+            .handle_lsp_diagnostics(&provider, uri, params.version, params.diagnostics);
     }
 
     fn handle_progress_message(
         &mut self,
-        _server_id: helix_lsp::LanguageServerId,
+        server_id: helix_lsp::LanguageServerId,
         params: lsp::ProgressParams,
     ) {
-        // Just log progress for now - could update a status bar in the future
+        let token = params.token;
         let lsp::ProgressParamsValue::WorkDone(work) = params.value;
+
         match work {
             lsp::WorkDoneProgress::Begin(begin) => {
-                log::trace!("LSP progress begin: {}", begin.title);
+                log::info!("LSP progress begin: {} (server {:?})", begin.title, server_id);
+                self.lsp_progress.begin(server_id, token, begin);
             }
             lsp::WorkDoneProgress::Report(report) => {
                 if let Some(msg) = &report.message {
                     log::trace!("LSP progress: {msg}");
                 }
+                self.lsp_progress.update(server_id, token, report);
             }
-            lsp::WorkDoneProgress::End(_) => {
-                log::trace!("LSP progress end");
+            lsp::WorkDoneProgress::End(end) => {
+                log::info!("LSP progress end (server {:?})", server_id);
+                self.lsp_progress.end_progress(server_id, &token);
+                // Log the message if present
+                if let Some(msg) = end.message {
+                    log::info!("LSP progress completed: {msg}");
+                }
             }
         }
     }
