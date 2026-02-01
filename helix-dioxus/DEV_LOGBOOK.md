@@ -1007,6 +1007,52 @@ let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
 
 ---
 
+## 2026-02-01: Global Search Picker
+
+### Progress
+- Implemented global search picker (`Space+/`)
+  - Searches for text patterns across all files in the workspace
+  - Uses `grep-regex`, `grep-searcher`, and `grep-matcher` crates
+  - Respects `.gitignore` patterns via the `ignore` crate
+  - Smart case detection: lowercase patterns are case-insensitive, uppercase triggers case-sensitive
+
+### Features
+- **In-memory search**: Open documents are searched in their in-memory state (shows unsaved changes)
+- **Cancellation support**: Cancel running searches with Escape or by starting a new search
+- **Batch streaming**: Results stream in batches of 50 for UI responsiveness
+- **Result limit**: Maximum 1000 results to avoid memory issues
+- **Binary detection**: Automatically skips binary files
+
+### Workflow
+1. Press `Space+/` to open the global search picker
+2. Type a regex pattern (e.g., "fn main", "TODO")
+3. Press Enter to execute the search
+4. Results appear with file path, line number, and line content
+5. Navigate with arrows, press Enter to open file at that line
+6. Press Escape to cancel
+
+### Files Created/Modified
+- `Cargo.toml` - Added `grep-regex`, `grep-searcher`, `grep-matcher` dependencies
+- `src/state/types.rs` - Added `PickerMode::GlobalSearch`, `PickerIcon::SearchResult`,
+  `GlobalSearchResult` struct, `EditorCommand::ShowGlobalSearch/GlobalSearchExecute/GlobalSearchResults/GlobalSearchComplete`
+- `src/state/mod.rs` - Added global search state fields, command handlers, picker cancel cleanup
+- `src/operations/picker_ops.rs` - Added `show_global_search_picker()`, `execute_global_search()`,
+  `cancel_global_search()`, `update_global_search_picker_items()`, `execute_global_search_blocking()`,
+  GlobalSearch handling in `picker_confirm()`
+- `src/keybindings/normal.rs` - Added `Space+/` keybinding
+- `src/components/picker/item.rs` - Added `TextSearch` icon (green) for search results
+- `src/components/picker/generic.rs` - Added "Global Search" title, "search/open" help text,
+  contextual empty state messages
+
+### Technical Notes
+- Search runs on `tokio::task::spawn_blocking` since it's CPU-bound (file walking/grep)
+- Uses `tokio::sync::watch` channel for cancellation signaling
+- Open documents are collected before spawning the task and searched in-memory
+- Results are sent back via the command channel in batches for progressive UI updates
+- Smart case: `pattern.chars().any(|c| c.is_uppercase())` determines case sensitivity
+
+---
+
 ## Planned Enhancements
 
 ### Helix Commands & Modes
@@ -1072,7 +1118,7 @@ let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
 ### Additional Pickers
 - [x] Symbol picker (document symbols via LSP)
 - [x] Workspace symbol picker (project-wide symbols)
-- [ ] Global search picker (ripgrep integration)
+- [x] Global search picker (grep-based, `Space+/`)
 - [x] Diagnostics picker (jump to errors/warnings)
 - [ ] References picker (LSP references)
 - [ ] Command picker (all available commands)

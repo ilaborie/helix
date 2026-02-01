@@ -15,8 +15,8 @@ mod types;
 
 pub use types::{
     BufferInfo, ConfirmationAction, ConfirmationDialogSnapshot, Direction, EditorCommand,
-    EditorSnapshot, InputDialogKind, InputDialogSnapshot, LineSnapshot, NotificationSeverity,
-    NotificationSnapshot, PickerIcon, PickerItem, PickerMode, TokenSpan,
+    EditorSnapshot, GlobalSearchResult, InputDialogKind, InputDialogSnapshot, LineSnapshot,
+    NotificationSeverity, NotificationSnapshot, PickerIcon, PickerItem, PickerMode, TokenSpan,
 };
 
 use std::path::PathBuf;
@@ -155,6 +155,14 @@ pub struct EditorContext {
     /// Current confirmation dialog snapshot.
     pub(crate) confirmation_dialog: ConfirmationDialogSnapshot,
 
+    // Global search state - pub(crate) for operations access
+    /// Global search results.
+    pub(crate) global_search_results: Vec<GlobalSearchResult>,
+    /// Whether a global search is currently running.
+    pub(crate) global_search_running: bool,
+    /// Cancellation signal for running global search.
+    pub(crate) global_search_cancel: Option<tokio::sync::watch::Sender<bool>>,
+
     // Application state - pub(crate) for operations access
     pub(crate) should_quit: bool,
 
@@ -269,6 +277,10 @@ impl EditorContext {
             // Confirmation dialog state
             confirmation_dialog_visible: false,
             confirmation_dialog: ConfirmationDialogSnapshot::default(),
+            // Global search state
+            global_search_results: Vec::new(),
+            global_search_running: false,
+            global_search_cancel: None,
             should_quit: false,
             snapshot_version: 0,
         })
@@ -439,6 +451,11 @@ impl EditorContext {
                 self.picker_confirm();
             }
             EditorCommand::PickerCancel => {
+                // Cancel any running global search
+                if self.picker_mode == PickerMode::GlobalSearch {
+                    self.cancel_global_search();
+                    self.global_search_results.clear();
+                }
                 self.picker_visible = false;
                 self.picker_items.clear();
                 self.picker_filter.clear();
@@ -747,6 +764,21 @@ impl EditorContext {
             EditorCommand::ConfirmationDialogCancel => {
                 self.confirmation_dialog_visible = false;
                 self.confirmation_dialog = ConfirmationDialogSnapshot::default();
+            }
+
+            // Global Search
+            EditorCommand::ShowGlobalSearch => {
+                self.show_global_search_picker();
+            }
+            EditorCommand::GlobalSearchExecute => {
+                self.execute_global_search();
+            }
+            EditorCommand::GlobalSearchResults(results) => {
+                self.global_search_results.extend(results);
+                self.update_global_search_picker_items();
+            }
+            EditorCommand::GlobalSearchComplete => {
+                self.global_search_running = false;
             }
         }
     }

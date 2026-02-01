@@ -46,6 +46,8 @@ pub enum PickerIcon {
     DiagnosticWarning,
     DiagnosticInfo,
     DiagnosticHint,
+    // Search result icon
+    SearchResult,
 }
 
 /// Generic picker item with match highlighting.
@@ -69,6 +71,7 @@ pub enum PickerMode {
     WorkspaceSymbols,
     DocumentDiagnostics,
     WorkspaceDiagnostics,
+    GlobalSearch,
 }
 
 /// A snapshot of the editor state for rendering.
@@ -453,6 +456,16 @@ pub enum EditorCommand {
     ConfirmationDialogDeny,
     /// User cancelled (pressed Esc or clicked cancel button).
     ConfirmationDialogCancel,
+
+    // Global Search
+    /// Show the global search picker.
+    ShowGlobalSearch,
+    /// Execute global search with current filter.
+    GlobalSearchExecute,
+    /// Receive batch of global search results.
+    GlobalSearchResults(Vec<GlobalSearchResult>),
+    /// Global search completed.
+    GlobalSearchComplete,
 }
 
 /// Direction for cursor movement.
@@ -545,4 +558,15 @@ pub struct ConfirmationDialogSnapshot {
     pub cancel_label: String,
     /// The action to perform when confirmed.
     pub action: ConfirmationAction,
+}
+
+/// A single global search result for the picker.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GlobalSearchResult {
+    /// Absolute path to the file.
+    pub path: PathBuf,
+    /// Line number (1-indexed, matching editor convention).
+    pub line_num: usize,
+    /// The matching line content (trimmed).
+    pub line_content: String,
 }

@@ -118,6 +118,8 @@ pub fn handle_bracket_prev(key: &KeyEvent) -> Vec<EditorCommand> {
 /// Handle two-key sequences starting with Space (leader).
 pub fn handle_space_leader(key: &KeyEvent) -> Vec<EditorCommand> {
     match key.code {
+        // Space / - global search
+        KeyCode::Char('/') => vec![EditorCommand::ShowGlobalSearch],
         // Space a - show code actions
         KeyCode::Char('a') => vec![EditorCommand::ShowCodeActions],
         // Space c - toggle line comment

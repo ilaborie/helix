@@ -51,6 +51,7 @@ pub fn GenericPicker(
         PickerMode::WorkspaceSymbols => "Workspace Symbols",
         PickerMode::DocumentDiagnostics => "Document Diagnostics",
         PickerMode::WorkspaceDiagnostics => "Workspace Diagnostics",
+        PickerMode::GlobalSearch => "Global Search",
     };
 
     rsx! {
@@ -115,6 +116,8 @@ pub fn GenericPicker(
                             kbd { "Enter" }
                             if mode == PickerMode::DirectoryBrowser {
                                 " open/enter \u{2022} "
+                            } else if mode == PickerMode::GlobalSearch {
+                                " search/open \u{2022} "
                             } else {
                                 " select \u{2022} "
                             }
@@ -137,7 +140,13 @@ pub fn GenericPicker(
                     if items.is_empty() {
                         div {
                             class: "picker-empty",
-                            if filter.is_empty() {
+                            if mode == PickerMode::GlobalSearch {
+                                if filter.is_empty() {
+                                    "Type a pattern and press Enter to search"
+                                } else {
+                                    "Press Enter to search"
+                                }
+                            } else if filter.is_empty() {
                                 "No items"
                             } else {
                                 "No matches found"

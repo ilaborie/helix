@@ -3,7 +3,7 @@
 use dioxus::prelude::*;
 use lucide_dioxus::{
     Blocks, Braces, ChevronRight, CircleX, Code, Component, File, FileText, Folder, Hash, Info,
-    Layers, Lightbulb, Package, SquareFunction, TriangleAlert, Variable,
+    Layers, Lightbulb, Package, SquareFunction, TextSearch, TriangleAlert, Variable,
 };
 
 use crate::state::{PickerIcon, PickerItem};
@@ -38,7 +38,10 @@ pub fn PickerItemRow(item: PickerItem, is_selected: bool) -> Element {
         PickerIcon::DiagnosticWarning => "#e5c07b", // Yellow
         PickerIcon::DiagnosticInfo => "#61afef",    // Blue
         PickerIcon::DiagnosticHint => "#56b6c2",    // Cyan
-        _ => "#abb2bf",                             // Default color
+        // Search result
+        PickerIcon::SearchResult => "#98c379",      // Green
+        // Default colors
+        PickerIcon::File | PickerIcon::Buffer => "#abb2bf", // Default gray
     };
 
     // Text color - use neutral for diagnostics so highlighting is visible
@@ -88,6 +91,7 @@ pub fn PickerItemRow(item: PickerItem, is_selected: bool) -> Element {
                     PickerIcon::DiagnosticWarning => rsx! { TriangleAlert { size: 16, color: icon_color } },
                     PickerIcon::DiagnosticInfo => rsx! { Info { size: 16, color: icon_color } },
                     PickerIcon::DiagnosticHint => rsx! { Lightbulb { size: 16, color: icon_color } },
+                    PickerIcon::SearchResult => rsx! { TextSearch { size: 16, color: icon_color } },
                 }}
             }
 

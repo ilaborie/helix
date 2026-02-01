@@ -1,9 +1,18 @@
 //! Picker operations for the editor.
 
 use std::path::PathBuf;
+use std::sync::Arc;
+
+use grep_matcher::Matcher;
+use grep_regex::RegexMatcherBuilder;
+use grep_searcher::sinks::UTF8;
+use grep_searcher::{BinaryDetection, SearcherBuilder};
+use ignore::WalkBuilder;
 
 use crate::operations::BufferOps;
-use crate::state::{EditorContext, PickerIcon, PickerItem, PickerMode};
+use crate::state::{
+    EditorCommand, EditorContext, GlobalSearchResult, PickerIcon, PickerItem, PickerMode,
+};
 
 impl EditorContext {
     /// Navigate to a specific line and column in the current document.
@@ -369,7 +378,28 @@ impl PickerOps for EditorContext {
                         }
                     }
                 }
+                PickerMode::GlobalSearch => {
+                    // Extract result data before mutable borrow
+                    if let Ok(idx) = selected.id.parse::<usize>() {
+                        let result_data = self
+                            .global_search_results
+                            .get(idx)
+                            .map(|r| (r.path.clone(), r.line_num));
+
+                        if let Some((path, line_num)) = result_data {
+                            // Open the file
+                            self.open_file(&path);
+                            // Navigate to the line (line_num is 1-indexed, goto_line_column expects 0-indexed)
+                            let line = line_num.saturating_sub(1);
+                            self.goto_line_column(line, 0);
+                        }
+                    }
+                }
             }
+        } else if self.picker_mode == PickerMode::GlobalSearch && !self.picker_filter.is_empty() {
+            // No items selected but filter is present - execute search
+            self.execute_global_search();
+            return; // Don't close the picker
         }
 
         self.picker_visible = false;
@@ -380,7 +410,233 @@ impl PickerOps for EditorContext {
         self.picker_current_path = None;
         self.symbols.clear();
         self.picker_diagnostics.clear();
+        self.global_search_results.clear();
+        self.cancel_global_search();
     }
+}
+
+impl EditorContext {
+    /// Show the global search picker.
+    pub(crate) fn show_global_search_picker(&mut self) {
+        // Cancel any existing search
+        self.cancel_global_search();
+
+        // Reset picker state
+        self.command_mode = false;
+        self.command_input.clear();
+        self.picker_items.clear();
+        self.picker_filter.clear();
+        self.picker_selected = 0;
+        self.picker_visible = true;
+        self.picker_mode = PickerMode::GlobalSearch;
+        self.picker_current_path = None;
+        self.global_search_results.clear();
+    }
+
+    /// Execute global search with the current filter pattern.
+    pub(crate) fn execute_global_search(&mut self) {
+        let pattern = self.picker_filter.trim().to_string();
+        if pattern.is_empty() {
+            return;
+        }
+
+        // Cancel any existing search
+        self.cancel_global_search();
+
+        // Clear previous results
+        self.global_search_results.clear();
+        self.picker_items.clear();
+        self.picker_selected = 0;
+        self.global_search_running = true;
+
+        // Create cancellation channel
+        let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+        self.global_search_cancel = Some(cancel_tx);
+
+        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let command_tx = self.command_tx.clone();
+
+        // Collect open documents' paths and their in-memory content
+        let open_docs: std::collections::HashMap<PathBuf, String> = self
+            .editor
+            .documents
+            .values()
+            .filter_map(|doc| {
+                doc.path().map(|p| {
+                    let content = doc.text().to_string();
+                    (p.to_path_buf(), content)
+                })
+            })
+            .collect();
+        let open_docs = Arc::new(open_docs);
+
+        // Spawn search task on blocking thread pool (CPU-bound operation)
+        tokio::task::spawn_blocking(move || {
+            let result = execute_global_search_blocking(
+                pattern,
+                cwd,
+                open_docs,
+                command_tx.clone(),
+                cancel_rx,
+            );
+
+            if let Err(e) = result {
+                log::error!("Global search error: {:?}", e);
+            }
+
+            // Signal completion
+            let _ = command_tx.send(EditorCommand::GlobalSearchComplete);
+        });
+    }
+
+    /// Cancel any running global search.
+    pub(crate) fn cancel_global_search(&mut self) {
+        if let Some(cancel_tx) = self.global_search_cancel.take() {
+            let _ = cancel_tx.send(true);
+        }
+        self.global_search_running = false;
+    }
+
+    /// Update picker items from global search results.
+    pub(crate) fn update_global_search_picker_items(&mut self) {
+        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+
+        self.picker_items = self
+            .global_search_results
+            .iter()
+            .enumerate()
+            .map(|(idx, result)| {
+                // Get relative path for display
+                let relative_path = result
+                    .path
+                    .strip_prefix(&cwd)
+                    .unwrap_or(&result.path)
+                    .to_string_lossy();
+
+                let display = format!("{}:{}", relative_path, result.line_num);
+
+                PickerItem {
+                    id: idx.to_string(),
+                    display,
+                    icon: PickerIcon::SearchResult,
+                    match_indices: vec![],
+                    secondary: Some(result.line_content.clone()),
+                }
+            })
+            .collect();
+    }
+}
+
+/// Execute global search on a blocking thread.
+fn execute_global_search_blocking(
+    pattern: String,
+    cwd: PathBuf,
+    open_docs: Arc<std::collections::HashMap<PathBuf, String>>,
+    command_tx: std::sync::mpsc::Sender<EditorCommand>,
+    cancel_rx: tokio::sync::watch::Receiver<bool>,
+) -> anyhow::Result<()> {
+    // Determine if pattern is case-sensitive (smart case: uppercase = case-sensitive)
+    let has_uppercase = pattern.chars().any(|c| c.is_uppercase());
+
+    // Build regex matcher
+    let matcher = RegexMatcherBuilder::new()
+        .case_insensitive(!has_uppercase)
+        .build(&pattern)?;
+
+    let mut results: Vec<GlobalSearchResult> = Vec::new();
+    let batch_size = 50;
+    let max_results = 1000;
+    let mut total_results = 0;
+
+    // Walk files respecting .gitignore
+    let walker = WalkBuilder::new(&cwd)
+        .hidden(true)
+        .git_ignore(true)
+        .git_global(true)
+        .git_exclude(true)
+        .build();
+
+    for entry in walker.flatten() {
+        // Check for cancellation
+        if *cancel_rx.borrow() {
+            return Ok(());
+        }
+
+        let path = entry.path();
+
+        // Skip directories
+        if path.is_dir() {
+            continue;
+        }
+
+        // Check if this file is open in the editor (search in-memory content)
+        let canonical_path = helix_stdx::path::canonicalize(path);
+        if let Some(content) = open_docs.get(&canonical_path) {
+            // Search in-memory content
+            for (line_idx, line) in content.lines().enumerate() {
+                if matcher.is_match(line.as_bytes())? {
+                    let line_num = line_idx + 1;
+                    let line_content = line.trim().to_string();
+
+                    results.push(GlobalSearchResult {
+                        path: canonical_path.clone(),
+                        line_num,
+                        line_content,
+                    });
+
+                    total_results += 1;
+                    if total_results >= max_results {
+                        break;
+                    }
+                }
+            }
+        } else {
+            // Search file on disk
+            let mut searcher = SearcherBuilder::new()
+                .binary_detection(BinaryDetection::quit(b'\x00'))
+                .build();
+
+            let canonical_path_clone = canonical_path.clone();
+            let search_result = searcher.search_path(
+                &matcher,
+                path,
+                UTF8(|line_num, line| {
+                    let line_content = line.trim().to_string();
+
+                    results.push(GlobalSearchResult {
+                        path: canonical_path_clone.clone(),
+                        line_num: line_num as usize,
+                        line_content,
+                    });
+
+                    total_results += 1;
+                    Ok(total_results < max_results)
+                }),
+            );
+
+            if let Err(e) = search_result {
+                // Skip files that can't be read (binary, permission denied, etc.)
+                log::debug!("Skipping file {:?}: {:?}", path, e);
+            }
+        }
+
+        // Send batch if we have enough results
+        if results.len() >= batch_size {
+            let batch = std::mem::take(&mut results);
+            let _ = command_tx.send(EditorCommand::GlobalSearchResults(batch));
+        }
+
+        if total_results >= max_results {
+            break;
+        }
+    }
+
+    // Send remaining results
+    if !results.is_empty() {
+        let _ = command_tx.send(EditorCommand::GlobalSearchResults(results));
+    }
+
+    Ok(())
 }
 
 /// Fuzzy match with indices: returns (score, match_indices) or None if no match.

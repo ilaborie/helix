@@ -56,6 +56,11 @@ ignore = "0.4"
 # Glob pattern matching
 glob = "0.3"
 
+# Global search support (grep-based)
+grep-regex = "0.1"
+grep-searcher = "0.1"
+grep-matcher = "0.1"
+
 # Native file dialogs
 rfd = "0.15"
 
