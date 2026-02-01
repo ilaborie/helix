@@ -18,6 +18,8 @@ pub fn handle_insert_mode(key: &KeyEvent) -> Vec<EditorCommand> {
             KeyCode::Char('c') => vec![EditorCommand::ToggleLineComment],
             // Ctrl+Space - trigger completion
             KeyCode::Char(' ') => vec![EditorCommand::TriggerCompletion],
+            // Ctrl+. - show code actions (quick fix)
+            KeyCode::Char('.') => vec![EditorCommand::ShowCodeActions],
             _ => vec![],
         };
     }

@@ -72,9 +72,31 @@ impl LspEventOps for EditorContext {
                     }
                     Ok(Notification::Initialized) => {
                         log::info!("LSP server {server_id:?} initialized");
+
+                        // Send didChangeConfiguration if the server has config
+                        if let Some(ls) = self.editor.language_servers.get_by_id(server_id) {
+                            if let Some(config) = ls.config() {
+                                ls.did_change_configuration(config.clone());
+                            }
+                        }
+
+                        // Dispatch the event so hooks can send textDocument/didOpen for all documents
+                        helix_event::dispatch(helix_view::events::LanguageServerInitialized {
+                            editor: &mut self.editor,
+                            server_id,
+                        });
                     }
                     Ok(Notification::Exit) => {
                         log::info!("LSP server {server_id:?} exited");
+
+                        // Dispatch the event so hooks can clean up
+                        helix_event::dispatch(helix_view::events::LanguageServerExited {
+                            editor: &mut self.editor,
+                            server_id,
+                        });
+
+                        // Remove the language server from the registry
+                        self.editor.language_servers.remove_by_id(server_id);
                     }
                     Ok(notification) => {
                         log::trace!("Unhandled LSP notification: {notification:?}");

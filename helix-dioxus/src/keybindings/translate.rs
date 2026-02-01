@@ -19,7 +19,13 @@ fn translate_key_code(evt: &KeyboardEvent) -> Option<KeyCode> {
 
     let key = evt.key();
 
+    // Debug: log all key events to help diagnose issues
+    log::trace!("translate_key_code: key={:?}, code={}", key, evt.code());
+
     match key {
+        // Space key (handle explicitly for Ctrl+Space)
+        Key::Character(ref c) if c == " " => Some(KeyCode::Char(' ')),
+
         // Letters and characters
         Key::Character(c) => {
             let ch = c.chars().next()?;

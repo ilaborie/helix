@@ -21,6 +21,7 @@ helix-dioxus/src/
 ├── lib.rs                      # Library root: launch(), AppState, module declarations
 ├── app.rs                      # Root App component
 ├── args.rs                     # Command-line argument parsing
+├── events.rs                   # Event registration for helix_event (MUST run before hooks)
 ├── tracing.rs                  # Logging configuration
 │
 ├── components/                 # UI Components
@@ -39,7 +40,10 @@ helix-dioxus/src/
 │   │   └── list.rs             # List dialog with selection support
 │   ├── code_actions.rs         # Code actions menu (uses InlineListDialog)
 │   ├── completion.rs           # Completion popup (uses InlineListDialog)
+│   ├── confirmation_dialog.rs  # Confirmation dialog (quit with unsaved changes)
 │   ├── hover.rs                # Hover popup (uses InlineDialogContainer)
+│   ├── input_dialog.rs         # Input dialog (rename symbol, etc.)
+│   ├── notification.rs         # Notification toast container
 │   ├── signature_help.rs       # Signature help (uses InlineDialogContainer)
 │   └── prompt.rs               # Command/search prompts
 │
@@ -67,7 +71,9 @@ helix-dioxus/src/
     ├── select.rs               # handle_select_mode
     ├── command.rs              # handle_command_mode
     ├── picker.rs               # handle_picker_mode
-    └── search.rs               # handle_search_mode
+    ├── search.rs               # handle_search_mode
+    ├── confirmation.rs         # handle_confirmation_mode
+    └── input_dialog.rs         # handle_input_dialog_mode
 
 helix-dioxus/assets/
 ├── styles.css                  # Main stylesheet (loaded via document::Stylesheet)
@@ -184,6 +190,31 @@ CSS classes:
 - `.inline-dialog-item-selected` - Selected state
 - `.inline-dialog-empty` - Empty state message
 
+### Event System (helix_event)
+
+**CRITICAL**: helix-view and helix-dioxus use helix_event for event dispatching and hook registration. Events MUST be registered before hooks can be registered for them.
+
+**Initialization Order** (in `lib.rs::launch()`):
+1. `events::register()` - registers all helix-view event types with helix_event
+2. `EditorContext::new()` - creates handlers and registers hooks via `helix_view::handlers::register_hooks()`
+
+**Why This Matters**:
+- `helix_view::handlers::register_hooks()` registers hooks for `DocumentDidChange`, `LanguageServerInitialized`, etc.
+- These hooks are ESSENTIAL for LSP synchronization:
+  - `DocumentDidChange` → sends `textDocument/didChange` to keep LSP in sync with document edits
+  - `LanguageServerInitialized` → sends `textDocument/didOpen` for all documents when LSP starts
+- Without proper event registration, the app will panic: "Tried to register handler for unknown event"
+- Without the hooks, LSP operations like rename will corrupt text because the server has stale content
+
+**Files involved**:
+- `events.rs` - registers events with `helix_event::register_event::<T>()`
+- `state/mod.rs::create_handlers()` - calls `helix_view::handlers::register_hooks()`
+- `state/lsp_events.rs` - dispatches `LanguageServerInitialized` and `LanguageServerExited` events
+
+**When adding new LSP features**: Check if helix-term dispatches any events in its handling code. If so, helix-dioxus must:
+1. Register the event type in `events.rs`
+2. Dispatch the event at the appropriate time in `lsp_events.rs`
+
 ### Coding Conventions
 
 - Keep components under 300 lines
@@ -240,6 +271,15 @@ cargo clippy -p helix-dioxus --bins
 - Cause: Dock icons require .app bundle on macOS
 - Status: Known issue, marked as TODO
 
+### LSP rename corrupts text (missing characters after rename)
+- Cause: LSP server not receiving `textDocument/didChange` notifications
+- Solution: Ensure `events::register()` is called before `EditorContext::new()`, and that `helix_view::handlers::register_hooks()` is called when creating handlers
+- See "Event System" section above
+
+### Panic: "Tried to register handler for unknown event"
+- Cause: `helix_view::handlers::register_hooks()` called before events are registered
+- Solution: Call `events::register()` at the start of `launch()` before creating `EditorContext`
+
 ## Feature Roadmap
 
 ### Planned Enhancements
@@ -257,14 +297,18 @@ cargo clippy -p helix-dioxus --bins
 
 ### UI Improvements (RustRover-inspired)
 - [x] Severity-colored lightbulb indicator - change color based on diagnostic severity (red/yellow/blue/cyan)
-- [ ] Code actions search box - add filter input to code actions dialog
+- [x] Code actions search box - filter input with count display, typing filters actions
 - [ ] Diagnostic scrollbar markers - show diagnostic positions on right scrollbar edge
 - [ ] Code actions preview panel - show fix preview before applying (needs LSP resolve)
+- [ ] Dialog search mode setting - user setting to toggle between: (1) current behavior where typing filters directly (arrows for navigation), or (2) vim-style where j/k and arrows navigate, '/' toggles search input focus. Applies to pickers and inline dialogs (code actions, completion, etc.)
 
 ### LSP Improvements
 - [ ] Investigate rust-analyzer diagnostic line reporting - diagnostics may be reported on the line where parsing fails rather than where the actual error is (e.g., unterminated string reports on the next line). Consider requesting upstream fix or mapping diagnostic positions back to the originating code
 
 ### Recently Completed
+- [x] Confirmation dialog for quit/close with unsaved changes - modal dialog with y/n/Esc keybindings, Save & Quit / Don't Save / Cancel options
+- [x] LSP document synchronization - register helix_event hooks to send `textDocument/didChange` to LSP, fixing rename corruption bug
+- [x] Code actions search box - typing filters actions by title (case-insensitive), shows filtered/total count, arrows for navigation
 - [x] Replaced unicode/emoji icons with Lucide icons throughout (statusline, LSP dialog, diagnostics)
 - [x] Implemented LSP server restart functionality via `Registry::restart_server()`
 - [x] Added diagnostic wavy underlines using CSS gradients

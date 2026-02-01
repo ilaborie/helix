@@ -3,17 +3,19 @@
 //! This is the root Dioxus component that composes the editor UI.
 
 use dioxus::prelude::*;
-use helix_view::input::KeyCode;
+use helix_view::input::{KeyCode, KeyModifiers};
 
 use crate::components::{
-    BufferBar, CodeActionsMenu, CommandPrompt, CompletionPopup, EditorView, GenericPicker,
-    HoverPopup, LocationPicker, SearchPrompt, SignatureHelpPopup, StatusLine,
+    BufferBar, CodeActionsMenu, CommandPrompt, CompletionPopup, ConfirmationDialog, EditorView,
+    GenericPicker, HoverPopup, InputDialog, LocationPicker, LspStatusDialog,
+    NotificationContainer, SearchPrompt, SignatureHelpPopup, StatusLine,
 };
 use crate::keybindings::{
     handle_bracket_next, handle_bracket_prev, handle_code_actions_mode, handle_command_mode,
-    handle_completion_mode, handle_g_prefix, handle_insert_mode, handle_location_picker_mode,
-    handle_normal_mode, handle_picker_mode, handle_search_mode, handle_select_mode,
-    handle_space_leader, translate_key_event,
+    handle_completion_mode, handle_confirmation_mode, handle_g_prefix, handle_input_dialog_mode,
+    handle_insert_mode, handle_location_picker_mode, handle_lsp_dialog_mode, handle_normal_mode,
+    handle_picker_mode, handle_search_mode, handle_select_mode, handle_space_leader,
+    translate_key_event,
 };
 use crate::AppState;
 
@@ -110,8 +112,14 @@ pub fn App() -> Element {
             );
 
             // Handle input based on UI state first, then editor mode
-            // LSP UI states take precedence
-            let commands = if snapshot.location_picker_visible {
+            // Confirmation dialog takes highest precedence, then input dialog
+            let commands = if snapshot.confirmation_dialog_visible {
+                handle_confirmation_mode(&key_event)
+            } else if snapshot.input_dialog_visible {
+                handle_input_dialog_mode(&key_event)
+            } else if snapshot.lsp_dialog_visible {
+                handle_lsp_dialog_mode(&key_event)
+            } else if snapshot.location_picker_visible {
                 handle_location_picker_mode(&key_event)
             } else if snapshot.code_actions_visible {
                 handle_code_actions_mode(&key_event)
@@ -144,29 +152,38 @@ pub fn App() -> Element {
                         handle_space_leader(&key_event)
                     }
                     PendingKeySequence::None => {
-                        // Check if this starts a sequence
-                        match key_event.code {
-                            KeyCode::Char('g') => {
-                                pending_key.set(PendingKeySequence::GPrefix);
-                                vec![]
+                        // Check for Ctrl modifier first - Ctrl+key combos go to normal mode handler
+                        if key_event.modifiers.contains(KeyModifiers::CONTROL) {
+                            if snapshot.mode == "SELECT" {
+                                handle_select_mode(&key_event)
+                            } else {
+                                handle_normal_mode(&key_event)
                             }
-                            KeyCode::Char(']') => {
-                                pending_key.set(PendingKeySequence::BracketNext);
-                                vec![]
-                            }
-                            KeyCode::Char('[') => {
-                                pending_key.set(PendingKeySequence::BracketPrev);
-                                vec![]
-                            }
-                            KeyCode::Char(' ') => {
-                                pending_key.set(PendingKeySequence::SpaceLeader);
-                                vec![]
-                            }
-                            _ => {
-                                if snapshot.mode == "SELECT" {
-                                    handle_select_mode(&key_event)
-                                } else {
-                                    handle_normal_mode(&key_event)
+                        } else {
+                            // Check if this starts a sequence (only without modifiers)
+                            match key_event.code {
+                                KeyCode::Char('g') => {
+                                    pending_key.set(PendingKeySequence::GPrefix);
+                                    vec![]
+                                }
+                                KeyCode::Char(']') => {
+                                    pending_key.set(PendingKeySequence::BracketNext);
+                                    vec![]
+                                }
+                                KeyCode::Char('[') => {
+                                    pending_key.set(PendingKeySequence::BracketPrev);
+                                    vec![]
+                                }
+                                KeyCode::Char(' ') => {
+                                    pending_key.set(PendingKeySequence::SpaceLeader);
+                                    vec![]
+                                }
+                                _ => {
+                                    if snapshot.mode == "SELECT" {
+                                        handle_select_mode(&key_event)
+                                    } else {
+                                        handle_normal_mode(&key_event)
+                                    }
                                 }
                             }
                         }
@@ -241,7 +258,12 @@ pub fn App() -> Element {
             }
 
             // Status line at the bottom
-            StatusLine { version: version }
+            StatusLine {
+                version: version,
+                on_change: move |_| {
+                    version += 1;
+                },
+            }
 
             // Generic picker overlay (shown when picker is visible)
             if snapshot.picker_visible {
@@ -294,6 +316,7 @@ pub fn App() -> Element {
                     selected: snapshot.code_action_selected,
                     cursor_line: snapshot.cursor_line,
                     cursor_col: snapshot.cursor_col,
+                    filter: snapshot.code_action_filter.clone(),
                 }
             }
 
@@ -304,6 +327,41 @@ pub fn App() -> Element {
                     locations: snapshot.locations.clone(),
                     selected: snapshot.location_selected,
                 }
+            }
+
+            // LSP - Status dialog
+            if snapshot.lsp_dialog_visible {
+                LspStatusDialog {
+                    servers: snapshot.lsp_servers.clone(),
+                    selected: snapshot.lsp_server_selected,
+                    on_change: move |_| {
+                        version += 1;
+                    },
+                }
+            }
+
+            // Input dialog (for rename, goto line, etc.)
+            if snapshot.input_dialog_visible {
+                InputDialog {
+                    dialog: snapshot.input_dialog.clone(),
+                    cursor_line: snapshot.cursor_line,
+                    cursor_col: snapshot.cursor_col,
+                }
+            }
+
+            // Confirmation dialog (for quit with unsaved changes, etc.)
+            if snapshot.confirmation_dialog_visible {
+                ConfirmationDialog {
+                    dialog: snapshot.confirmation_dialog.clone(),
+                    on_change: move |_| {
+                        version += 1;
+                    },
+                }
+            }
+
+            // Notification toasts (bottom-right corner)
+            NotificationContainer {
+                notifications: snapshot.notifications.clone(),
             }
         }
     }

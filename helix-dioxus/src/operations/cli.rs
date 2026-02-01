@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use crate::operations::{BufferOps, PickerOps};
-use crate::state::EditorContext;
+use crate::state::{EditorContext, NotificationSeverity};
 
 /// Extension trait for CLI command operations.
 pub trait CliOps {
@@ -77,6 +77,10 @@ impl CliOps for EditorContext {
 
             _ => {
                 log::warn!("Unknown command: {}", cmd);
+                self.show_notification(
+                    format!("Unknown command: {}", cmd),
+                    NotificationSeverity::Error,
+                );
             }
         }
 

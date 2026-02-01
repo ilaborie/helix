@@ -13,6 +13,8 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
             KeyCode::Char('r') => vec![EditorCommand::Redo],
             KeyCode::Char('h') => vec![EditorCommand::PreviousBuffer],
             KeyCode::Char('l') => vec![EditorCommand::NextBuffer],
+            // Ctrl+Space or Ctrl+. - show code actions (quick fix)
+            KeyCode::Char(' ') | KeyCode::Char('.') => vec![EditorCommand::ShowCodeActions],
             _ => vec![],
         };
     }

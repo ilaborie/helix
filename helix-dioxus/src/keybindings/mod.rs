@@ -5,6 +5,8 @@
 
 mod command;
 mod completion;
+mod confirmation;
+mod input_dialog;
 mod insert;
 mod normal;
 mod picker;
@@ -15,7 +17,10 @@ mod translate;
 pub use command::handle_command_mode;
 pub use completion::{
     handle_code_actions_mode, handle_completion_mode, handle_location_picker_mode,
+    handle_lsp_dialog_mode,
 };
+pub use confirmation::handle_confirmation_mode;
+pub use input_dialog::handle_input_dialog_mode;
 pub use insert::handle_insert_mode;
 pub use normal::{
     handle_bracket_next, handle_bracket_prev, handle_g_prefix, handle_normal_mode,

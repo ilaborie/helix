@@ -52,12 +52,27 @@ pub fn handle_location_picker_mode(key: &KeyEvent) -> Vec<EditorCommand> {
 }
 
 /// Handle keyboard input when code actions menu is visible.
+/// Navigation uses arrow keys only; typing adds to the filter.
 pub fn handle_code_actions_mode(key: &KeyEvent) -> Vec<EditorCommand> {
     match key.code {
         KeyCode::Esc => vec![EditorCommand::CodeActionCancel],
-        KeyCode::Up | KeyCode::Char('k') => vec![EditorCommand::CodeActionUp],
-        KeyCode::Down | KeyCode::Char('j') => vec![EditorCommand::CodeActionDown],
+        KeyCode::Up => vec![EditorCommand::CodeActionUp],
+        KeyCode::Down => vec![EditorCommand::CodeActionDown],
         KeyCode::Enter => vec![EditorCommand::CodeActionConfirm],
+        KeyCode::Backspace => vec![EditorCommand::CodeActionFilterBackspace],
+        KeyCode::Char(ch) => vec![EditorCommand::CodeActionFilterChar(ch)],
+        _ => vec![],
+    }
+}
+
+/// Handle keyboard input when LSP dialog is visible.
+pub fn handle_lsp_dialog_mode(key: &KeyEvent) -> Vec<EditorCommand> {
+    match key.code {
+        KeyCode::Esc => vec![EditorCommand::CloseLspDialog],
+        KeyCode::Up | KeyCode::Char('k') => vec![EditorCommand::LspDialogUp],
+        KeyCode::Down | KeyCode::Char('j') => vec![EditorCommand::LspDialogDown],
+        KeyCode::Char('r') => vec![EditorCommand::RestartSelectedLsp],
+        KeyCode::Enter => vec![EditorCommand::CloseLspDialog],
         _ => vec![],
     }
 }

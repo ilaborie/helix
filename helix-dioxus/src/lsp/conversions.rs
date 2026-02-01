@@ -210,12 +210,13 @@ fn convert_parameter(param: lsp::ParameterInformation) -> ParameterSnapshot {
 }
 
 /// Convert LSP code actions to stored code actions with full data for execution.
+/// Actions are sorted to prioritize quickfix (diagnostic) actions first.
 pub fn convert_code_actions(
     actions: Vec<lsp::CodeActionOrCommand>,
     language_server_id: helix_lsp::LanguageServerId,
     offset_encoding: OffsetEncoding,
 ) -> Vec<StoredCodeAction> {
-    actions
+    let mut stored_actions: Vec<StoredCodeAction> = actions
         .into_iter()
         .enumerate()
         .map(|(index, action)| {
@@ -227,7 +228,42 @@ pub fn convert_code_actions(
                 offset_encoding,
             }
         })
-        .collect()
+        .collect();
+
+    // Sort actions to prioritize:
+    // 1. Preferred actions first
+    // 2. Quickfix actions (diagnostic fixes) before refactors
+    // 3. Source actions last
+    stored_actions.sort_by(|a, b| {
+        // Preferred actions always first
+        let a_preferred = a.snapshot.is_preferred;
+        let b_preferred = b.snapshot.is_preferred;
+        if a_preferred != b_preferred {
+            return b_preferred.cmp(&a_preferred);
+        }
+
+        // Then sort by kind priority
+        let a_priority = code_action_kind_priority(&a.snapshot.kind);
+        let b_priority = code_action_kind_priority(&b.snapshot.kind);
+        a_priority.cmp(&b_priority)
+    });
+
+    stored_actions
+}
+
+/// Get sorting priority for code action kinds.
+/// Lower number = higher priority (shown first).
+fn code_action_kind_priority(kind: &Option<String>) -> u8 {
+    match kind.as_deref() {
+        Some(k) if k.starts_with("quickfix") => 0, // Diagnostic fixes first
+        Some(k) if k.starts_with("refactor.rewrite") => 1, // Rewrites (often fixes)
+        Some(k) if k.starts_with("refactor.inline") => 2,
+        Some(k) if k.starts_with("refactor.extract") => 3,
+        Some(k) if k.starts_with("refactor") => 4, // Other refactors
+        Some(k) if k.starts_with("source") => 5, // Source actions last
+        None => 3, // Unknown kind in middle
+        _ => 4,
+    }
 }
 
 /// Convert a single LSP code action or command to a snapshot for display.

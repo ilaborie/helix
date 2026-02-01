@@ -4,7 +4,10 @@ use std::path::PathBuf;
 
 use helix_view::DocumentId;
 
-use crate::state::{BufferInfo, EditorContext};
+use crate::state::{
+    BufferInfo, ConfirmationAction, ConfirmationDialogSnapshot, EditorContext,
+    NotificationSeverity,
+};
 
 /// Extension trait for buffer management operations.
 pub trait BufferOps {
@@ -39,7 +42,19 @@ impl BufferOps for EditorContext {
         if !force {
             if let Some(doc) = self.editor.document(doc_id) {
                 if doc.is_modified() {
-                    log::warn!("Buffer has unsaved changes. Use :bd! to force close.");
+                    log::warn!("Buffer has unsaved changes - showing confirmation dialog");
+                    let file_name = doc.display_name().to_string();
+                    self.confirmation_dialog = ConfirmationDialogSnapshot {
+                        title: "Close Buffer".to_string(),
+                        message: format!(
+                            "\"{file_name}\" has unsaved changes. Do you want to close it anyway?"
+                        ),
+                        confirm_label: "Close".to_string(),
+                        deny_label: None, // Only confirm/cancel for close buffer
+                        cancel_label: "Cancel".to_string(),
+                        action: ConfirmationAction::CloseBuffer,
+                    };
+                    self.confirmation_dialog_visible = true;
                     return;
                 }
             }
@@ -110,6 +125,10 @@ impl BufferOps for EditorContext {
             }
             Err(e) => {
                 log::error!("Failed to open file {:?}: {}", path, e);
+                self.show_notification(
+                    format!("Failed to open file: {}", e),
+                    NotificationSeverity::Error,
+                );
             }
         }
     }
@@ -128,6 +147,10 @@ impl BufferOps for EditorContext {
                 Some(doc) => doc,
                 None => {
                     log::error!("No document to save");
+                    self.show_notification(
+                        "No document to save".to_string(),
+                        NotificationSeverity::Error,
+                    );
                     return;
                 }
             };
@@ -148,6 +171,10 @@ impl BufferOps for EditorContext {
                 Ok(future) => future,
                 Err(e) => {
                     log::error!("Failed to initiate save: {}", e);
+                    self.show_notification(
+                        format!("Failed to save: {}", e),
+                        NotificationSeverity::Error,
+                    );
                     return;
                 }
             }
@@ -161,15 +188,39 @@ impl BufferOps for EditorContext {
                 if let Some(doc) = self.editor.document_mut(doc_id) {
                     doc.set_last_saved_revision(event.revision, event.save_time);
                 }
+                // Use relative path if shorter than absolute path
+                let display_path = if let Ok(cwd) = std::env::current_dir() {
+                    if let Ok(relative) = event.path.strip_prefix(&cwd) {
+                        let relative_str = relative.to_string_lossy();
+                        let absolute_str = event.path.to_string_lossy();
+                        if relative_str.len() < absolute_str.len() {
+                            relative_str.into_owned()
+                        } else {
+                            absolute_str.into_owned()
+                        }
+                    } else {
+                        event.path.to_string_lossy().into_owned()
+                    }
+                } else {
+                    event.path.to_string_lossy().into_owned()
+                };
+                self.show_notification(
+                    format!("Saved to {}", display_path),
+                    NotificationSeverity::Success,
+                );
             }
             Err(e) => {
                 log::error!("Save failed: {}", e);
+                self.show_notification(
+                    format!("Save failed: {}", e),
+                    NotificationSeverity::Error,
+                );
             }
         }
     }
 
     /// Try to quit the editor.
-    /// If force is false and there are unsaved changes, logs a warning and does not quit.
+    /// If force is false and there are unsaved changes, shows a confirmation dialog.
     fn try_quit(&mut self, force: bool) {
         let view_id = self.editor.tree.focus;
         let view = self.editor.tree.get(view_id);
@@ -182,7 +233,17 @@ impl BufferOps for EditorContext {
         };
 
         if doc.is_modified() && !force {
-            log::warn!("Unsaved changes. Use :q! to force quit.");
+            log::warn!("Unsaved changes - showing confirmation dialog");
+            let file_name = doc.display_name().to_string();
+            self.confirmation_dialog = ConfirmationDialogSnapshot {
+                title: "Unsaved Changes".to_string(),
+                message: format!("\"{file_name}\" has unsaved changes. What would you like to do?"),
+                confirm_label: "Save & Quit".to_string(),
+                deny_label: Some("Don't Save".to_string()),
+                cancel_label: "Cancel".to_string(),
+                action: ConfirmationAction::SaveAndQuit,
+            };
+            self.confirmation_dialog_visible = true;
             return;
         }
 

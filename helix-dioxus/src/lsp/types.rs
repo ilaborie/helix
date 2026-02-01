@@ -387,6 +387,12 @@ pub enum LspResponse {
     FormatApplied,
     /// Workspace edit applied (from code action).
     WorkspaceEditApplied,
+    /// Rename result received.
+    RenameResult {
+        edit: helix_lsp::lsp::WorkspaceEdit,
+        offset_encoding: helix_lsp::OffsetEncoding,
+        new_name: String,
+    },
     /// Error from LSP operation.
     Error(String),
 }

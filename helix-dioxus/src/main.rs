@@ -8,7 +8,6 @@ fn main() -> Result<()> {
 
     log::info!("Starting helix-dioxus");
 
-
     // Initialize helix runtime (grammars, queries, themes)
     helix_loader::initialize_config_file(None);
     helix_loader::initialize_log_file(None);

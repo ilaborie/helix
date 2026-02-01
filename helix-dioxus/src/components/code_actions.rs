@@ -3,7 +3,7 @@
 //! Displays available code actions (quick fixes, refactors) at cursor position.
 
 use dioxus::prelude::*;
-use lucide_dioxus::{FileCode, Lightbulb, PackagePlus, Star, Wrench};
+use lucide_dioxus::{FileCode, Lightbulb, PackagePlus, Search, Star, Wrench};
 
 use super::inline_dialog::{DialogConstraints, InlineListDialog, InlineListItem};
 use crate::lsp::CodeActionSnapshot;
@@ -106,7 +106,26 @@ pub fn CodeActionsMenu(
     selected: usize,
     cursor_line: usize,
     cursor_col: usize,
+    filter: String,
 ) -> Element {
+    // Filter actions by title (case-insensitive substring match)
+    let filter_lower = filter.to_lowercase();
+    let filtered_actions: Vec<_> = actions
+        .iter()
+        .filter(|a| filter.is_empty() || a.title.to_lowercase().contains(&filter_lower))
+        .cloned()
+        .collect();
+
+    let total_count = actions.len();
+    let filtered_count = filtered_actions.len();
+
+    // Determine empty message based on filter state
+    let empty_message = if filter.is_empty() {
+        "No code actions available"
+    } else {
+        "No matching code actions"
+    };
+
     let constraints = DialogConstraints {
         min_width: Some(220),
         max_width: Some(450),
@@ -118,12 +137,33 @@ pub fn CodeActionsMenu(
             cursor_line,
             cursor_col,
             selected,
-            empty_message: "No code actions available",
+            empty_message,
             class: "code-actions-menu",
             constraints,
-            has_items: !actions.is_empty(),
+            has_items: !filtered_actions.is_empty(),
 
-            for (idx, action) in actions.iter().enumerate() {
+            // Search input at the top
+            div {
+                class: "code-actions-search",
+                span {
+                    class: "icon-wrapper",
+                    Search { size: 14, color: "#5c6370" }
+                }
+                span {
+                    class: "code-actions-search-input",
+                    if filter.is_empty() {
+                        span { class: "code-actions-search-placeholder", "Type to filter..." }
+                    } else {
+                        "{filter}"
+                    }
+                }
+                span {
+                    class: "code-actions-count",
+                    "{filtered_count}/{total_count}"
+                }
+            }
+
+            for (idx, action) in filtered_actions.iter().enumerate() {
                 CodeActionItem {
                     key: "{idx}",
                     action: action.clone(),

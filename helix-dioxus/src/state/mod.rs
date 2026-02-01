@@ -14,8 +14,9 @@ mod lsp_events;
 mod types;
 
 pub use types::{
-    BufferInfo, Direction, EditorCommand, EditorSnapshot, LineSnapshot, PickerIcon, PickerItem,
-    PickerMode, TokenSpan,
+    BufferInfo, ConfirmationAction, ConfirmationDialogSnapshot, Direction, EditorCommand,
+    EditorSnapshot, InputDialogKind, InputDialogSnapshot, LineSnapshot, NotificationSeverity,
+    NotificationSnapshot, PickerIcon, PickerItem, PickerMode, TokenSpan,
 };
 
 use std::path::PathBuf;
@@ -95,6 +96,8 @@ pub struct EditorContext {
     pub(crate) code_actions: Vec<StoredCodeAction>,
     /// Selected code action index.
     pub(crate) code_action_selected: usize,
+    /// Code action filter string for searching.
+    pub(crate) code_action_filter: String,
     /// Whether code actions are available at the current cursor position.
     /// This is checked proactively to show a lightbulb indicator.
     pub(crate) has_code_actions: bool,
@@ -116,6 +119,32 @@ pub struct EditorContext {
     pub(crate) lsp_server_selected: usize,
     /// LSP progress tracking for indexing status.
     pub(crate) lsp_progress: helix_lsp::LspProgressMap,
+
+    // Notification state - pub(crate) for operations access
+    /// Active notifications.
+    pub(crate) notifications: Vec<NotificationSnapshot>,
+    /// Counter for generating unique notification IDs.
+    pub(crate) notification_id_counter: u64,
+
+    // Input dialog state - pub(crate) for operations access
+    /// Whether the input dialog is visible.
+    pub(crate) input_dialog_visible: bool,
+    /// Input dialog value.
+    pub(crate) input_dialog_value: String,
+    /// Input dialog title.
+    pub(crate) input_dialog_title: String,
+    /// Input dialog prompt.
+    pub(crate) input_dialog_prompt: String,
+    /// Input dialog placeholder.
+    pub(crate) input_dialog_placeholder: Option<String>,
+    /// Kind of input dialog operation pending.
+    pub(crate) input_dialog_kind: InputDialogKind,
+
+    // Confirmation dialog state - pub(crate) for operations access
+    /// Whether the confirmation dialog is visible.
+    pub(crate) confirmation_dialog_visible: bool,
+    /// Current confirmation dialog snapshot.
+    pub(crate) confirmation_dialog: ConfirmationDialogSnapshot,
 
     // Application state - pub(crate) for operations access
     pub(crate) should_quit: bool,
@@ -145,8 +174,8 @@ impl EditorContext {
         let config: Arc<dyn arc_swap::access::DynAccess<helix_view::editor::Config>> =
             Arc::new(arc_swap::ArcSwap::from_pointee(config));
 
-        // Create dummy handlers
-        let handlers = create_dummy_handlers();
+        // Create handlers and register essential hooks
+        let handlers = create_handlers();
 
         // Create the editor
         let mut editor = helix_view::Editor::new(
@@ -203,6 +232,7 @@ impl EditorContext {
             code_actions_visible: false,
             code_actions: Vec::new(),
             code_action_selected: 0,
+            code_action_filter: String::new(),
             has_code_actions: false,
             code_actions_check_position: None,
             location_picker_visible: false,
@@ -213,6 +243,19 @@ impl EditorContext {
             lsp_dialog_visible: false,
             lsp_server_selected: 0,
             lsp_progress: helix_lsp::LspProgressMap::new(),
+            // Notification state
+            notifications: Vec::new(),
+            notification_id_counter: 0,
+            // Input dialog state
+            input_dialog_visible: false,
+            input_dialog_value: String::new(),
+            input_dialog_title: String::new(),
+            input_dialog_prompt: String::new(),
+            input_dialog_placeholder: None,
+            input_dialog_kind: InputDialogKind::default(),
+            // Confirmation dialog state
+            confirmation_dialog_visible: false,
+            confirmation_dialog: ConfirmationDialogSnapshot::default(),
             should_quit: false,
             snapshot_version: 0,
         })
@@ -494,6 +537,8 @@ impl EditorContext {
 
             // LSP - Code Actions
             EditorCommand::ShowCodeActions => {
+                // Clear the filter when opening
+                self.code_action_filter.clear();
                 // If we already have cached code actions from the proactive check, show them
                 if self.has_code_actions && !self.code_actions.is_empty() {
                     self.code_actions_visible = true;
@@ -504,12 +549,14 @@ impl EditorContext {
                 }
             }
             EditorCommand::CodeActionUp => {
-                if self.code_action_selected > 0 {
+                let filtered_count = self.filtered_code_actions_count();
+                if self.code_action_selected > 0 && filtered_count > 0 {
                     self.code_action_selected -= 1;
                 }
             }
             EditorCommand::CodeActionDown => {
-                if self.code_action_selected + 1 < self.code_actions.len() {
+                let filtered_count = self.filtered_code_actions_count();
+                if filtered_count > 0 && self.code_action_selected + 1 < filtered_count {
                     self.code_action_selected += 1;
                 }
             }
@@ -520,6 +567,15 @@ impl EditorContext {
                 self.code_actions_visible = false;
                 self.code_actions.clear();
                 self.code_action_selected = 0;
+                self.code_action_filter.clear();
+            }
+            EditorCommand::CodeActionFilterChar(ch) => {
+                self.code_action_filter.push(ch);
+                self.code_action_selected = 0; // Reset selection when filter changes
+            }
+            EditorCommand::CodeActionFilterBackspace => {
+                self.code_action_filter.pop();
+                self.code_action_selected = 0; // Reset selection when filter changes
             }
 
             // LSP - Diagnostics
@@ -538,8 +594,7 @@ impl EditorContext {
 
             // LSP - Rename
             EditorCommand::RenameSymbol => {
-                // TODO: Trigger LSP rename
-                log::info!("RenameSymbol - not yet implemented");
+                self.show_rename_dialog();
             }
 
             // LSP - Inlay Hints
@@ -605,6 +660,63 @@ impl EditorContext {
             }
             EditorCommand::RestartLspServer(name) => {
                 self.restart_lsp_server(&name);
+            }
+
+            // Notifications
+            EditorCommand::ShowNotification { message, severity } => {
+                self.show_notification(message, severity);
+            }
+            EditorCommand::DismissNotification(id) => {
+                self.notifications.retain(|n| n.id != id);
+            }
+            EditorCommand::DismissAllNotifications => {
+                self.notifications.clear();
+            }
+
+            // Input Dialog
+            EditorCommand::ShowInputDialog {
+                title,
+                prompt,
+                placeholder,
+                prefill,
+                kind,
+            } => {
+                self.input_dialog_visible = true;
+                self.input_dialog_title = title;
+                self.input_dialog_prompt = prompt;
+                self.input_dialog_placeholder = placeholder;
+                self.input_dialog_value = prefill.unwrap_or_default();
+                self.input_dialog_kind = kind;
+            }
+            EditorCommand::InputDialogInput(ch) => {
+                self.input_dialog_value.push(ch);
+            }
+            EditorCommand::InputDialogBackspace => {
+                self.input_dialog_value.pop();
+            }
+            EditorCommand::InputDialogConfirm => {
+                self.handle_input_dialog_confirm();
+            }
+            EditorCommand::InputDialogCancel => {
+                self.input_dialog_visible = false;
+                self.input_dialog_value.clear();
+                self.input_dialog_kind = InputDialogKind::None;
+            }
+
+            // Confirmation Dialog
+            EditorCommand::ShowConfirmationDialog(dialog) => {
+                self.confirmation_dialog = dialog;
+                self.confirmation_dialog_visible = true;
+            }
+            EditorCommand::ConfirmationDialogConfirm => {
+                self.handle_confirmation_dialog_confirm();
+            }
+            EditorCommand::ConfirmationDialogDeny => {
+                self.handle_confirmation_dialog_deny();
+            }
+            EditorCommand::ConfirmationDialogCancel => {
+                self.confirmation_dialog_visible = false;
+                self.confirmation_dialog = ConfirmationDialogSnapshot::default();
             }
         }
     }
@@ -678,10 +790,53 @@ impl EditorContext {
             LspResponse::FormatApplied | LspResponse::WorkspaceEditApplied => {
                 // Nothing to do - changes already applied
             }
+            LspResponse::RenameResult {
+                edit,
+                offset_encoding,
+                new_name,
+            } => {
+                // Apply the workspace edit
+                if let Err(e) = self.editor.apply_workspace_edit(offset_encoding, &edit) {
+                    log::error!("Failed to apply rename edit: {:?}", e);
+                    self.show_notification(
+                        format!("Rename failed: {:?}", e),
+                        NotificationSeverity::Error,
+                    );
+                } else {
+                    self.show_notification(
+                        format!("Renamed to '{}'", new_name),
+                        NotificationSeverity::Success,
+                    );
+                }
+            }
             LspResponse::Error(msg) => {
                 log::error!("LSP error: {}", msg);
             }
         }
+    }
+
+    /// Count the number of code actions that match the current filter.
+    fn filtered_code_actions_count(&self) -> usize {
+        if self.code_action_filter.is_empty() {
+            return self.code_actions.len();
+        }
+        let filter_lower = self.code_action_filter.to_lowercase();
+        self.code_actions
+            .iter()
+            .filter(|a| a.snapshot.title.to_lowercase().contains(&filter_lower))
+            .count()
+    }
+
+    /// Get the filtered code actions based on the current filter.
+    fn filtered_code_actions(&self) -> Vec<&StoredCodeAction> {
+        if self.code_action_filter.is_empty() {
+            return self.code_actions.iter().collect();
+        }
+        let filter_lower = self.code_action_filter.to_lowercase();
+        self.code_actions
+            .iter()
+            .filter(|a| a.snapshot.title.to_lowercase().contains(&filter_lower))
+            .collect()
     }
 
     /// Collect snapshots of all language servers.
@@ -1013,6 +1168,7 @@ impl EditorContext {
                 .map(|a| a.snapshot.clone())
                 .collect(),
             code_action_selected: self.code_action_selected,
+            code_action_filter: self.code_action_filter.clone(),
             has_code_actions: self.has_code_actions,
             location_picker_visible: self.location_picker_visible,
             locations: self.locations.clone(),
@@ -1022,6 +1178,19 @@ impl EditorContext {
             lsp_dialog_visible: self.lsp_dialog_visible,
             lsp_servers: self.collect_lsp_servers(),
             lsp_server_selected: self.lsp_server_selected,
+            // Notification state
+            notifications: self.notifications.clone(),
+            // Input dialog state
+            input_dialog_visible: self.input_dialog_visible,
+            input_dialog: InputDialogSnapshot {
+                title: self.input_dialog_title.clone(),
+                prompt: self.input_dialog_prompt.clone(),
+                value: self.input_dialog_value.clone(),
+                placeholder: self.input_dialog_placeholder.clone(),
+            },
+            // Confirmation dialog state
+            confirmation_dialog_visible: self.confirmation_dialog_visible,
+            confirmation_dialog: self.confirmation_dialog.clone(),
             should_quit: self.should_quit,
         }
     }
@@ -1694,10 +1863,13 @@ impl EditorContext {
 
     /// Apply the selected code action.
     pub(crate) fn apply_code_action(&mut self) {
-        let Some(action) = self.code_actions.get(self.code_action_selected).cloned() else {
+        // Get the selected action from the filtered list
+        let filtered = self.filtered_code_actions();
+        let Some(action) = filtered.get(self.code_action_selected).cloned().cloned() else {
             self.code_actions_visible = false;
             self.code_actions.clear();
             self.code_action_selected = 0;
+            self.code_action_filter.clear();
             return;
         };
 
@@ -1705,6 +1877,7 @@ impl EditorContext {
         self.code_actions_visible = false;
         self.code_actions.clear();
         self.code_action_selected = 0;
+        self.code_action_filter.clear();
 
         match &action.lsp_item {
             lsp::CodeActionOrCommand::Command(command) => {
@@ -1973,6 +2146,263 @@ impl EditorContext {
             }
         });
     }
+
+    /// Show a notification toast.
+    pub(crate) fn show_notification(&mut self, message: String, severity: NotificationSeverity) {
+        self.notification_id_counter += 1;
+        let notification = NotificationSnapshot {
+            id: self.notification_id_counter,
+            message,
+            severity,
+            created_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
+        };
+        self.notifications.push(notification);
+
+        // Auto-dismiss after 5 seconds - schedule via command
+        let id = self.notification_id_counter;
+        let tx = self.command_tx.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            let _ = tx.send(EditorCommand::DismissNotification(id));
+        });
+    }
+
+    /// Show the rename dialog with the word under cursor prefilled.
+    fn show_rename_dialog(&mut self) {
+        let view_id = self.editor.tree.focus;
+        let view = self.editor.tree.get(view_id);
+        let doc_id = view.doc;
+
+        let Some(doc) = self.editor.document(doc_id) else {
+            self.show_notification("No document for rename".to_string(), NotificationSeverity::Error);
+            return;
+        };
+
+        // Check if rename is supported
+        if doc
+            .language_servers_with_feature(LanguageServerFeature::RenameSymbol)
+            .next()
+            .is_none()
+        {
+            self.show_notification(
+                "No language server supports rename".to_string(),
+                NotificationSeverity::Error,
+            );
+            return;
+        }
+
+        // Get the word under cursor
+        let word = self.get_word_under_cursor(doc_id, view_id);
+
+        // Show input dialog
+        self.input_dialog_visible = true;
+        self.input_dialog_title = "Rename Symbol".to_string();
+        self.input_dialog_prompt = "New name:".to_string();
+        self.input_dialog_placeholder = Some(word.clone());
+        self.input_dialog_value = word;
+        self.input_dialog_kind = InputDialogKind::RenameSymbol;
+    }
+
+    /// Get the word under cursor.
+    fn get_word_under_cursor(
+        &self,
+        doc_id: helix_view::DocumentId,
+        view_id: helix_view::ViewId,
+    ) -> String {
+        let Some(doc) = self.editor.document(doc_id) else {
+            return String::new();
+        };
+
+        let text = doc.text();
+        let selection = doc.selection(view_id);
+        let cursor = selection.primary().cursor(text.slice(..));
+
+        // Find word boundaries
+        let mut start = cursor;
+        let mut end = cursor;
+
+        // Move start to beginning of word
+        while start > 0 {
+            let ch = text.char(start - 1);
+            if !ch.is_alphanumeric() && ch != '_' {
+                break;
+            }
+            start -= 1;
+        }
+
+        // Move end to end of word
+        let len = text.len_chars();
+        while end < len {
+            let ch = text.char(end);
+            if !ch.is_alphanumeric() && ch != '_' {
+                break;
+            }
+            end += 1;
+        }
+
+        if start < end {
+            text.slice(start..end).to_string()
+        } else {
+            String::new()
+        }
+    }
+
+    /// Handle input dialog confirmation based on the dialog kind.
+    fn handle_input_dialog_confirm(&mut self) {
+        let value = self.input_dialog_value.clone();
+        let kind = self.input_dialog_kind;
+
+        // Close the dialog
+        self.input_dialog_visible = false;
+        self.input_dialog_value.clear();
+        self.input_dialog_kind = InputDialogKind::None;
+
+        match kind {
+            InputDialogKind::None => {}
+            InputDialogKind::RenameSymbol => {
+                self.execute_rename_symbol(&value);
+            }
+        }
+    }
+
+    /// Handle confirmation dialog confirm button (yes/save action).
+    fn handle_confirmation_dialog_confirm(&mut self) {
+        use types::ConfirmationAction;
+
+        let action = self.confirmation_dialog.action;
+
+        // Close the dialog
+        self.confirmation_dialog_visible = false;
+        self.confirmation_dialog = ConfirmationDialogSnapshot::default();
+
+        match action {
+            ConfirmationAction::None => {}
+            ConfirmationAction::SaveAndQuit => {
+                // Save first, then quit
+                self.save_document(None, false);
+                self.should_quit = true;
+            }
+            ConfirmationAction::QuitWithoutSave => {
+                // This is handled by deny, but can also be confirm if only two buttons
+                self.should_quit = true;
+            }
+            ConfirmationAction::CloseBuffer => {
+                // Force close the buffer
+                self.close_current_buffer(true);
+            }
+            ConfirmationAction::ReloadFile => {
+                // TODO: Implement file reload
+                log::info!("ReloadFile not yet implemented");
+            }
+        }
+    }
+
+    /// Handle confirmation dialog deny button (no/don't save action).
+    fn handle_confirmation_dialog_deny(&mut self) {
+        use types::ConfirmationAction;
+
+        let action = self.confirmation_dialog.action;
+
+        // Close the dialog
+        self.confirmation_dialog_visible = false;
+        self.confirmation_dialog = ConfirmationDialogSnapshot::default();
+
+        match action {
+            ConfirmationAction::None => {}
+            ConfirmationAction::SaveAndQuit => {
+                // User chose "Don't Save" - quit without saving
+                self.should_quit = true;
+            }
+            ConfirmationAction::QuitWithoutSave | ConfirmationAction::CloseBuffer => {
+                // Deny on these actions means "cancel" - do nothing
+            }
+            ConfirmationAction::ReloadFile => {
+                // Don't reload - do nothing
+            }
+        }
+    }
+
+    /// Execute LSP rename with the given new name.
+    fn execute_rename_symbol(&mut self, new_name: &str) {
+        if new_name.is_empty() {
+            self.show_notification(
+                "Rename cancelled: empty name".to_string(),
+                NotificationSeverity::Warning,
+            );
+            return;
+        }
+
+        let view_id = self.editor.tree.focus;
+        let view = self.editor.tree.get(view_id);
+        let doc_id = view.doc;
+
+        // Extract what we need in a scope to release the borrow
+        let rename_data = {
+            let Some(doc) = self.editor.document(doc_id) else {
+                return;
+            };
+
+            // Get language server with rename support
+            let ls = match doc
+                .language_servers_with_feature(LanguageServerFeature::RenameSymbol)
+                .next()
+            {
+                Some(ls) => ls,
+                None => {
+                    return;
+                }
+            };
+
+            let offset_encoding = ls.offset_encoding();
+            let pos = doc.position(view_id, offset_encoding);
+            let doc_id_lsp = doc.identifier();
+            let new_name_owned = new_name.to_string();
+
+            let future = ls.rename_symbol(doc_id_lsp, pos, new_name_owned.clone());
+
+            future.map(|f| (f, offset_encoding, new_name_owned))
+        };
+
+        let Some((future, offset_encoding, new_name_owned)) = rename_data else {
+            self.show_notification(
+                "No language server supports rename".to_string(),
+                NotificationSeverity::Error,
+            );
+            return;
+        };
+
+        let tx = self.command_tx.clone();
+        tokio::spawn(async move {
+            match future.await {
+                Ok(Some(edit)) => {
+                    log::info!("Received rename response");
+                    // Send the workspace edit to be applied
+                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::RenameResult {
+                        edit,
+                        offset_encoding,
+                        new_name: new_name_owned,
+                    }));
+                }
+                Ok(None) => {
+                    log::info!("No rename results");
+                    let _ = tx.send(EditorCommand::ShowNotification {
+                        message: "No rename results".to_string(),
+                        severity: NotificationSeverity::Info,
+                    });
+                }
+                Err(e) => {
+                    log::error!("Rename request failed: {}", e);
+                    let _ = tx.send(EditorCommand::ShowNotification {
+                        message: format!("Rename failed: {}", e),
+                        severity: NotificationSeverity::Error,
+                    });
+                }
+            }
+        });
+    }
 }
 
 /// Convert a helix Color to a CSS color string.
@@ -2001,8 +2431,8 @@ fn color_to_css(color: &helix_view::graphics::Color) -> Option<String> {
     }
 }
 
-/// Create dummy handlers for initialization.
-fn create_dummy_handlers() -> helix_view::handlers::Handlers {
+/// Create handlers for initialization and register essential hooks.
+fn create_handlers() -> helix_view::handlers::Handlers {
     use helix_view::handlers::completion::CompletionHandler;
     use helix_view::handlers::*;
     use tokio::sync::mpsc::channel;
@@ -2014,7 +2444,7 @@ fn create_dummy_handlers() -> helix_view::handlers::Handlers {
     let (pull_diag_tx, _) = channel(1);
     let (pull_all_diag_tx, _) = channel(1);
 
-    Handlers {
+    let handlers = Handlers {
         completions: CompletionHandler::new(completion_tx),
         signature_hints: signature_tx,
         auto_save: auto_save_tx,
@@ -2022,5 +2452,15 @@ fn create_dummy_handlers() -> helix_view::handlers::Handlers {
         word_index: word_index::Handler::spawn(),
         pull_diagnostics: pull_diag_tx,
         pull_all_documents_diagnostics: pull_all_diag_tx,
-    }
+    };
+
+    // Register essential hooks from helix-view, including:
+    // - DocumentDidChange -> textDocument/didChange notifications to LSP
+    // - DocumentDidClose -> textDocument/didClose notifications to LSP
+    // - LanguageServerInitialized -> textDocument/didOpen for all documents
+    // Without this, the LSP server won't know about document changes,
+    // causing issues like corrupted renames when the server has stale content.
+    helix_view::handlers::register_hooks(&handlers);
+
+    handlers
 }

@@ -5,13 +5,16 @@
 mod buffer_bar;
 mod code_actions;
 mod completion;
+mod confirmation_dialog;
 mod diagnostics;
 mod editor_view;
 mod hover;
 mod inlay_hints;
 mod inline_dialog;
+mod input_dialog;
 mod location_picker;
 mod lsp_dialog;
+mod notification;
 mod picker;
 mod prompt;
 mod signature_help;
@@ -20,17 +23,20 @@ mod statusline;
 pub use buffer_bar::BufferBar;
 pub use code_actions::CodeActionsMenu;
 pub use completion::CompletionPopup;
+pub use confirmation_dialog::ConfirmationDialog;
 pub use diagnostics::{
     diagnostics_for_line, first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker,
     DiagnosticUnderline, ErrorLens,
 };
 pub use editor_view::EditorView;
 pub use hover::HoverPopup;
-pub use inline_dialog::{DialogConstraints, DialogPosition, InlineDialogContainer, InlineListDialog, InlineListItem};
+// Note: inline_dialog types are used internally by input_dialog.rs via super::inline_dialog
+pub use input_dialog::InputDialog;
 // Note: inlay_hints utilities (format_hint, hints_for_line) are available
 // but not re-exported until LSP client integration is complete.
 pub use location_picker::LocationPicker;
 pub use lsp_dialog::LspStatusDialog;
+pub use notification::NotificationContainer;
 pub use picker::GenericPicker;
 pub use prompt::{CommandPrompt, SearchPrompt};
 pub use signature_help::SignatureHelpPopup;

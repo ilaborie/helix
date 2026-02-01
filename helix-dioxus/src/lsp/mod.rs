@@ -13,5 +13,6 @@ pub use conversions::{
 pub use types::{
     CodeActionSnapshot, CompletionItemKind, CompletionItemSnapshot, DiagnosticSeverity,
     DiagnosticSnapshot, HoverSnapshot, InlayHintKind, InlayHintSnapshot, LocationSnapshot,
-    LspResponse, ParameterSnapshot, SignatureHelpSnapshot, SignatureSnapshot, StoredCodeAction,
+    LspResponse, LspServerSnapshot, LspServerStatus, ParameterSnapshot, SignatureHelpSnapshot,
+    SignatureSnapshot, StoredCodeAction,
 };

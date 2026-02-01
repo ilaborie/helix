@@ -23,6 +23,7 @@ use dioxus::desktop::tao::window::Icon;
 mod app;
 pub mod args;
 mod components;
+mod events;
 mod keybindings;
 mod lsp;
 mod operations;
@@ -53,6 +54,10 @@ fn load_icon() -> Option<Icon> {
 /// This function initializes the editor context based on the startup action,
 /// sets up the Dioxus application, and starts the event loop.
 pub fn launch(startup_action: StartupAction) -> Result<()> {
+    // Register helix-view events with helix_event.
+    // This must be done before creating handlers that register hooks for these events.
+    events::register();
+
     // Create command channel
     let (command_tx, command_rx) = mpsc::channel::<EditorCommand>();
 

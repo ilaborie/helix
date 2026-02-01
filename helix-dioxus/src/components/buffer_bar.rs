@@ -121,7 +121,8 @@ fn BufferTab(buffer: BufferInfo, on_action: EventHandler<()>) -> Element {
         "2px solid transparent"
     };
 
-    let modified_indicator = if buffer.is_modified { " \u{25cf}" } else { "" };
+    // Modified indicator color - use a warmer color for visibility
+    let modified_color = if buffer.is_current { "#e5c07b" } else { "#e5c07b" };
 
     rsx! {
         div {
@@ -138,6 +139,14 @@ fn BufferTab(buffer: BufferInfo, on_action: EventHandler<()>) -> Element {
                 on_action_switch.call(());
             },
 
+            // Modified indicator (before file icon for visibility)
+            if buffer.is_modified {
+                span {
+                    style: "color: {modified_color}; margin-right: 4px; font-size: 10px;",
+                    "\u{25cf}"
+                }
+            }
+
             // File icon
             span {
                 class: "icon-wrapper",
@@ -149,7 +158,7 @@ fn BufferTab(buffer: BufferInfo, on_action: EventHandler<()>) -> Element {
             span {
                 class: "buffer-tab-name",
                 style: "color: {text_color};",
-                "{buffer.name}{modified_indicator}"
+                "{buffer.name}"
             }
 
             // Close button

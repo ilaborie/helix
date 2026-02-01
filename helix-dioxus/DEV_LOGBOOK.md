@@ -840,6 +840,41 @@ let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
 
 ---
 
+## 2026-02-01: Confirmation Dialog
+
+### Progress
+- Implemented confirmation dialog for quit/close with unsaved changes
+  - Modal overlay centered on screen with backdrop
+  - Title, message, and configurable buttons
+  - Keyboard shortcuts: `y`/`Y`/`Enter` (confirm), `n`/`N` (deny), `Esc` (cancel)
+  - Buttons show keyboard shortcuts as badges
+
+### Use Cases
+- `:q` with unsaved changes → "Save & Quit" / "Don't Save" / "Cancel"
+- `:bd` with unsaved changes → "Close" / "Cancel"
+- `:q!` and `:bd!` → Force quit/close without dialog (unchanged)
+
+### Files Created
+- `src/components/confirmation_dialog.rs` - Modal dialog component
+- `src/keybindings/confirmation.rs` - Keybinding handler
+
+### Files Modified
+- `src/state/types.rs` - Added `ConfirmationAction`, `ConfirmationDialogSnapshot`, `EditorCommand` variants
+- `src/state/mod.rs` - Added confirmation dialog state and command handlers
+- `src/operations/buffer.rs` - `try_quit()` and `close_current_buffer()` now show confirmation dialog
+- `src/keybindings/mod.rs` - Exports `handle_confirmation_mode`
+- `src/components/mod.rs` - Exports `ConfirmationDialog`
+- `src/app.rs` - Integrated confirmation dialog in key handler and render tree
+- `assets/styles.css` - Added `.confirmation-dialog-*` styles
+- `CLAUDE.md` - Updated documentation
+
+### Technical Notes
+- Confirmation dialog takes highest priority in key handling (before input dialog)
+- `ConfirmationAction` enum determines what happens on confirm/deny
+- Dialog state stored in `EditorContext` and snapshotted in `EditorSnapshot`
+
+---
+
 ## Planned Enhancements
 
 ### Helix Commands & Modes
@@ -855,13 +890,13 @@ let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
 - [ ] User preferences support
 
 ### Standard UI Components
-- [ ] Toast notifications
-- [ ] Confirm dialogs
-- [ ] Rename prompt (for LSP rename)
-- [ ] Documentation popup (hover info)
+- [x] Toast notifications
+- [x] Confirm dialogs
+- [x] Rename prompt (for LSP rename)
+- [x] Documentation popup (hover info)
 - [ ] Help panel
 - [ ] Autocomplete lite picker
-- [ ] Error lens (inline diagnostics)
+- [x] Error lens (inline diagnostics)
 
 ### LSP Integration
 - [x] LSP snapshot types (thread-safe for UI rendering)
@@ -878,7 +913,7 @@ let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
 
 ### Gutter Improvements
 - [ ] Git diff indicators (added/modified/removed lines)
-- [ ] Diagnostic indicators (error/warning icons)
+- [x] Diagnostic indicators (error/warning icons)
 
 ### Application Icon (macOS)
 - [ ] Fix macOS dock icon not displaying
