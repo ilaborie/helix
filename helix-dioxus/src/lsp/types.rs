@@ -35,10 +35,21 @@ impl DiagnosticSeverity {
     #[must_use]
     pub fn gutter_icon(&self) -> &'static str {
         match self {
-            Self::Error => "E",
-            Self::Warning => "W",
-            Self::Info => "I",
-            Self::Hint => "H",
+            Self::Error => "●",   // Filled circle
+            Self::Warning => "▲", // Triangle
+            Self::Info => "●",    // Filled circle
+            Self::Hint => "○",    // Empty circle
+        }
+    }
+
+    /// Returns the status bar icon character for this severity.
+    #[must_use]
+    pub fn status_icon(&self) -> &'static str {
+        match self {
+            Self::Error => "✕",   // Cross
+            Self::Warning => "⚠", // Warning sign
+            Self::Info => "ℹ",    // Info
+            Self::Hint => "💡",   // Lightbulb
         }
     }
 }
@@ -315,6 +326,20 @@ pub struct CodeActionSnapshot {
     pub index: usize,
 }
 
+/// Stored code action data for execution.
+/// This stores the original LSP data needed to apply the action.
+#[derive(Debug, Clone)]
+pub struct StoredCodeAction {
+    /// The snapshot for display.
+    pub snapshot: CodeActionSnapshot,
+    /// The original LSP code action or command.
+    pub lsp_item: helix_lsp::lsp::CodeActionOrCommand,
+    /// The language server ID that provided this action.
+    pub language_server_id: helix_lsp::LanguageServerId,
+    /// The offset encoding for this language server.
+    pub offset_encoding: helix_lsp::OffsetEncoding,
+}
+
 /// Response types from async LSP operations.
 #[derive(Debug, Clone)]
 pub enum LspResponse {
@@ -330,8 +355,8 @@ pub enum LspResponse {
     GotoDefinition(Vec<LocationSnapshot>),
     /// References locations received.
     References(Vec<LocationSnapshot>),
-    /// Code actions received.
-    CodeActions(Vec<CodeActionSnapshot>),
+    /// Code actions received (with full data for execution).
+    CodeActions(Vec<StoredCodeAction>),
     /// Diagnostics updated.
     DiagnosticsUpdated,
     /// Format edits received (applied directly).

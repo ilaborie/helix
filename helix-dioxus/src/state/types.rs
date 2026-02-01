@@ -54,6 +54,9 @@ pub enum PickerMode {
 /// This is Clone + Send + Sync so it can be used with Dioxus.
 #[derive(Debug, Clone, Default)]
 pub struct EditorSnapshot {
+    /// Version counter that increments on each snapshot creation.
+    /// Used for change detection to avoid unnecessary re-renders.
+    pub snapshot_version: u64,
     pub mode: String,
     pub file_name: String,
     pub is_modified: bool,
@@ -86,6 +89,10 @@ pub struct EditorSnapshot {
     // LSP state
     /// Diagnostics for the current document, grouped by line.
     pub diagnostics: Vec<DiagnosticSnapshot>,
+    /// Total error count in the current document.
+    pub error_count: usize,
+    /// Total warning count in the current document.
+    pub warning_count: usize,
     /// Whether the completion popup is visible.
     pub completion_visible: bool,
     /// Completion items to display.
@@ -161,6 +168,10 @@ pub enum EditorCommand {
     MoveLineEnd,
     GotoFirstLine,
     GotoLastLine,
+    PageUp,
+    PageDown,
+    ScrollUp(usize),
+    ScrollDown(usize),
 
     // Mode changes
     EnterInsertMode,
@@ -172,6 +183,7 @@ pub enum EditorCommand {
 
     // Editing
     InsertChar(char),
+    InsertTab,
     InsertNewline,
     DeleteCharBackward,
     DeleteCharForward,
@@ -181,6 +193,10 @@ pub enum EditorCommand {
     // History
     Undo,
     Redo,
+
+    // Comments
+    ToggleLineComment,
+    ToggleBlockComment,
 
     // Selection
     ExtendLeft,

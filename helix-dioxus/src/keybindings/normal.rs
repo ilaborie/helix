@@ -9,6 +9,7 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
     // Handle Ctrl+key combinations first
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         return match key.code {
+            KeyCode::Char('c') => vec![EditorCommand::ToggleLineComment],
             KeyCode::Char('r') => vec![EditorCommand::Redo],
             KeyCode::Char('h') => vec![EditorCommand::PreviousBuffer],
             KeyCode::Char('l') => vec![EditorCommand::NextBuffer],
@@ -33,7 +34,8 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
 
         // File navigation
         KeyCode::Char('G') => vec![EditorCommand::GotoLastLine],
-        // TODO: 'gg' requires tracking previous key
+        KeyCode::PageUp => vec![EditorCommand::PageUp],
+        KeyCode::PageDown => vec![EditorCommand::PageDown],
 
         // Mode changes
         KeyCode::Char('i') => vec![EditorCommand::EnterInsertMode],
@@ -116,6 +118,10 @@ pub fn handle_space_leader(key: &KeyEvent) -> Vec<EditorCommand> {
     match key.code {
         // Space a - show code actions
         KeyCode::Char('a') => vec![EditorCommand::ShowCodeActions],
+        // Space c - toggle line comment
+        KeyCode::Char('c') => vec![EditorCommand::ToggleLineComment],
+        // Space C - toggle block comment
+        KeyCode::Char('C') => vec![EditorCommand::ToggleBlockComment],
         // Space f - format document
         KeyCode::Char('f') => vec![EditorCommand::FormatDocument],
         // Space i - toggle inlay hints

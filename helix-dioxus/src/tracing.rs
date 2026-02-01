@@ -11,13 +11,12 @@ use std::io;
 use std::sync::Mutex;
 
 use tracing::{Event, Subscriber};
-use tracing_subscriber::{
-    fmt::{self, format::Writer, FmtContext, FormatEvent, FormatFields},
-    layer::SubscriberExt,
-    registry::LookupSpan,
-    util::SubscriberInitExt,
-    EnvFilter,
-};
+use tracing_subscriber::fmt::format::Writer;
+use tracing_subscriber::fmt::{self, FmtContext, FormatEvent, FormatFields};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::registry::LookupSpan;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::EnvFilter;
 
 /// Patterns to filter out from log output.
 /// These are substrings that, if found in a log message, will cause it to be suppressed.

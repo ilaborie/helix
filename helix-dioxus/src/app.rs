@@ -9,12 +9,11 @@ use crate::components::{
     BufferBar, CodeActionsMenu, CommandPrompt, CompletionPopup, EditorView, GenericPicker,
     HoverPopup, LocationPicker, SearchPrompt, SignatureHelpPopup, StatusLine,
 };
-use crate::input::translate_key_event;
 use crate::keybindings::{
     handle_bracket_next, handle_bracket_prev, handle_code_actions_mode, handle_command_mode,
     handle_completion_mode, handle_g_prefix, handle_insert_mode, handle_location_picker_mode,
     handle_normal_mode, handle_picker_mode, handle_search_mode, handle_select_mode,
-    handle_space_leader,
+    handle_space_leader, translate_key_event,
 };
 use crate::AppState;
 
@@ -39,8 +38,6 @@ pub fn App() -> Element {
     // Get app state from context
     let app_state = use_context::<AppState>();
 
-    let x : String = 3;
-
     // Track version for re-renders when editor state changes
     let mut version = use_signal(|| 0_usize);
 
@@ -55,19 +52,55 @@ pub fn App() -> Element {
         document::eval("focusAppContainer();");
     });
 
+    // Track the last seen snapshot version to avoid unnecessary re-renders
+    let mut last_snapshot_version = use_signal(|| 0_u64);
+
+    // Background coroutine to poll for LSP events (diagnostics, etc.)
+    // This ensures UI updates when async events arrive without keyboard input.
+    let app_state_for_poll = app_state.clone();
+    use_future(move || {
+        let app_state = app_state_for_poll.clone();
+        async move {
+            log::info!("LSP polling coroutine started");
+            loop {
+                // Wait for a short interval before polling
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+                // Process any pending commands (including LSP events)
+                app_state.process_commands_sync();
+
+                // Only trigger re-render if snapshot actually changed
+                let snapshot = app_state.get_snapshot();
+                let current_version = snapshot.snapshot_version;
+                if current_version != last_snapshot_version() {
+                    log::info!(
+                        "Snapshot changed: v{} -> v{}, diagnostics: {}, errors: {}, warnings: {}",
+                        last_snapshot_version(),
+                        current_version,
+                        snapshot.diagnostics.len(),
+                        snapshot.error_count,
+                        snapshot.warning_count
+                    );
+                    last_snapshot_version.set(current_version);
+                    version += 1;
+                }
+            }
+        }
+    });
+
     // Clone app_state for the closure
     let app_state_for_handler = app_state.clone();
 
     // Handle keyboard input at the app level
     let onkeydown = move |evt: KeyboardEvent| {
-        log::info!("Key pressed: {:?}", evt.key());
+        log::trace!("Key pressed: {:?}", evt.key());
 
         // Get current mode
         let snapshot = app_state_for_handler.get_snapshot();
 
         // Translate to helix key event
         if let Some(key_event) = translate_key_event(&evt) {
-            log::info!(
+            log::trace!(
                 "Mode: {}, command_mode: {}, search_mode: {}, picker_visible: {}, pending_key: {:?}",
                 snapshot.mode,
                 snapshot.command_mode,
@@ -147,7 +180,7 @@ pub fn App() -> Element {
             };
 
             // Send commands to editor
-            log::info!("Commands: {:?}", commands);
+            log::trace!("Commands: {:?}", commands);
             for cmd in commands {
                 app_state_for_handler.send_command(cmd);
             }
@@ -166,14 +199,10 @@ pub fn App() -> Element {
     // Get snapshot for conditional rendering
     let snapshot = app_state.get_snapshot();
 
-    log::info!(
-        "Rendering App: command_mode={}, search_mode={}, picker_visible={}",
-        snapshot.command_mode,
-        snapshot.search_mode,
-        snapshot.picker_visible
-    );
-
     rsx! {
+        // Load external stylesheet
+        document::Stylesheet { href: asset!("/assets/styles.css") }
+
         // Dynamic window title based on current buffer
         document::Title { "helix-dioxus - {snapshot.file_name}" }
 

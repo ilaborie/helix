@@ -13,6 +13,10 @@ pub trait MovementOps {
     fn move_line_end(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn goto_first_line(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn goto_last_line(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn page_up(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn page_down(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn scroll_up(&mut self, doc_id: DocumentId, view_id: ViewId, lines: usize);
+    fn scroll_down(&mut self, doc_id: DocumentId, view_id: ViewId, lines: usize);
 }
 
 impl MovementOps for EditorContext {
@@ -20,13 +24,6 @@ impl MovementOps for EditorContext {
         let doc = self.editor.document_mut(doc_id).expect("doc exists");
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
-
-        log::info!(
-            "move_cursor: direction={:?}, old selection anchor={}, head={}",
-            direction,
-            selection.primary().anchor,
-            selection.primary().head
-        );
 
         let new_selection = selection.transform(|range| {
             let cursor = range.cursor(text);
@@ -61,12 +58,6 @@ impl MovementOps for EditorContext {
             };
             helix_core::Range::point(new_cursor)
         });
-
-        log::info!(
-            "move_cursor: new selection anchor={}, head={}",
-            new_selection.primary().anchor,
-            new_selection.primary().head
-        );
 
         doc.set_selection(view_id, new_selection);
     }
@@ -138,5 +129,79 @@ impl MovementOps for EditorContext {
         let line_start = text.line_to_char(last_line);
 
         doc.set_selection(view_id, helix_core::Selection::point(line_start));
+    }
+
+    fn page_up(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        // Move cursor up by approximately half the viewport (20 lines)
+        let page_size = 20;
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection.transform(|range| {
+            let cursor = range.cursor(text);
+            let line = text.char_to_line(cursor);
+            let col = cursor - text.line_to_char(line);
+            let new_line = line.saturating_sub(page_size);
+            let new_line_len = text.line(new_line).len_chars().saturating_sub(1);
+            let new_cursor = text.line_to_char(new_line) + col.min(new_line_len);
+            helix_core::Range::point(new_cursor)
+        });
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    fn page_down(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        // Move cursor down by approximately half the viewport (20 lines)
+        let page_size = 20;
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection.transform(|range| {
+            let cursor = range.cursor(text);
+            let line = text.char_to_line(cursor);
+            let col = cursor - text.line_to_char(line);
+            let last_line = text.len_lines().saturating_sub(1);
+            let new_line = (line + page_size).min(last_line);
+            let new_line_len = text.line(new_line).len_chars().saturating_sub(1);
+            let new_cursor = text.line_to_char(new_line) + col.min(new_line_len);
+            helix_core::Range::point(new_cursor)
+        });
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    fn scroll_up(&mut self, doc_id: DocumentId, view_id: ViewId, lines: usize) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+
+        // Get the current view offset
+        let mut offset = doc.view_offset(view_id);
+        let current_line = text.char_to_line(offset.anchor.min(text.len_chars()));
+
+        // Calculate the new line (scroll up = decrease line number)
+        let new_line = current_line.saturating_sub(lines);
+
+        // Set the new anchor to the start of the new line
+        offset.anchor = text.line_to_char(new_line);
+        doc.set_view_offset(view_id, offset);
+    }
+
+    fn scroll_down(&mut self, doc_id: DocumentId, view_id: ViewId, lines: usize) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+
+        // Get the current view offset
+        let mut offset = doc.view_offset(view_id);
+        let current_line = text.char_to_line(offset.anchor.min(text.len_chars()));
+
+        // Calculate the new line (scroll down = increase line number)
+        let last_line = text.len_lines().saturating_sub(1);
+        let new_line = (current_line + lines).min(last_line);
+
+        // Set the new anchor to the start of the new line
+        offset.anchor = text.line_to_char(new_line);
+        doc.set_view_offset(view_id, offset);
     }
 }

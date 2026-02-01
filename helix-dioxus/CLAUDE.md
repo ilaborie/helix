@@ -17,8 +17,11 @@ helix-dioxus is a Dioxus 0.7 desktop frontend for the Helix text editor.
 
 ```
 helix-dioxus/src/
-├── main.rs                     # Entry point, AppState definition
+├── main.rs                     # Entry point (anemic: tracing, helix loader, args, launch)
+├── lib.rs                      # Library root: launch(), AppState, module declarations
 ├── app.rs                      # Root App component
+├── args.rs                     # Command-line argument parsing
+├── tracing.rs                  # Logging configuration
 │
 ├── components/                 # UI Components
 │   ├── mod.rs                  # Re-exports
@@ -34,7 +37,8 @@ helix-dioxus/src/
 │
 ├── state/                      # State Management
 │   ├── mod.rs                  # EditorContext, command dispatch
-│   └── types.rs                # Data structures (EditorSnapshot, etc.)
+│   ├── types.rs                # Data structures (EditorSnapshot, etc.)
+│   └── lsp_events.rs           # LspEventOps: poll_lsp_events, diagnostics handling
 │
 ├── operations/                 # Editor Operations (extension traits)
 │   ├── mod.rs                  # Re-exports all traits
@@ -47,20 +51,19 @@ helix-dioxus/src/
 │   ├── buffer.rs               # BufferOps: switch_to_buffer, save_document
 │   └── cli.rs                  # CliOps: execute_command
 │
-├── keybindings/                # Key Handling
-│   ├── mod.rs                  # Re-exports handlers
-│   ├── normal.rs               # handle_normal_mode
-│   ├── insert.rs               # handle_insert_mode
-│   ├── select.rs               # handle_select_mode
-│   ├── command.rs              # handle_command_mode
-│   ├── picker.rs               # handle_picker_mode
-│   └── search.rs               # handle_search_mode
-│
-├── input.rs                    # Keyboard event translation
-└── tracing.rs                  # Logging configuration
+└── keybindings/                # Key Handling
+    ├── mod.rs                  # Re-exports handlers
+    ├── translate.rs            # Dioxus KeyboardEvent → helix KeyEvent translation
+    ├── normal.rs               # handle_normal_mode
+    ├── insert.rs               # handle_insert_mode
+    ├── select.rs               # handle_select_mode
+    ├── command.rs              # handle_command_mode
+    ├── picker.rs               # handle_picker_mode
+    └── search.rs               # handle_search_mode
 
 helix-dioxus/assets/
-└── head.html                   # CSS styles and JavaScript functions
+├── styles.css                  # Main stylesheet (loaded via document::Stylesheet)
+└── script.js                   # JavaScript functions (loaded via custom head)
 ```
 
 ### Dioxus 0.7 Patterns
@@ -95,21 +98,34 @@ use crate::operations::{MovementOps, EditingOps, ...};
 
 ### Assets Pattern
 
-CSS and JavaScript are extracted to `assets/head.html` and loaded via `include_str!`:
+**External Stylesheet**: CSS is loaded via Dioxus `document::Stylesheet` with `asset!()` macro:
 
 ```rust
-const CUSTOM_HEAD: &str = include_str!("../assets/head.html");
+// In app.rs
+rsx! {
+    document::Stylesheet { href: asset!("/assets/styles.css") }
+    // ...
+}
 ```
 
-**CSS Classes**: Static styles use CSS classes defined in `head.html`:
+**JavaScript Functions**: Custom script is loaded via `include_str!` and wrapped in a script tag:
+
+```rust
+// In main.rs
+const CUSTOM_SCRIPT: &str = include_str!("../assets/script.js");
+// Used with: .with_custom_head(format!("<script>{CUSTOM_SCRIPT}</script>"))
+```
+
+Functions defined in `script.js`:
+- `focusAppContainer()` - focuses app on mount
+- `scrollCursorIntoView()` - scrolls cursor into view
+
+**CSS Classes** (defined in `styles.css`):
 - `.app-container`, `.editor-view`, `.gutter`, `.content`
 - `.buffer-bar`, `.buffer-tab`, `.statusline`
 - `.picker-*` (overlay, container, header, list, item)
 - `.prompt`, `.prompt-cursor`
-
-**JavaScript Functions**: DOM manipulation extracted to `head.html`:
-- `focusAppContainer()` - focuses app on mount
-- `scrollCursorIntoView()` - scrolls cursor into view
+- `.completion-*`, `.hover-*`, `.code-action-*` (LSP popups)
 
 **Dynamic Styles**: Styles requiring Rust variables remain inline:
 - Mode colors: `style: "background-color: {mode_bg};"`
@@ -123,7 +139,7 @@ const CUSTOM_HEAD: &str = include_str!("../assets/head.html");
 - Always call `process_commands_sync()` after sending commands
 - Follow Rust derive order: Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default
 - Fields that need cross-module access use `pub(crate)`
-- Extract static CSS to `head.html` classes, keep dynamic styles inline
+- Extract static CSS to `styles.css`, keep dynamic styles inline in RSX
 
 ## Build Commands
 
@@ -168,10 +184,11 @@ cargo clippy -p helix-dioxus --bins
 ## Feature Roadmap
 
 ### Planned Enhancements
+- [ ] Keybinding help bar above statusline showing common shortcuts (context-aware per mode)
 - [ ] Command panel as picker-style UI with fuzzy search
 - [ ] File-type specific icons in buffer bar
 - [ ] Mouse click support in picker
-- [ ] LSP integration for diagnostics and completions
+- [x] ~~LSP integration for diagnostics and completions~~ Diagnostics display with gutter icons, error lens, and status bar counts
 - [ ] Multiple splits/views support
 - [ ] System clipboard integration
 - [ ] Extract theme colors to `theme.rs` or `colors.rs`

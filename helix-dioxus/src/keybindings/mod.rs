@@ -10,6 +10,7 @@ mod normal;
 mod picker;
 mod search;
 mod select;
+mod translate;
 
 pub use command::handle_command_mode;
 pub use completion::{
@@ -23,3 +24,4 @@ pub use normal::{
 pub use picker::handle_picker_mode;
 pub use search::handle_search_mode;
 pub use select::handle_select_mode;
+pub use translate::translate_key_event;

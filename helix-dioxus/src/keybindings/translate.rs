@@ -18,7 +18,6 @@ fn translate_key_code(evt: &KeyboardEvent) -> Option<KeyCode> {
     use dioxus::prelude::Key;
 
     let key = evt.key();
-    log::debug!("translate_key_code: key = {:?}", key);
 
     match key {
         // Letters and characters

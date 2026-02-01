@@ -14,6 +14,8 @@ pub fn handle_insert_mode(key: &KeyEvent) -> Vec<EditorCommand> {
     // Handle control key combinations
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         return match key.code {
+            // Ctrl+c - toggle line comment
+            KeyCode::Char('c') => vec![EditorCommand::ToggleLineComment],
             // Ctrl+Space - trigger completion
             KeyCode::Char(' ') => vec![EditorCommand::TriggerCompletion],
             _ => vec![],
@@ -22,6 +24,7 @@ pub fn handle_insert_mode(key: &KeyEvent) -> Vec<EditorCommand> {
 
     match key.code {
         KeyCode::Char(c) => vec![EditorCommand::InsertChar(c)],
+        KeyCode::Tab => vec![EditorCommand::InsertTab],
         KeyCode::Enter => vec![EditorCommand::InsertNewline],
         KeyCode::Backspace => vec![EditorCommand::DeleteCharBackward],
         KeyCode::Delete => vec![EditorCommand::DeleteCharForward],
@@ -29,6 +32,10 @@ pub fn handle_insert_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Right => vec![EditorCommand::MoveRight],
         KeyCode::Up => vec![EditorCommand::MoveUp],
         KeyCode::Down => vec![EditorCommand::MoveDown],
+        KeyCode::Home => vec![EditorCommand::MoveLineStart],
+        KeyCode::End => vec![EditorCommand::MoveLineEnd],
+        KeyCode::PageUp => vec![EditorCommand::PageUp],
+        KeyCode::PageDown => vec![EditorCommand::PageDown],
         _ => vec![],
     }
 }

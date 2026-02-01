@@ -20,6 +20,8 @@ pub fn StatusLine(version: ReadSignal<usize>) -> Element {
     let line = snapshot.cursor_line;
     let col = snapshot.cursor_col;
     let total_lines = snapshot.total_lines;
+    let error_count = snapshot.error_count;
+    let warning_count = snapshot.warning_count;
 
     // Mode-specific colors
     let (mode_bg, mode_fg) = match mode.as_str() {
@@ -51,6 +53,30 @@ pub fn StatusLine(version: ReadSignal<usize>) -> Element {
             div {
                 class: "statusline-filename",
                 "{file_name}{modified_indicator}"
+            }
+
+            // Diagnostic counts (if any)
+            if error_count > 0 || warning_count > 0 {
+                div {
+                    class: "statusline-diagnostics",
+                    if error_count > 0 {
+                        span {
+                            class: "statusline-errors",
+                            style: "color: #e06c75;",
+                            "✕ {error_count}"
+                        }
+                    }
+                    if error_count > 0 && warning_count > 0 {
+                        span { " " }
+                    }
+                    if warning_count > 0 {
+                        span {
+                            class: "statusline-warnings",
+                            style: "color: #e5c07b;",
+                            "⚠ {warning_count}"
+                        }
+                    }
+                }
             }
 
             // Spacer
