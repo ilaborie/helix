@@ -122,7 +122,11 @@ fn BufferTab(buffer: BufferInfo, on_action: EventHandler<()>) -> Element {
     };
 
     // Modified indicator color - use a warmer color for visibility
-    let modified_color = if buffer.is_current { "#e5c07b" } else { "#e5c07b" };
+    let modified_color = if buffer.is_current {
+        "#e5c07b"
+    } else {
+        "#e5c07b"
+    };
 
     rsx! {
         div {

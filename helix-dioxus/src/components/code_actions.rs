@@ -18,9 +18,10 @@ fn action_kind_style(kind: Option<&str>, is_preferred: bool) -> (&'static str, E
         Some(k) if k.starts_with("quickfix") => {
             ("#98c379", rsx! { Wrench { size: 12, color: "#98c379" } })
         }
-        Some(k) if k.starts_with("refactor.extract") => {
-            ("#61afef", rsx! { PackagePlus { size: 12, color: "#61afef" } })
-        }
+        Some(k) if k.starts_with("refactor.extract") => (
+            "#61afef",
+            rsx! { PackagePlus { size: 12, color: "#61afef" } },
+        ),
         Some(k) if k.starts_with("refactor") => {
             ("#c678dd", rsx! { FileCode { size: 12, color: "#c678dd" } })
         }

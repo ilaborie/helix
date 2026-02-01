@@ -5,7 +5,4 @@ fn main() {
     println!("Hello");
 
     let x: String = 1;
-    
-   
-    
 }

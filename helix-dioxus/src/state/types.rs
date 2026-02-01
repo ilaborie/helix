@@ -29,6 +29,18 @@ pub enum PickerIcon {
     Folder,
     Buffer,
     BufferModified,
+    // Symbol icons
+    SymbolFunction,
+    SymbolMethod,
+    SymbolClass,
+    SymbolStruct,
+    SymbolEnum,
+    SymbolInterface,
+    SymbolVariable,
+    SymbolConstant,
+    SymbolField,
+    SymbolModule,
+    SymbolOther,
 }
 
 /// Generic picker item with match highlighting.
@@ -48,6 +60,8 @@ pub enum PickerMode {
     DirectoryBrowser,
     FilesRecursive,
     Buffers,
+    DocumentSymbols,
+    WorkspaceSymbols,
 }
 
 /// A snapshot of the editor state for rendering.
@@ -357,6 +371,12 @@ pub enum EditorCommand {
     ToggleInlayHints,
     /// Refresh inlay hints from LSP.
     RefreshInlayHints,
+
+    // LSP - Symbol Picker
+    /// Show document symbols picker.
+    ShowDocumentSymbols,
+    /// Show workspace symbols picker.
+    ShowWorkspaceSymbols,
 
     // LSP - Signature Help
     /// Trigger signature help (usually auto-triggered on `(`).

@@ -1,7 +1,10 @@
 //! Picker item row component.
 
 use dioxus::prelude::*;
-use lucide_dioxus::{ChevronRight, File, FileText, Folder};
+use lucide_dioxus::{
+    Blocks, Braces, ChevronRight, Code, Component, File, FileText, Folder, Hash, Layers, Package,
+    SquareFunction, Variable,
+};
 
 use crate::state::{PickerIcon, PickerItem};
 
@@ -19,7 +22,17 @@ pub fn PickerItemRow(item: PickerItem, is_selected: bool) -> Element {
     let text_color = match item.icon {
         PickerIcon::Folder => "#61afef",         // Blue for directories
         PickerIcon::BufferModified => "#e5c07b", // Yellow for modified buffers
-        _ => "#abb2bf",                          // Default text color
+        // Symbol colors (matching LSP completion icons in code_actions.rs and completion.rs)
+        PickerIcon::SymbolFunction | PickerIcon::SymbolMethod => "#61afef", // Blue
+        PickerIcon::SymbolClass
+        | PickerIcon::SymbolStruct
+        | PickerIcon::SymbolEnum
+        | PickerIcon::SymbolInterface => "#e5c07b", // Yellow
+        PickerIcon::SymbolVariable | PickerIcon::SymbolField => "#e06c75",  // Red
+        PickerIcon::SymbolConstant => "#d19a66",                            // Orange
+        PickerIcon::SymbolModule => "#c678dd",                              // Purple
+        PickerIcon::SymbolOther => "#abb2bf",                               // Gray
+        _ => "#abb2bf",                                                     // Default text color
     };
 
     let indicator_opacity = if is_selected { "1" } else { "0" };
@@ -43,6 +56,18 @@ pub fn PickerItemRow(item: PickerItem, is_selected: bool) -> Element {
                     PickerIcon::Folder => rsx! { Folder { size: 16, color: text_color } },
                     PickerIcon::File => rsx! { File { size: 16, color: text_color } },
                     PickerIcon::Buffer | PickerIcon::BufferModified => rsx! { FileText { size: 16, color: text_color } },
+                    // Symbol icons
+                    PickerIcon::SymbolFunction => rsx! { SquareFunction { size: 16, color: text_color } },
+                    PickerIcon::SymbolMethod => rsx! { Code { size: 16, color: text_color } },
+                    PickerIcon::SymbolClass => rsx! { Blocks { size: 16, color: text_color } },
+                    PickerIcon::SymbolStruct => rsx! { Braces { size: 16, color: text_color } },
+                    PickerIcon::SymbolEnum => rsx! { Layers { size: 16, color: text_color } },
+                    PickerIcon::SymbolInterface => rsx! { Component { size: 16, color: text_color } },
+                    PickerIcon::SymbolVariable => rsx! { Variable { size: 16, color: text_color } },
+                    PickerIcon::SymbolConstant => rsx! { Hash { size: 16, color: text_color } },
+                    PickerIcon::SymbolField => rsx! { Code { size: 16, color: text_color } },
+                    PickerIcon::SymbolModule => rsx! { Package { size: 16, color: text_color } },
+                    PickerIcon::SymbolOther => rsx! { Code { size: 16, color: text_color } },
                 }}
             }
 

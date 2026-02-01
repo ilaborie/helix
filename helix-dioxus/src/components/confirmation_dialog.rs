@@ -9,7 +9,10 @@ use crate::AppState;
 
 /// Confirmation dialog component.
 #[component]
-pub fn ConfirmationDialog(dialog: ConfirmationDialogSnapshot, on_change: EventHandler<()>) -> Element {
+pub fn ConfirmationDialog(
+    dialog: ConfirmationDialogSnapshot,
+    on_change: EventHandler<()>,
+) -> Element {
     let app_state = use_context::<AppState>();
 
     let confirm_handler = {

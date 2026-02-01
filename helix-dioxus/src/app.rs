@@ -7,8 +7,8 @@ use helix_view::input::{KeyCode, KeyModifiers};
 
 use crate::components::{
     BufferBar, CodeActionsMenu, CommandPrompt, CompletionPopup, ConfirmationDialog, EditorView,
-    GenericPicker, HoverPopup, InputDialog, LocationPicker, LspStatusDialog,
-    NotificationContainer, SearchPrompt, SignatureHelpPopup, StatusLine,
+    GenericPicker, HoverPopup, InputDialog, LocationPicker, LspStatusDialog, NotificationContainer,
+    SearchPrompt, SignatureHelpPopup, StatusLine,
 };
 use crate::keybindings::{
     handle_bracket_next, handle_bracket_prev, handle_code_actions_mode, handle_command_mode,

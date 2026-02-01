@@ -9,7 +9,7 @@ use helix_lsp::OffsetEncoding;
 use super::{
     CodeActionSnapshot, CompletionItemKind, CompletionItemSnapshot, HoverSnapshot, InlayHintKind,
     InlayHintSnapshot, LocationSnapshot, ParameterSnapshot, SignatureHelpSnapshot,
-    StoredCodeAction,
+    StoredCodeAction, SymbolKind, SymbolSnapshot,
 };
 
 /// Convert LSP completion response to completion item snapshots.
@@ -260,8 +260,8 @@ fn code_action_kind_priority(kind: &Option<String>) -> u8 {
         Some(k) if k.starts_with("refactor.inline") => 2,
         Some(k) if k.starts_with("refactor.extract") => 3,
         Some(k) if k.starts_with("refactor") => 4, // Other refactors
-        Some(k) if k.starts_with("source") => 5, // Source actions last
-        None => 3, // Unknown kind in middle
+        Some(k) if k.starts_with("source") => 5,   // Source actions last
+        None => 3,                                 // Unknown kind in middle
         _ => 4,
     }
 }
@@ -318,5 +318,92 @@ fn convert_inlay_hint(hint: lsp::InlayHint) -> InlayHintSnapshot {
         kind,
         padding_left: hint.padding_left.unwrap_or(false),
         padding_right: hint.padding_right.unwrap_or(false),
+    }
+}
+
+/// Convert LSP document symbols to symbol snapshots.
+/// Handles both flat (SymbolInformation) and nested (DocumentSymbol) responses.
+pub fn convert_document_symbols(response: lsp::DocumentSymbolResponse) -> Vec<SymbolSnapshot> {
+    match response {
+        lsp::DocumentSymbolResponse::Flat(symbols) => symbols
+            .into_iter()
+            .map(|sym| SymbolSnapshot {
+                name: sym.name,
+                kind: SymbolKind::from(sym.kind),
+                container_name: sym.container_name,
+                path: sym.location.uri.to_file_path().ok(),
+                line: sym.location.range.start.line as usize + 1,
+                column: sym.location.range.start.character as usize + 1,
+            })
+            .collect(),
+        lsp::DocumentSymbolResponse::Nested(symbols) => {
+            // Flatten nested DocumentSymbol hierarchy
+            let mut result = Vec::new();
+            flatten_document_symbols(&symbols, None, &mut result);
+            result
+        }
+    }
+}
+
+/// Recursively flatten nested DocumentSymbol hierarchy.
+fn flatten_document_symbols(
+    symbols: &[lsp::DocumentSymbol],
+    parent_name: Option<&str>,
+    result: &mut Vec<SymbolSnapshot>,
+) {
+    for sym in symbols {
+        result.push(SymbolSnapshot {
+            name: sym.name.clone(),
+            kind: SymbolKind::from(sym.kind),
+            container_name: parent_name.map(String::from),
+            path: None, // Document symbols are for current file
+            line: sym.selection_range.start.line as usize + 1,
+            column: sym.selection_range.start.character as usize + 1,
+        });
+
+        // Recurse into children
+        if let Some(ref children) = sym.children {
+            flatten_document_symbols(children, Some(&sym.name), result);
+        }
+    }
+}
+
+/// Convert LSP workspace symbols to symbol snapshots.
+pub fn convert_workspace_symbols(response: lsp::WorkspaceSymbolResponse) -> Vec<SymbolSnapshot> {
+    match response {
+        lsp::WorkspaceSymbolResponse::Flat(symbols) => symbols
+            .into_iter()
+            .map(|sym| SymbolSnapshot {
+                name: sym.name,
+                kind: SymbolKind::from(sym.kind),
+                container_name: sym.container_name,
+                path: sym.location.uri.to_file_path().ok(),
+                line: sym.location.range.start.line as usize + 1,
+                column: sym.location.range.start.character as usize + 1,
+            })
+            .collect(),
+        lsp::WorkspaceSymbolResponse::Nested(symbols) => symbols
+            .into_iter()
+            .map(|sym| {
+                let (path, line, column) = match sym.location {
+                    lsp::OneOf::Left(location) => (
+                        location.uri.to_file_path().ok(),
+                        location.range.start.line as usize + 1,
+                        location.range.start.character as usize + 1,
+                    ),
+                    lsp::OneOf::Right(location_link) => {
+                        (location_link.uri.to_file_path().ok(), 1, 1)
+                    }
+                };
+                SymbolSnapshot {
+                    name: sym.name,
+                    kind: SymbolKind::from(sym.kind),
+                    container_name: sym.container_name,
+                    path,
+                    line,
+                    column,
+                }
+            })
+            .collect(),
     }
 }

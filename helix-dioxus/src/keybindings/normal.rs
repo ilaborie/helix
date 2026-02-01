@@ -130,6 +130,10 @@ pub fn handle_space_leader(key: &KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('i') => vec![EditorCommand::ToggleInlayHints],
         // Space r - rename symbol
         KeyCode::Char('r') => vec![EditorCommand::RenameSymbol],
+        // Space s - document symbols
+        KeyCode::Char('s') => vec![EditorCommand::ShowDocumentSymbols],
+        // Space S - workspace symbols
+        KeyCode::Char('S') => vec![EditorCommand::ShowWorkspaceSymbols],
         _ => vec![],
     }
 }

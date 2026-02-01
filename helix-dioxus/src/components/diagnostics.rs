@@ -120,6 +120,12 @@ pub fn first_diagnostic_for_line(
 
 /// Get all diagnostics for a line (for underlines).
 /// Returns all diagnostics on the given line.
-pub fn diagnostics_for_line(diagnostics: &[DiagnosticSnapshot], line: usize) -> Vec<&DiagnosticSnapshot> {
-    diagnostics.iter().filter(|diag| diag.line == line).collect()
+pub fn diagnostics_for_line(
+    diagnostics: &[DiagnosticSnapshot],
+    line: usize,
+) -> Vec<&DiagnosticSnapshot> {
+    diagnostics
+        .iter()
+        .filter(|diag| diag.line == line)
+        .collect()
 }

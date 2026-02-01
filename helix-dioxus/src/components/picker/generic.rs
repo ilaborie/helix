@@ -47,6 +47,8 @@ pub fn GenericPicker(
         PickerMode::DirectoryBrowser => "Open File",
         PickerMode::FilesRecursive => "Find Files",
         PickerMode::Buffers => "Switch Buffer",
+        PickerMode::DocumentSymbols => "Document Symbols",
+        PickerMode::WorkspaceSymbols => "Workspace Symbols",
     };
 
     rsx! {

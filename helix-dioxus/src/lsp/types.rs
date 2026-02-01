@@ -30,7 +30,6 @@ impl DiagnosticSeverity {
             Self::Hint => "#56b6c2",    // Cyan
         }
     }
-
 }
 
 impl From<helix_core::diagnostic::Severity> for DiagnosticSeverity {
@@ -361,6 +360,89 @@ pub struct LspServerSnapshot {
     pub progress_message: Option<String>,
 }
 
+/// Symbol kind for picker display.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SymbolKind {
+    #[default]
+    File,
+    Module,
+    Namespace,
+    Package,
+    Class,
+    Method,
+    Property,
+    Field,
+    Constructor,
+    Enum,
+    Interface,
+    Function,
+    Variable,
+    Constant,
+    String,
+    Number,
+    Boolean,
+    Array,
+    Object,
+    Key,
+    Null,
+    EnumMember,
+    Struct,
+    Event,
+    Operator,
+    TypeParameter,
+}
+
+impl From<helix_lsp::lsp::SymbolKind> for SymbolKind {
+    fn from(kind: helix_lsp::lsp::SymbolKind) -> Self {
+        match kind {
+            k if k == helix_lsp::lsp::SymbolKind::FILE => Self::File,
+            k if k == helix_lsp::lsp::SymbolKind::MODULE => Self::Module,
+            k if k == helix_lsp::lsp::SymbolKind::NAMESPACE => Self::Namespace,
+            k if k == helix_lsp::lsp::SymbolKind::PACKAGE => Self::Package,
+            k if k == helix_lsp::lsp::SymbolKind::CLASS => Self::Class,
+            k if k == helix_lsp::lsp::SymbolKind::METHOD => Self::Method,
+            k if k == helix_lsp::lsp::SymbolKind::PROPERTY => Self::Property,
+            k if k == helix_lsp::lsp::SymbolKind::FIELD => Self::Field,
+            k if k == helix_lsp::lsp::SymbolKind::CONSTRUCTOR => Self::Constructor,
+            k if k == helix_lsp::lsp::SymbolKind::ENUM => Self::Enum,
+            k if k == helix_lsp::lsp::SymbolKind::INTERFACE => Self::Interface,
+            k if k == helix_lsp::lsp::SymbolKind::FUNCTION => Self::Function,
+            k if k == helix_lsp::lsp::SymbolKind::VARIABLE => Self::Variable,
+            k if k == helix_lsp::lsp::SymbolKind::CONSTANT => Self::Constant,
+            k if k == helix_lsp::lsp::SymbolKind::STRING => Self::String,
+            k if k == helix_lsp::lsp::SymbolKind::NUMBER => Self::Number,
+            k if k == helix_lsp::lsp::SymbolKind::BOOLEAN => Self::Boolean,
+            k if k == helix_lsp::lsp::SymbolKind::ARRAY => Self::Array,
+            k if k == helix_lsp::lsp::SymbolKind::OBJECT => Self::Object,
+            k if k == helix_lsp::lsp::SymbolKind::KEY => Self::Key,
+            k if k == helix_lsp::lsp::SymbolKind::NULL => Self::Null,
+            k if k == helix_lsp::lsp::SymbolKind::ENUM_MEMBER => Self::EnumMember,
+            k if k == helix_lsp::lsp::SymbolKind::STRUCT => Self::Struct,
+            k if k == helix_lsp::lsp::SymbolKind::EVENT => Self::Event,
+            k if k == helix_lsp::lsp::SymbolKind::OPERATOR => Self::Operator,
+            k if k == helix_lsp::lsp::SymbolKind::TYPE_PARAMETER => Self::TypeParameter,
+            _ => Self::File,
+        }
+    }
+}
+
+/// Symbol snapshot for UI rendering.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SymbolSnapshot {
+    /// The symbol name.
+    pub name: String,
+    /// The kind of symbol.
+    pub kind: SymbolKind,
+    /// Container name (e.g., parent class/module).
+    pub container_name: Option<String>,
+    /// File path (for workspace symbols).
+    pub path: Option<PathBuf>,
+    /// Line number (1-indexed).
+    pub line: usize,
+    /// Column number (1-indexed).
+    pub column: usize,
+}
+
 /// Response types from async LSP operations.
 #[derive(Debug, Clone)]
 pub enum LspResponse {
@@ -393,6 +475,10 @@ pub enum LspResponse {
         offset_encoding: helix_lsp::OffsetEncoding,
         new_name: String,
     },
+    /// Document symbols received.
+    DocumentSymbols(Vec<SymbolSnapshot>),
+    /// Workspace symbols received.
+    WorkspaceSymbols(Vec<SymbolSnapshot>),
     /// Error from LSP operation.
     Error(String),
 }

@@ -875,6 +875,54 @@ let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
 
 ---
 
+## 2026-02-01: Symbol Picker
+
+### Progress
+- Implemented document symbols picker (`Space+s`)
+  - Shows all symbols (functions, classes, structs, etc.) in the current file
+  - Uses LSP `textDocument/documentSymbol` request
+  - Handles both flat and nested DocumentSymbol responses
+- Implemented workspace symbols picker (`Space+S`)
+  - Shows symbols across all files in the workspace
+  - Uses LSP `workspace/symbol` request
+  - Opens file and navigates to symbol on selection
+- Reuses existing `GenericPicker` infrastructure
+  - Added `PickerMode::DocumentSymbols` and `PickerMode::WorkspaceSymbols`
+  - Fuzzy filtering with match highlighting
+  - Keyboard navigation (arrows, Enter, Esc)
+
+### Symbol Icons
+- Added Lucide icons for symbol types:
+  - Function: `SquareFunction` (blue)
+  - Method: `Code` (blue)
+  - Class: `Blocks` (yellow)
+  - Struct: `Braces` (yellow)
+  - Enum: `Layers` (yellow)
+  - Interface: `Component` (yellow)
+  - Variable: `Variable` (red)
+  - Constant: `Hash` (orange)
+  - Field: `Code` (red)
+  - Module: `Package` (purple)
+
+### Files Created/Modified
+- `src/lsp/types.rs` - Added `SymbolKind`, `SymbolSnapshot`, `LspResponse` variants
+- `src/lsp/conversions.rs` - Added `convert_document_symbols()`, `convert_workspace_symbols()`
+- `src/lsp/mod.rs` - Exported new types and functions
+- `src/state/types.rs` - Extended `PickerIcon`, `PickerMode`, `EditorCommand`
+- `src/state/mod.rs` - Added `symbols` field, trigger methods, command/response handling
+- `src/operations/picker_ops.rs` - Added `goto_line_column()`, symbol picker confirm handling
+- `src/keybindings/normal.rs` - Added `Space+s` and `Space+S` bindings
+- `src/components/picker/item.rs` - Added symbol icons and colors
+- `src/components/picker/generic.rs` - Added picker titles for symbol modes
+
+### Technical Notes
+- Symbol navigation uses 1-indexed line/column from LSP, converted to 0-indexed for editor
+- Workspace symbols open the target file before navigating
+- Symbols are stored in `EditorContext.symbols` and converted to `PickerItem`s for display
+- `SymbolKind` maps LSP symbol kinds to `PickerIcon` variants for appropriate icons
+
+---
+
 ## Planned Enhancements
 
 ### Helix Commands & Modes
@@ -938,8 +986,8 @@ let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
 - [ ] Preview pane (file content preview)
 
 ### Additional Pickers
-- [ ] Symbol picker (document symbols via LSP)
-- [ ] Workspace symbol picker (project-wide symbols)
+- [x] Symbol picker (document symbols via LSP)
+- [x] Workspace symbol picker (project-wide symbols)
 - [ ] Global search picker (ripgrep integration)
 - [ ] Diagnostics picker (jump to errors/warnings)
 - [ ] References picker (LSP references)

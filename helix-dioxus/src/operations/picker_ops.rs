@@ -5,6 +5,35 @@ use std::path::PathBuf;
 use crate::operations::BufferOps;
 use crate::state::{EditorContext, PickerIcon, PickerItem, PickerMode};
 
+impl EditorContext {
+    /// Navigate to a specific line and column in the current document.
+    pub(crate) fn goto_line_column(&mut self, line: usize, column: usize) {
+        let view_id = self.editor.tree.focus;
+        let view = self.editor.tree.get(view_id);
+        let doc_id = view.doc;
+
+        let Some(doc) = self.editor.document_mut(doc_id) else {
+            return;
+        };
+
+        let text = doc.text();
+        let total_lines = text.len_lines();
+
+        // Clamp line to valid range
+        let line = line.min(total_lines.saturating_sub(1));
+        let line_start = text.line_to_char(line);
+        let line_len = text.line(line).len_chars();
+
+        // Clamp column to valid range
+        let column = column.min(line_len.saturating_sub(1));
+        let pos = line_start + column;
+
+        // Set cursor position
+        let selection = helix_core::Selection::point(pos);
+        doc.set_selection(view_id, selection);
+    }
+}
+
 /// Extension trait for picker operations.
 pub trait PickerOps {
     fn show_file_picker(&mut self);
@@ -286,6 +315,29 @@ impl PickerOps for EditorContext {
                         self.switch_to_buffer(doc_id);
                     }
                 }
+                PickerMode::DocumentSymbols | PickerMode::WorkspaceSymbols => {
+                    // Extract symbol data before mutable borrow
+                    if let Ok(idx) = selected.id.parse::<usize>() {
+                        let symbol_data = self
+                            .symbols
+                            .get(idx)
+                            .map(|sym| (sym.path.clone(), sym.line, sym.column));
+
+                        if let Some((path, line, column)) = symbol_data {
+                            // For workspace symbols, open the file first
+                            if self.picker_mode == PickerMode::WorkspaceSymbols {
+                                if let Some(ref path) = path {
+                                    self.open_file(path);
+                                }
+                            }
+
+                            // Navigate to symbol position
+                            let line = line.saturating_sub(1);
+                            let column = column.saturating_sub(1);
+                            self.goto_line_column(line, column);
+                        }
+                    }
+                }
             }
         }
 
@@ -295,6 +347,7 @@ impl PickerOps for EditorContext {
         self.picker_selected = 0;
         self.picker_mode = PickerMode::default();
         self.picker_current_path = None;
+        self.symbols.clear();
     }
 }
 

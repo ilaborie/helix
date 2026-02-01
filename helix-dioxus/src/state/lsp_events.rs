@@ -182,7 +182,11 @@ impl LspEventOps for EditorContext {
 
         match work {
             lsp::WorkDoneProgress::Begin(begin) => {
-                log::info!("LSP progress begin: {} (server {:?})", begin.title, server_id);
+                log::info!(
+                    "LSP progress begin: {} (server {:?})",
+                    begin.title,
+                    server_id
+                );
                 self.lsp_progress.begin(server_id, token, begin);
             }
             lsp::WorkDoneProgress::Report(report) => {

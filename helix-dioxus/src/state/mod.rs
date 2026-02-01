@@ -29,11 +29,12 @@ use helix_lsp::lsp;
 use helix_view::document::Mode;
 
 use crate::lsp::{
-    convert_code_actions, convert_completion_response, convert_goto_response, convert_hover,
-    convert_inlay_hints, convert_references_response, convert_signature_help,
-    CompletionItemSnapshot, DiagnosticSeverity, DiagnosticSnapshot, HoverSnapshot,
-    InlayHintSnapshot, LocationSnapshot, LspResponse, LspServerSnapshot, LspServerStatus,
-    SignatureHelpSnapshot, StoredCodeAction,
+    convert_code_actions, convert_completion_response, convert_document_symbols,
+    convert_goto_response, convert_hover, convert_inlay_hints, convert_references_response,
+    convert_signature_help, convert_workspace_symbols, CompletionItemSnapshot, DiagnosticSeverity,
+    DiagnosticSnapshot, HoverSnapshot, InlayHintSnapshot, LocationSnapshot, LspResponse,
+    LspServerSnapshot, LspServerStatus, SignatureHelpSnapshot, StoredCodeAction, SymbolKind,
+    SymbolSnapshot,
 };
 use crate::operations::{
     BufferOps, CliOps, ClipboardOps, EditingOps, LspOps, MovementOps, PickerOps, SearchOps,
@@ -111,6 +112,10 @@ pub struct EditorContext {
     pub(crate) location_selected: usize,
     /// Location picker title.
     pub(crate) location_picker_title: String,
+
+    // Symbol picker state - pub(crate) for operations access
+    /// Symbols for symbol picker.
+    pub(crate) symbols: Vec<SymbolSnapshot>,
 
     // LSP dialog state - pub(crate) for operations access
     /// Whether the LSP dialog is visible.
@@ -239,6 +244,8 @@ impl EditorContext {
             locations: Vec::new(),
             location_selected: 0,
             location_picker_title: String::new(),
+            // Symbol picker state
+            symbols: Vec::new(),
             // LSP dialog state
             lsp_dialog_visible: false,
             lsp_server_selected: 0,
@@ -616,6 +623,14 @@ impl EditorContext {
                 self.refresh_inlay_hints();
             }
 
+            // LSP - Symbol Picker
+            EditorCommand::ShowDocumentSymbols => {
+                self.show_document_symbols();
+            }
+            EditorCommand::ShowWorkspaceSymbols => {
+                self.show_workspace_symbols();
+            }
+
             // LSP - Signature Help
             EditorCommand::TriggerSignatureHelp => {
                 self.trigger_signature_help();
@@ -809,6 +824,14 @@ impl EditorContext {
                     );
                 }
             }
+            LspResponse::DocumentSymbols(symbols) => {
+                self.symbols = symbols;
+                self.populate_symbol_picker_items();
+            }
+            LspResponse::WorkspaceSymbols(symbols) => {
+                self.symbols = symbols;
+                self.populate_symbol_picker_items();
+            }
             LspResponse::Error(msg) => {
                 log::error!("LSP error: {}", msg);
             }
@@ -872,24 +895,22 @@ impl EditorContext {
                 };
 
                 // Get progress message if available
-                let progress_message = self
-                    .lsp_progress
-                    .progress_map(client.id())
-                    .and_then(|tokens| {
-                        // Get the most recent progress with a message
-                        tokens.values().find_map(|status| {
-                            status.progress().and_then(|p| match p {
-                                WorkDoneProgress::Begin(begin) => {
-                                    Some(begin.title.clone())
-                                }
-                                WorkDoneProgress::Report(report) => {
-                                    // Prefer message over title if available
-                                    report.message.clone()
-                                }
-                                WorkDoneProgress::End(_) => None,
+                let progress_message =
+                    self.lsp_progress
+                        .progress_map(client.id())
+                        .and_then(|tokens| {
+                            // Get the most recent progress with a message
+                            tokens.values().find_map(|status| {
+                                status.progress().and_then(|p| match p {
+                                    WorkDoneProgress::Begin(begin) => Some(begin.title.clone()),
+                                    WorkDoneProgress::Report(report) => {
+                                        // Prefer message over title if available
+                                        report.message.clone()
+                                    }
+                                    WorkDoneProgress::End(_) => None,
+                                })
                             })
-                        })
-                    });
+                        });
 
                 // Get supported languages from client capabilities
                 // Note: helix-lsp doesn't expose this directly, so we track it differently
@@ -971,10 +992,7 @@ impl EditorContext {
             .documents()
             .filter_map(|doc| {
                 doc.language_config().and_then(|config| {
-                    let uses_this_server = config
-                        .language_servers
-                        .iter()
-                        .any(|ls| ls.name == name);
+                    let uses_this_server = config.language_servers.iter().any(|ls| ls.name == name);
                     if uses_this_server {
                         Some(doc.id())
                     } else {
@@ -2177,7 +2195,10 @@ impl EditorContext {
         let doc_id = view.doc;
 
         let Some(doc) = self.editor.document(doc_id) else {
-            self.show_notification("No document for rename".to_string(), NotificationSeverity::Error);
+            self.show_notification(
+                "No document for rename".to_string(),
+                NotificationSeverity::Error,
+            );
             return;
         };
 
@@ -2402,6 +2423,192 @@ impl EditorContext {
                 }
             }
         });
+    }
+
+    /// Show the document symbols picker.
+    fn show_document_symbols(&mut self) {
+        let view_id = self.editor.tree.focus;
+        let view = self.editor.tree.get(view_id);
+        let doc_id = view.doc;
+
+        // Extract needed data before mutable borrow
+        let future = {
+            let Some(doc) = self.editor.document(doc_id) else {
+                log::warn!("No document for document symbols");
+                return;
+            };
+
+            // Get language server with document symbols support
+            let ls = match doc
+                .language_servers_with_feature(LanguageServerFeature::DocumentSymbols)
+                .next()
+            {
+                Some(ls) => ls,
+                None => {
+                    log::info!("No language server supports document symbols");
+                    return;
+                }
+            };
+
+            let doc_id_lsp = doc.identifier();
+            ls.document_symbols(doc_id_lsp)
+        };
+
+        let Some(future) = future else {
+            log::warn!("Failed to create document symbols request");
+            return;
+        };
+
+        // Set up picker state
+        self.picker_mode = PickerMode::DocumentSymbols;
+        self.picker_visible = true;
+        self.picker_filter.clear();
+        self.picker_selected = 0;
+        self.picker_items.clear();
+        self.symbols.clear();
+        self.picker_current_path = None;
+
+        let tx = self.command_tx.clone();
+        tokio::spawn(async move {
+            match future.await {
+                Ok(Some(response)) => {
+                    let symbols = convert_document_symbols(response);
+                    log::info!("Received {} document symbols", symbols.len());
+                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::DocumentSymbols(
+                        symbols,
+                    )));
+                }
+                Ok(None) => {
+                    log::info!("No document symbols available");
+                }
+                Err(e) => {
+                    log::error!("Document symbols request failed: {}", e);
+                }
+            }
+        });
+    }
+
+    /// Show the workspace symbols picker.
+    fn show_workspace_symbols(&mut self) {
+        let view_id = self.editor.tree.focus;
+        let view = self.editor.tree.get(view_id);
+        let doc_id = view.doc;
+
+        // Extract language server ID before mutable borrow
+        let language_server_id = {
+            let Some(doc) = self.editor.document(doc_id) else {
+                log::warn!("No document for workspace symbols");
+                return;
+            };
+
+            // Get language server with workspace symbols support
+            let ls = match doc
+                .language_servers_with_feature(LanguageServerFeature::WorkspaceSymbols)
+                .next()
+            {
+                Some(ls) => ls,
+                None => {
+                    log::info!("No language server supports workspace symbols");
+                    return;
+                }
+            };
+
+            ls.id()
+        };
+
+        // Set up picker state - initially empty, will populate on filter input
+        self.picker_mode = PickerMode::WorkspaceSymbols;
+        self.picker_visible = true;
+        self.picker_filter.clear();
+        self.picker_selected = 0;
+        self.picker_items.clear();
+        self.symbols.clear();
+        self.picker_current_path = None;
+
+        // Trigger initial workspace symbols search with empty query
+        self.trigger_workspace_symbols_search(language_server_id, String::new());
+    }
+
+    /// Trigger a workspace symbols search with the given query.
+    fn trigger_workspace_symbols_search(
+        &self,
+        language_server_id: helix_lsp::LanguageServerId,
+        query: String,
+    ) {
+        let Some(ls) = self.editor.language_server_by_id(language_server_id) else {
+            return;
+        };
+
+        let Some(future) = ls.workspace_symbols(query) else {
+            log::warn!("Failed to create workspace symbols request");
+            return;
+        };
+
+        let tx = self.command_tx.clone();
+        tokio::spawn(async move {
+            match future.await {
+                Ok(Some(response)) => {
+                    let symbols = convert_workspace_symbols(response);
+                    log::info!("Received {} workspace symbols", symbols.len());
+                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::WorkspaceSymbols(
+                        symbols,
+                    )));
+                }
+                Ok(None) => {
+                    log::info!("No workspace symbols available");
+                }
+                Err(e) => {
+                    log::error!("Workspace symbols request failed: {}", e);
+                }
+            }
+        });
+    }
+
+    /// Populate picker items from symbols.
+    fn populate_symbol_picker_items(&mut self) {
+        self.picker_items = self
+            .symbols
+            .iter()
+            .enumerate()
+            .map(|(idx, sym)| {
+                let icon = symbol_kind_to_picker_icon(sym.kind);
+                let secondary = match (&sym.container_name, &sym.path) {
+                    (Some(container), Some(path)) => {
+                        Some(format!("{} · {}", container, path.display()))
+                    }
+                    (Some(container), None) => Some(container.clone()),
+                    (None, Some(path)) => Some(format!("{}", path.display())),
+                    (None, None) => Some(format!("Line {}", sym.line)),
+                };
+
+                PickerItem {
+                    id: idx.to_string(),
+                    display: sym.name.clone(),
+                    icon,
+                    match_indices: vec![],
+                    secondary,
+                }
+            })
+            .collect();
+    }
+}
+
+/// Convert SymbolKind to PickerIcon.
+fn symbol_kind_to_picker_icon(kind: SymbolKind) -> PickerIcon {
+    match kind {
+        SymbolKind::Function => PickerIcon::SymbolFunction,
+        SymbolKind::Method | SymbolKind::Constructor => PickerIcon::SymbolMethod,
+        SymbolKind::Class => PickerIcon::SymbolClass,
+        SymbolKind::Struct => PickerIcon::SymbolStruct,
+        SymbolKind::Enum | SymbolKind::EnumMember => PickerIcon::SymbolEnum,
+        SymbolKind::Interface => PickerIcon::SymbolInterface,
+        SymbolKind::Variable => PickerIcon::SymbolVariable,
+        SymbolKind::Constant => PickerIcon::SymbolConstant,
+        SymbolKind::Field | SymbolKind::Property => PickerIcon::SymbolField,
+        SymbolKind::Module | SymbolKind::Namespace | SymbolKind::Package => {
+            PickerIcon::SymbolModule
+        }
+        _ => PickerIcon::SymbolOther,
     }
 }
 

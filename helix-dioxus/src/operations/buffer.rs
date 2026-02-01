@@ -5,8 +5,7 @@ use std::path::PathBuf;
 use helix_view::DocumentId;
 
 use crate::state::{
-    BufferInfo, ConfirmationAction, ConfirmationDialogSnapshot, EditorContext,
-    NotificationSeverity,
+    BufferInfo, ConfirmationAction, ConfirmationDialogSnapshot, EditorContext, NotificationSeverity,
 };
 
 /// Extension trait for buffer management operations.
@@ -211,10 +210,7 @@ impl BufferOps for EditorContext {
             }
             Err(e) => {
                 log::error!("Save failed: {}", e);
-                self.show_notification(
-                    format!("Save failed: {}", e),
-                    NotificationSeverity::Error,
-                );
+                self.show_notification(format!("Save failed: {}", e), NotificationSeverity::Error);
             }
         }
     }
