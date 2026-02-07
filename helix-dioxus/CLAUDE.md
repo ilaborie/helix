@@ -333,7 +333,7 @@ cargo clippy -p helix-dioxus --bins
 - [x] ~~Consider splitting picker into `FilePicker`, `BufferPicker` components~~ Split into picker/ folder
 - [ ] Add integration tests for key operations
 - [x] ~~Named registers (`"a`–`"z`) — register selection before yank/paste (e.g., `"ay`, `"ap`)~~ Full register support with `"` prefix key, named/special registers, black hole `_`, statusline indicator
-- [ ] Register picker (`:reg` command) — picker-style overlay showing all populated registers
+- [x] ~~Register picker (`:reg` command) — picker-style overlay showing all populated registers~~ GenericPicker with register browsing, confirm sets selected register
 
 ### UI Improvements (RustRover-inspired)
 - [x] Severity-colored lightbulb indicator - change color based on diagnostic severity (red/yellow/blue/cyan)
@@ -349,6 +349,7 @@ cargo clippy -p helix-dioxus --bins
 - [ ] Investigate rust-analyzer diagnostic line reporting - diagnostics may be reported on the line where parsing fails rather than where the actual error is (e.g., unterminated string reports on the next line). Consider requesting upstream fix or mapping diagnostic positions back to the originating code
 
 ### Recently Completed
+- [x] Register picker — `:reg`/`:registers` command opens GenericPicker showing all registers, populated first, confirm sets `editor.selected_register` for next yank/paste
 - [x] Named registers — `"` prefix key for register selection (`"ay`, `"ap`, `"_d`), `take_register()` helper, black hole register `_`, statusline `reg=` indicator, help bar hints, select mode `p` fix (`ReplaceWithYanked`)
 - [x] Core tutor commands batch — 21 commands: `;` (collapse selection), `,` (keep primary), `Alt-.` (repeat motion), `c` (change), `e`/`W`/`E`/`B` (word motions), `I` (insert line start), `r` (replace char), `R` (replace with yank), `J` (join), `~`/`` ` ``/`Alt+`` ` (case ops), `mm` (match bracket), `mi`/`ma` (select inside/around), `ms`/`md`/`mr` (surround)
 - [x] Register indicators in help bar — `+` (clipboard), `*` (selection), `/` (search) with active/inactive highlighting, click-to-open dialog with content view and Clear button

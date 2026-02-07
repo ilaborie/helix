@@ -140,6 +140,11 @@ impl CliOps for EditorContext {
                 self.print_working_directory();
             }
 
+            // Registers
+            "reg" | "registers" => {
+                self.show_register_picker();
+            }
+
             // History navigation
             "earlier" => {
                 let steps = args.and_then(|a| a.parse().ok()).unwrap_or(1);

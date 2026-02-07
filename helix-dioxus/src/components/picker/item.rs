@@ -45,8 +45,8 @@ pub fn PickerItemRow(
         // Search result
         PickerIcon::SearchResult => "#98c379", // Green
         // Location icons
-        PickerIcon::Reference => "#61afef",  // Blue
-        PickerIcon::Definition => "#c678dd", // Purple
+        PickerIcon::Reference => "#61afef", // Blue
+        PickerIcon::Definition | PickerIcon::Register => "#c678dd", // Purple
         // Default colors
         PickerIcon::File | PickerIcon::Buffer => "#abb2bf", // Default gray
     };
@@ -106,6 +106,7 @@ pub fn PickerItemRow(
                     PickerIcon::SearchResult => rsx! { TextSearch { size: 16, color: icon_color } },
                     PickerIcon::Reference => rsx! { Link2 { size: 16, color: icon_color } },
                     PickerIcon::Definition => rsx! { FileCode { size: 16, color: icon_color } },
+                    PickerIcon::Register => rsx! { FileText { size: 16, color: icon_color } },
                 }}
             }
 

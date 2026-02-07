@@ -51,6 +51,8 @@ pub enum PickerIcon {
     // Location icons
     Reference,
     Definition,
+    // Register icon
+    Register,
 }
 
 /// Generic picker item with match highlighting.
@@ -77,6 +79,7 @@ pub enum PickerMode {
     GlobalSearch,
     References,
     Definitions,
+    Registers,
 }
 
 /// Minimal diagnostic info for scrollbar markers.

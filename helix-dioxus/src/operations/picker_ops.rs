@@ -395,6 +395,16 @@ impl PickerOps for EditorContext {
                         }
                     }
                 }
+                PickerMode::Registers => {
+                    // Extract register char from the id (single char)
+                    if let Some(ch) = selected.id.chars().next() {
+                        self.editor.selected_register = Some(ch);
+                        self.show_notification(
+                            format!("Register '{}' selected", ch),
+                            crate::state::NotificationSeverity::Info,
+                        );
+                    }
+                }
                 PickerMode::References | PickerMode::Definitions => {
                     // Extract location data before mutable borrow
                     if let Ok(idx) = selected.id.parse::<usize>() {
@@ -435,6 +445,64 @@ impl PickerOps for EditorContext {
 }
 
 impl EditorContext {
+    /// Show the register picker with all populated registers.
+    pub(crate) fn show_register_picker(&mut self) {
+        self.command_mode = false;
+        self.command_input.clear();
+
+        let mut items: Vec<PickerItem> = self
+            .editor
+            .registers
+            .iter_preview()
+            .map(|(name, preview)| {
+                // For clipboard registers, try to read actual content
+                let content = if matches!(name, '+' | '*') {
+                    self.editor
+                        .registers
+                        .first(name, &self.editor)
+                        .map(|cow| {
+                            let s = cow.as_ref();
+                            // Take first line, truncated
+                            s.lines().next().unwrap_or(s).to_string()
+                        })
+                        .unwrap_or_else(|| preview.to_string())
+                } else {
+                    preview.to_string()
+                };
+
+                PickerItem {
+                    id: name.to_string(),
+                    display: format!("\"{name}\""),
+                    icon: PickerIcon::Register,
+                    match_indices: vec![],
+                    secondary: Some(content),
+                }
+            })
+            .collect();
+
+        // Sort: populated registers first, then by name
+        items.sort_by(|a, b| {
+            let a_populated = a.secondary.as_ref().is_some_and(|s| !s.starts_with('<'));
+            let b_populated = b.secondary.as_ref().is_some_and(|s| !s.starts_with('<'));
+            match (a_populated, b_populated) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => {
+                    let a_name = a.id.chars().next().unwrap_or('\0');
+                    let b_name = b.id.chars().next().unwrap_or('\0');
+                    a_name.cmp(&b_name)
+                }
+            }
+        });
+
+        self.picker_items = items;
+        self.picker_filter.clear();
+        self.picker_selected = 0;
+        self.picker_visible = true;
+        self.picker_mode = PickerMode::Registers;
+        self.picker_current_path = None;
+    }
+
     /// Show the global search picker.
     pub(crate) fn show_global_search_picker(&mut self) {
         // Cancel any existing search
