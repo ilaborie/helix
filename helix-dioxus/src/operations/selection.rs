@@ -1,6 +1,5 @@
 //! Selection operations for the editor.
 
-use helix_view::document::Mode;
 use helix_view::{DocumentId, ViewId};
 
 use crate::state::{Direction, EditorContext};
@@ -114,25 +113,33 @@ impl SelectionOps for EditorContext {
         doc.set_selection(view_id, new_selection);
     }
 
-    /// Select the entire current line (helix `x` command).
+    /// Extend selection to line bounds (helix `x` command).
+    ///
+    /// Snaps anchor to its line start and head to its line end (start of next line).
+    /// On subsequent presses, since head is already at the start of the next line,
+    /// it extends to include that line too — growing the selection one line at a time.
     fn select_line(&mut self, doc_id: DocumentId, view_id: ViewId) {
         let doc = self.editor.document_mut(doc_id).expect("doc exists");
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
 
         let new_selection = selection.transform(|range| {
-            let line = text.char_to_line(range.head);
-            let line_start = text.line_to_char(line);
-            let line_end = if line + 1 < text.len_lines() {
-                text.line_to_char(line + 1)
+            // Snap anchor to the start of its line
+            let anchor_line = text.char_to_line(range.anchor);
+            let new_anchor = text.line_to_char(anchor_line);
+
+            // Snap head to the end of its line (= start of next line)
+            let head_line = text.char_to_line(range.head);
+            let new_head = if head_line + 1 < text.len_lines() {
+                text.line_to_char(head_line + 1)
             } else {
                 text.len_chars()
             };
-            helix_core::Range::new(line_start, line_end)
+
+            helix_core::Range::new(new_anchor, new_head)
         });
 
         doc.set_selection(view_id, new_selection);
-        self.editor.mode = Mode::Select;
     }
 
     /// Extend selection to include the next line (helix `X` command).
@@ -152,5 +159,58 @@ impl SelectionOps for EditorContext {
         });
 
         doc.set_selection(view_id, new_selection);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::test_helpers::{assert_state, doc_view, test_context};
+
+    use super::*;
+
+    #[test]
+    fn select_line_first_press_selects_current_line() {
+        let mut ctx = test_context("#[|h]#ello\nworld\nfoo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.select_line(doc_id, view_id);
+        assert_state(&ctx, "#[hello\n|]#world\nfoo\n");
+    }
+
+    #[test]
+    fn select_line_extends_downward() {
+        let mut ctx = test_context("#[|h]#ello\nworld\nfoo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.select_line(doc_id, view_id);
+        assert_state(&ctx, "#[hello\n|]#world\nfoo\n");
+        ctx.select_line(doc_id, view_id);
+        assert_state(&ctx, "#[hello\nworld\n|]#foo\n");
+        ctx.select_line(doc_id, view_id);
+        assert_state(&ctx, "#[hello\nworld\nfoo\n|]#");
+    }
+
+    #[test]
+    fn select_line_from_middle_of_line() {
+        let mut ctx = test_context("hel#[|l]#o\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.select_line(doc_id, view_id);
+        assert_state(&ctx, "#[hello\n|]#world\n");
+    }
+
+    #[test]
+    fn select_line_on_last_line_without_trailing_newline() {
+        let mut ctx = test_context("hello\n#[|w]#orld");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.select_line(doc_id, view_id);
+        assert_state(&ctx, "hello\n#[world|]#");
+    }
+
+    #[test]
+    fn extend_line_grows_from_current() {
+        let mut ctx = test_context("#[|h]#ello\nworld\nfoo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.extend_line(doc_id, view_id);
+        assert_state(&ctx, "#[hello\n|]#world\nfoo\n");
+        ctx.extend_line(doc_id, view_id);
+        assert_state(&ctx, "#[hello\nworld\n|]#foo\n");
     }
 }

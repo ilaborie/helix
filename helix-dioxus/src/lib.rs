@@ -30,6 +30,9 @@ mod operations;
 mod state;
 pub mod tracing;
 
+#[cfg(test)]
+mod test_helpers;
+
 use args::StartupAction;
 use state::{EditorCommand, EditorContext, EditorSnapshot};
 

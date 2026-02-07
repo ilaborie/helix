@@ -46,6 +46,44 @@ pub trait SearchOps {
     fn do_search(&mut self, doc_id: DocumentId, view_id: ViewId, pattern: &str, backwards: bool);
 }
 
+impl EditorContext {
+    /// Search for the word under the cursor and jump to the next occurrence.
+    pub(crate) fn search_word_under_cursor(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let word = {
+            let doc = self.editor.document(doc_id).expect("doc exists");
+            let text = doc.text().slice(..);
+            let selection = doc.selection(view_id);
+            let cursor = selection.primary().cursor(text);
+
+            // Find word boundaries around cursor
+            let mut start = cursor;
+            while start > 0 && is_word_char(text.char(start.saturating_sub(1))) {
+                start -= 1;
+            }
+            let len = text.len_chars();
+            let mut end = cursor;
+            while end < len && is_word_char(text.char(end)) {
+                end += 1;
+            }
+
+            if start == end {
+                return;
+            }
+
+            text.slice(start..end).to_string()
+        };
+
+        self.last_search = word.clone();
+        self.search_backwards = false;
+        self.do_search(doc_id, view_id, &word, false);
+    }
+}
+
+/// Check if a character is part of a word (alphanumeric or underscore).
+fn is_word_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
+}
+
 impl SearchOps for EditorContext {
     /// Execute search with current search input.
     fn execute_search(&mut self, doc_id: DocumentId, view_id: ViewId) {
@@ -137,5 +175,35 @@ impl SearchOps for EditorContext {
         } else {
             log::info!("Pattern '{}' not found", pattern);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::test_helpers::{assert_state, doc_view, test_context};
+
+    #[test]
+    fn search_word_under_cursor_finds_next_occurrence() {
+        let mut ctx = test_context("#[|f]#oo bar foo baz\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.search_word_under_cursor(doc_id, view_id);
+        assert_state(&ctx, "foo bar #[foo|]# baz\n");
+    }
+
+    #[test]
+    fn search_word_under_cursor_wraps_around() {
+        let mut ctx = test_context("foo bar #[|f]#oo baz\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.search_word_under_cursor(doc_id, view_id);
+        // Should wrap around to the first "foo"
+        assert_state(&ctx, "#[foo|]# bar foo baz\n");
+    }
+
+    #[test]
+    fn search_word_under_cursor_sets_last_search() {
+        let mut ctx = test_context("#[|h]#ello world hello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.search_word_under_cursor(doc_id, view_id);
+        assert_eq!(ctx.last_search, "hello");
     }
 }
