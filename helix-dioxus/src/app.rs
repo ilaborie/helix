@@ -292,7 +292,11 @@ pub fn App() -> Element {
             }
 
             // Keybinding help bar (above statusline)
-            KeybindingHelpBar { mode: snapshot.mode.clone(), pending: *pending_key.read() }
+            KeybindingHelpBar {
+                mode: snapshot.mode.clone(),
+                pending: *pending_key.read(),
+                register_snapshots: snapshot.registers.clone(),
+            }
 
             // Status line at the bottom
             StatusLine {

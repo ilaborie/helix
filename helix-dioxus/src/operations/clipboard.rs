@@ -22,14 +22,27 @@ impl ClipboardOps for EditorContext {
 
         // Extract selected text
         let selected_text: String = text.slice(primary.from()..primary.to()).into();
-        self.clipboard = selected_text;
+        self.clipboard.clone_from(&selected_text);
+
+        // Write to system clipboard via '+' register
+        if let Err(e) = self.editor.registers.write('+', vec![selected_text]) {
+            log::warn!("Failed to write to system clipboard: {e}");
+        }
 
         log::info!("Yanked {} characters", self.clipboard.len());
     }
 
     /// Paste from clipboard.
     fn paste(&mut self, doc_id: DocumentId, view_id: ViewId, before: bool) {
-        if self.clipboard.is_empty() {
+        // Read from system clipboard via '+' register, fall back to internal
+        let clipboard_text = self
+            .editor
+            .registers
+            .read('+', &self.editor)
+            .and_then(|mut values| values.next().map(|v| v.into_owned()))
+            .unwrap_or_else(|| self.clipboard.clone());
+
+        if clipboard_text.is_empty() {
             return;
         }
 
@@ -44,7 +57,7 @@ impl ClipboardOps for EditorContext {
         };
 
         // Check if clipboard ends with newline (line-wise paste)
-        let is_linewise = self.clipboard.ends_with('\n');
+        let is_linewise = clipboard_text.ends_with('\n');
 
         let insert_pos = if is_linewise && !before {
             // For line-wise paste after, move to start of next line
@@ -66,29 +79,33 @@ impl ClipboardOps for EditorContext {
         let transaction = helix_core::Transaction::insert(
             doc.text(),
             &insert_selection,
-            self.clipboard.clone().into(),
+            clipboard_text.clone().into(),
         );
         doc.apply(&transaction, view_id);
 
-        log::info!("Pasted {} characters", self.clipboard.len());
+        log::info!("Pasted {} characters", clipboard_text.len());
     }
 
     /// Delete the current selection.
     fn delete_selection(&mut self, doc_id: DocumentId, view_id: ViewId) {
-        let doc = self.editor.document_mut(doc_id).expect("doc exists");
-        let text = doc.text().slice(..);
-        let selection = doc.selection(view_id).clone();
-        let primary = selection.primary();
+        // Extract selected text and range (immutable borrow)
+        let (selected_text, from, to) = {
+            let doc = self.editor.document(doc_id).expect("doc exists");
+            let text = doc.text().slice(..);
+            let primary = doc.selection(view_id).primary();
+            let selected: String = text.slice(primary.from()..primary.to()).into();
+            (selected, primary.from(), primary.to())
+        };
 
-        // First yank the selection
-        let selected_text: String = text.slice(primary.from()..primary.to()).into();
-        self.clipboard = selected_text;
+        // Yank to internal and system clipboard
+        self.clipboard.clone_from(&selected_text);
+        if let Err(e) = self.editor.registers.write('+', vec![selected_text]) {
+            log::warn!("Failed to write to system clipboard: {e}");
+        }
 
         // Delete the selection
-        let from = primary.from();
-        let to = primary.to();
-
         if from < to {
+            let doc = self.editor.document_mut(doc_id).expect("doc exists");
             let ranges = std::iter::once((from, to));
             let transaction = helix_core::Transaction::delete(doc.text(), ranges);
             doc.apply(&transaction, view_id);

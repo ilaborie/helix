@@ -17,7 +17,7 @@ pub use types::{
     BufferInfo, ConfirmationAction, ConfirmationDialogSnapshot, Direction, EditorCommand,
     EditorSnapshot, GlobalSearchResult, InputDialogKind, InputDialogSnapshot, LineSnapshot,
     NotificationSeverity, NotificationSnapshot, PendingKeySequence, PickerIcon, PickerItem,
-    PickerMode, ScrollbarDiagnostic, TokenSpan,
+    PickerMode, RegisterSnapshot, ScrollbarDiagnostic, TokenSpan,
 };
 
 use std::path::PathBuf;
@@ -876,6 +876,18 @@ impl EditorContext {
             EditorCommand::Later(steps) => {
                 self.later(steps);
             }
+
+            // Register management
+            EditorCommand::ClearRegister(name) => match name {
+                '+' => {
+                    self.clipboard.clear();
+                    let _ = self.editor.registers.write('+', vec![String::new()]);
+                }
+                '/' => {
+                    self.last_search.clear();
+                }
+                _ => {}
+            },
         }
     }
 
@@ -999,6 +1011,36 @@ impl EditorContext {
             .iter()
             .filter(|a| a.snapshot.title.to_lowercase().contains(&filter_lower))
             .collect()
+    }
+
+    /// Collect register snapshots for display in the help bar.
+    fn collect_register_snapshots(&self) -> Vec<RegisterSnapshot> {
+        // Get current selection text for * register
+        let (view, doc) = helix_view::current_ref!(self.editor);
+        let text = doc.text().slice(..);
+        let primary = doc.selection(view.id).primary();
+        let sel_len = primary.to() - primary.from();
+        // Only show selection if it spans more than 1 char (skip default 1-char cursor)
+        let selection_text = if sel_len > 1 {
+            text.slice(primary.from()..primary.to()).to_string()
+        } else {
+            String::new()
+        };
+
+        vec![
+            RegisterSnapshot {
+                name: '+',
+                content: self.clipboard.clone(),
+            },
+            RegisterSnapshot {
+                name: '*',
+                content: selection_text,
+            },
+            RegisterSnapshot {
+                name: '/',
+                content: self.last_search.clone(),
+            },
+        ]
     }
 
     /// Collect snapshots of all language servers.
@@ -1369,6 +1411,7 @@ impl EditorContext {
             // Confirmation dialog state
             confirmation_dialog_visible: self.confirmation_dialog_visible,
             confirmation_dialog: self.confirmation_dialog.clone(),
+            registers: self.collect_register_snapshots(),
             should_quit: self.should_quit,
         }
     }

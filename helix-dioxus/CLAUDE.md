@@ -309,17 +309,19 @@ cargo clippy -p helix-dioxus --bins
 ## Feature Roadmap
 
 ### Planned Enhancements
-- [ ] Keybinding help bar above statusline showing common shortcuts (context-aware per mode)
+- [x] ~~Keybinding help bar above statusline showing common shortcuts (context-aware per mode)~~ Context-aware help bar with register indicators
 - [ ] Command panel as picker-style UI with fuzzy search
 - [x] ~~File-type specific icons in buffer bar~~ Added file-type icons
 - [x] ~~Mouse click support in picker~~ Added picker mouse clicks
 - [x] ~~LSP integration for diagnostics and completions~~ Diagnostics display with gutter icons, error lens, wavy underlines, and status bar counts
 - [ ] Multiple splits/views support
-- [ ] System clipboard integration
+- [x] ~~System clipboard integration~~ Uses `Editor.registers` with `'+'` register for system clipboard
 - [x] ~~Extract theme colors to `theme.rs` or `colors.rs`~~ Extracted to CSS custom properties in `:root`
 - [ ] Add custom hooks (`use_editor_state`, `use_keybinding`)
 - [x] ~~Consider splitting picker into `FilePicker`, `BufferPicker` components~~ Split into picker/ folder
 - [ ] Add integration tests for key operations
+- [ ] Named registers (`"a`–`"z`) — register selection before yank/paste (e.g., `"ay`, `"ap`)
+- [ ] Register picker (`:reg` command) — picker-style overlay showing all populated registers
 
 ### UI Improvements (RustRover-inspired)
 - [x] Severity-colored lightbulb indicator - change color based on diagnostic severity (red/yellow/blue/cyan)
@@ -327,11 +329,16 @@ cargo clippy -p helix-dioxus --bins
 - [x] Diagnostic scrollbar markers - show diagnostic and search positions on right scrollbar edge
 - [ ] Code actions preview panel - show fix preview before applying (needs LSP resolve)
 - [ ] Dialog search mode setting - user setting to toggle between: (1) current behavior where typing filters directly (arrows for navigation), or (2) vim-style where j/k and arrows navigate, '/' toggles search input focus. Applies to pickers and inline dialogs (code actions, completion, etc.)
+- [ ] Cursor block visibility — cursor is hard to spot against selection/line-highlight backgrounds, especially after `w`/`b` motions that create multi-char selections. Needs more prominent styling or animation
+- [ ] Clipboard register (`+`) visibility in register dialog — register dialog opens but content display needs polish
+- [ ] `*` register — currently shows editor selection text; should instead reflect the search register set by the `*` (search word under cursor) command, or be wired to the system primary selection
 
 ### LSP Improvements
 - [ ] Investigate rust-analyzer diagnostic line reporting - diagnostics may be reported on the line where parsing fails rather than where the actual error is (e.g., unterminated string reports on the next line). Consider requesting upstream fix or mapping diagnostic positions back to the originating code
 
 ### Recently Completed
+- [x] Register indicators in help bar — `+` (clipboard), `*` (selection), `/` (search) with active/inactive highlighting, click-to-open dialog with content view and Clear button
+- [x] Keybinding help bar — context-aware shortcut hints above statusline per mode and pending key sequence
 - [x] Find/till character motions (f/F/t/T) with repeat (;) and reverse (,)
 - [x] Indent/unindent (>/<), search word under cursor (*)
 - [x] Insert mode: Ctrl+w (delete word backward), Ctrl+u (delete to line start)

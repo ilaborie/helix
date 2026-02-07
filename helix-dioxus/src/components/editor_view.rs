@@ -181,8 +181,8 @@ fn Line(
 
     let cursor_style = match mode.as_str() {
         "INSERT" => "background-color: transparent; box-shadow: -2px 0 0 0 #61afef;",
-        "SELECT" => "background-color: #c678dd; color: #282c34;",
-        _ => "background-color: #61afef; color: #282c34;", // Normal mode
+        "SELECT" => "background-color: #c678dd; color: #282c34; position: relative; z-index: 1; box-shadow: 0 0 0 2px #c678dd;",
+        _ => "background-color: #61afef; color: #282c34; position: relative; z-index: 1; box-shadow: 0 0 0 2px #61afef;",
     };
 
     // Determine line class:

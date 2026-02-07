@@ -198,6 +198,10 @@ pub struct EditorSnapshot {
     /// Confirmation dialog content.
     pub confirmation_dialog: ConfirmationDialogSnapshot,
 
+    // Register state
+    /// Register snapshots for display in the help bar.
+    pub registers: Vec<RegisterSnapshot>,
+
     // Application state
     pub should_quit: bool,
 }
@@ -550,6 +554,10 @@ pub enum EditorCommand {
     Earlier(usize),
     /// Redo to a later state (multiple steps).
     Later(usize),
+
+    // Register management
+    /// Clear a register by name ('+' = clipboard, '/' = search).
+    ClearRegister(char),
 }
 
 /// Direction for cursor movement.
@@ -665,6 +673,15 @@ pub enum PendingKeySequence {
     TillForward,
     /// Waiting for character after 'T' (till backward)
     TillBackward,
+}
+
+/// A single register's state for display in the help bar.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct RegisterSnapshot {
+    /// Register name character (e.g., '+', '*', '/').
+    pub name: char,
+    /// Register content (empty if register has no value).
+    pub content: String,
 }
 
 /// A single global search result for the picker.
