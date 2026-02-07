@@ -179,10 +179,10 @@ fn Line(
     let display_content = line.content.trim_end_matches('\n');
     let chars: Vec<char> = display_content.chars().collect();
 
-    let cursor_style = match mode.as_str() {
-        "INSERT" => "background-color: transparent; box-shadow: -2px 0 0 0 #61afef;",
-        "SELECT" => "background-color: #c678dd; color: #282c34; position: relative; z-index: 1; box-shadow: 0 0 0 2px #c678dd;",
-        _ => "background-color: #61afef; color: #282c34; position: relative; z-index: 1; box-shadow: 0 0 0 2px #61afef;",
+    let cursor_class = match mode.as_str() {
+        "INSERT" => "cursor-line-insert",
+        "SELECT" => "cursor-block-select",
+        _ => "cursor-block-normal",
     };
 
     // Determine line class:
@@ -213,7 +213,7 @@ fn Line(
     rsx! {
         div {
             class: "{line_class}",
-            {render_styled_content(&chars, &line.tokens, cursor_pos, cursor_style, line.selection_range)}
+            {render_styled_content(&chars, &line.tokens, cursor_pos, cursor_class, line.selection_range)}
             // Diagnostic underlines (wavy lines under errors/warnings)
             for (idx, diag) in diagnostics.iter().enumerate() {
                 DiagnosticUnderline {
@@ -238,7 +238,7 @@ fn render_styled_content(
     chars: &[char],
     tokens: &[TokenSpan],
     cursor_pos: Option<usize>,
-    cursor_style: &str,
+    cursor_class: &str,
     selection_range: Option<(usize, usize)>,
 ) -> Element {
     // Build a list of spans to render
@@ -327,14 +327,11 @@ fn render_styled_content(
         if let Some(token) = active_token {
             style.push_str(&format!("color: {};", token.color));
         }
-        if is_cursor {
-            style.push_str(cursor_style);
-        }
 
-        // Add the span (with id for cursor to enable scrollIntoView)
+        // Add the span (with id and class for cursor to enable scrollIntoView + CSS animation)
         if is_cursor {
             spans.push(
-                rsx! { span { key: "{pos}", id: "editor-cursor", style: "{style}", "{text}" } },
+                rsx! { span { key: "{pos}", id: "editor-cursor", class: "{cursor_class}", style: "{style}", "{text}" } },
             );
         } else if style.is_empty() {
             spans.push(rsx! { span { key: "{pos}", "{text}" } });
@@ -353,10 +350,9 @@ fn render_styled_content(
     // Handle cursor at end of line
     if let Some(cursor) = cursor_pos {
         if cursor >= len {
-            let style = cursor_style.to_string();
             let cursor_key = "cursor-end";
             spans.push(
-                rsx! { span { key: "{cursor_key}", id: "editor-cursor", style: "{style}", " " } },
+                rsx! { span { key: "{cursor_key}", id: "editor-cursor", class: "{cursor_class}", " " } },
             );
         }
     }

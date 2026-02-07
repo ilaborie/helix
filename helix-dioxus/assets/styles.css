@@ -23,6 +23,11 @@
     /* Font */
     --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, Monaco, monospace;
 
+    /* Cursor */
+    --cursor-normal: #61afef;
+    --cursor-select: #c678dd;
+    --cursor-fg: #282c34;
+
     /* Z-index layers */
     --z-dropdown: 100;
     --z-overlay: 200;
@@ -132,6 +137,32 @@ body {
     background-color: var(--bg-selection);
     min-height: 1.5em;
     position: relative;
+}
+
+/* ───── Cursor ───── */
+@keyframes cursor-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+.cursor-block-normal {
+    background-color: var(--cursor-normal);
+    color: var(--cursor-fg);
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 0 0 1px var(--cursor-normal);
+    animation: cursor-blink 1s step-end infinite;
+}
+.cursor-block-select {
+    background-color: var(--cursor-select);
+    color: var(--cursor-fg);
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 0 0 1px var(--cursor-select);
+    animation: cursor-blink 1s step-end infinite;
+}
+.cursor-line-insert {
+    box-shadow: -2px 0 0 0 var(--cursor-normal);
+    animation: cursor-blink 1s step-end infinite;
 }
 
 /* ───── Buffer bar ───── */
