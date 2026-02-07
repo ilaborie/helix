@@ -203,7 +203,7 @@ impl PickerOps for EditorContext {
                 let is_current = id == current_doc_id;
 
                 PickerItem {
-                    id: format!("{:?}", id),
+                    id: format!("{}", id),
                     display: name,
                     icon: if is_modified {
                         PickerIcon::BufferModified

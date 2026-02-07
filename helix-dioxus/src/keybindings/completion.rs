@@ -42,27 +42,29 @@ pub fn handle_completion_mode(key: &KeyEvent) -> Vec<EditorCommand> {
 
 /// Handle keyboard input when location picker is visible.
 pub fn handle_location_picker_mode(key: &KeyEvent) -> Vec<EditorCommand> {
-    match key.code {
-        KeyCode::Esc => vec![EditorCommand::LocationCancel],
-        KeyCode::Up | KeyCode::Char('k') => vec![EditorCommand::LocationUp],
-        KeyCode::Down | KeyCode::Char('j') => vec![EditorCommand::LocationDown],
-        KeyCode::Enter => vec![EditorCommand::LocationConfirm],
-        _ => vec![],
-    }
+    super::handle_list_navigation_keys(
+        key.code,
+        EditorCommand::LocationCancel,
+        EditorCommand::LocationUp,
+        EditorCommand::LocationDown,
+        EditorCommand::LocationConfirm,
+        None,
+        None,
+    )
 }
 
 /// Handle keyboard input when code actions menu is visible.
 /// Navigation uses arrow keys only; typing adds to the filter.
 pub fn handle_code_actions_mode(key: &KeyEvent) -> Vec<EditorCommand> {
-    match key.code {
-        KeyCode::Esc => vec![EditorCommand::CodeActionCancel],
-        KeyCode::Up => vec![EditorCommand::CodeActionUp],
-        KeyCode::Down => vec![EditorCommand::CodeActionDown],
-        KeyCode::Enter => vec![EditorCommand::CodeActionConfirm],
-        KeyCode::Backspace => vec![EditorCommand::CodeActionFilterBackspace],
-        KeyCode::Char(ch) => vec![EditorCommand::CodeActionFilterChar(ch)],
-        _ => vec![],
-    }
+    super::handle_list_navigation_keys(
+        key.code,
+        EditorCommand::CodeActionCancel,
+        EditorCommand::CodeActionUp,
+        EditorCommand::CodeActionDown,
+        EditorCommand::CodeActionConfirm,
+        Some(EditorCommand::CodeActionFilterBackspace),
+        Some(&EditorCommand::CodeActionFilterChar),
+    )
 }
 
 /// Handle keyboard input when LSP dialog is visible.

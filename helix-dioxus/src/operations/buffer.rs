@@ -2,11 +2,30 @@
 
 use std::path::{Path, PathBuf};
 
+use helix_view::document::DocumentSavedEvent;
 use helix_view::DocumentId;
 
 use crate::state::{
     BufferInfo, ConfirmationAction, ConfirmationDialogSnapshot, EditorContext, NotificationSeverity,
 };
+
+/// Build a `ConfirmationDialogSnapshot` with common structure.
+fn build_confirmation_dialog(
+    title: &str,
+    message: &str,
+    confirm_label: &str,
+    deny_label: Option<&str>,
+    action: ConfirmationAction,
+) -> ConfirmationDialogSnapshot {
+    ConfirmationDialogSnapshot {
+        title: title.to_string(),
+        message: message.to_string(),
+        confirm_label: confirm_label.to_string(),
+        deny_label: deny_label.map(str::to_string),
+        cancel_label: "Cancel".to_string(),
+        action,
+    }
+}
 
 /// Extension trait for buffer management operations.
 pub trait BufferOps {
@@ -53,16 +72,15 @@ impl BufferOps for EditorContext {
                 if doc.is_modified() {
                     log::warn!("Buffer has unsaved changes - showing confirmation dialog");
                     let file_name = doc.display_name().to_string();
-                    self.confirmation_dialog = ConfirmationDialogSnapshot {
-                        title: "Close Buffer".to_string(),
-                        message: format!(
+                    self.confirmation_dialog = build_confirmation_dialog(
+                        "Close Buffer",
+                        &format!(
                             "\"{file_name}\" has unsaved changes. Do you want to close it anyway?"
                         ),
-                        confirm_label: "Close".to_string(),
-                        deny_label: None, // Only confirm/cancel for close buffer
-                        cancel_label: "Cancel".to_string(),
-                        action: ConfirmationAction::CloseBuffer,
-                    };
+                        "Close",
+                        None,
+                        ConfirmationAction::CloseBuffer,
+                    );
                     self.confirmation_dialog_visible = true;
                     return;
                 }
@@ -148,54 +166,10 @@ impl BufferOps for EditorContext {
         let view_id = self.editor.tree.focus;
         let doc_id = self.editor.tree.get(view_id).doc;
 
-        // Flush pending changes to history before saving
-        // This ensures is_modified() returns false after save
-        {
-            let view = self.editor.tree.get_mut(view_id);
-            let doc = match self.editor.documents.get_mut(&doc_id) {
-                Some(doc) => doc,
-                None => {
-                    log::error!("No document to save");
-                    self.show_notification(
-                        "No document to save".to_string(),
-                        NotificationSeverity::Error,
-                    );
-                    return;
-                }
-            };
-            doc.append_changes_to_history(view);
-        }
-
-        // Get the save future in a separate scope to release the borrow
-        let save_future = {
-            let doc = match self.editor.document_mut(doc_id) {
-                Some(doc) => doc,
-                None => {
-                    log::error!("No document to save");
-                    return;
-                }
-            };
-
-            match doc.save::<PathBuf>(path, force) {
-                Ok(future) => future,
-                Err(e) => {
-                    log::error!("Failed to initiate save: {}", e);
-                    self.show_notification(
-                        format!("Failed to save: {}", e),
-                        NotificationSeverity::Error,
-                    );
-                    return;
-                }
-            }
-        };
-
-        // Block on the async save operation
-        match futures::executor::block_on(save_future) {
+        match self.save_doc_inner(doc_id, path, force) {
             Ok(event) => {
-                log::info!("Saved to {:?}", event.path);
-                // Update the document's path and modified state
+                // Set the document path (important for Save As on scratch buffers)
                 if let Some(doc) = self.editor.document_mut(doc_id) {
-                    // Set the document path (important for Save As on scratch buffers)
                     doc.set_path(Some(&event.path));
                     doc.set_last_saved_revision(event.revision, event.save_time);
                 }
@@ -221,7 +195,6 @@ impl BufferOps for EditorContext {
                 );
             }
             Err(e) => {
-                log::error!("Save failed: {}", e);
                 self.show_notification(format!("Save failed: {}", e), NotificationSeverity::Error);
             }
         }
@@ -243,14 +216,13 @@ impl BufferOps for EditorContext {
         if doc.is_modified() && !force {
             log::warn!("Unsaved changes - showing confirmation dialog");
             let file_name = doc.display_name().to_string();
-            self.confirmation_dialog = ConfirmationDialogSnapshot {
-                title: "Unsaved Changes".to_string(),
-                message: format!("\"{file_name}\" has unsaved changes. What would you like to do?"),
-                confirm_label: "Save & Quit".to_string(),
-                deny_label: Some("Don't Save".to_string()),
-                cancel_label: "Cancel".to_string(),
-                action: ConfirmationAction::SaveAndQuit,
-            };
+            self.confirmation_dialog = build_confirmation_dialog(
+                "Unsaved Changes",
+                &format!("\"{file_name}\" has unsaved changes. What would you like to do?"),
+                "Save & Quit",
+                Some("Don't Save"),
+                ConfirmationAction::SaveAndQuit,
+            );
             self.confirmation_dialog_visible = true;
             return;
         }
@@ -259,15 +231,13 @@ impl BufferOps for EditorContext {
         log::info!("Quit command executed");
     }
 
-    /// Parse a document ID from its debug string representation.
+    /// Parse a document ID from its display string and find the matching document.
     fn parse_document_id(&self, id_str: &str) -> Option<DocumentId> {
-        // The id is stored directly, we need to find the matching document
-        for (&doc_id, _) in &self.editor.documents {
-            if format!("{:?}", doc_id) == id_str {
-                return Some(doc_id);
-            }
-        }
-        None
+        self.editor
+            .documents
+            .keys()
+            .find(|&&doc_id| doc_id.to_string() == id_str)
+            .copied()
     }
 
     /// Create a new scratch buffer.
@@ -312,7 +282,7 @@ impl BufferOps for EditorContext {
         let doc_ids: Vec<_> = self
             .editor
             .documents()
-            .filter(|d| d.is_modified())
+            .filter(|d| d.is_modified() && d.path().is_some())
             .map(|d| d.id())
             .collect();
 
@@ -328,50 +298,16 @@ impl BufferOps for EditorContext {
         let mut error_count = 0;
 
         for doc_id in doc_ids {
-            // We need to save each document individually
-            // First flush pending changes to history
-            let view_id = self.editor.tree.focus;
-            {
-                let view = self.editor.tree.get_mut(view_id);
-                if let Some(doc) = self.editor.documents.get_mut(&doc_id) {
-                    doc.append_changes_to_history(view);
+            match self.save_doc_inner(doc_id, None, false) {
+                Ok(event) => {
+                    if let Some(doc) = self.editor.document_mut(doc_id) {
+                        doc.set_last_saved_revision(event.revision, event.save_time);
+                    }
+                    saved_count += 1;
                 }
-            }
-
-            // Get the save future
-            let save_future = {
-                if let Some(doc) = self.editor.document_mut(doc_id) {
-                    if doc.path().is_none() {
-                        // Skip scratch buffers
-                        continue;
-                    }
-                    match doc.save::<PathBuf>(None, false) {
-                        Ok(future) => Some(future),
-                        Err(e) => {
-                            log::error!("Failed to initiate save for {:?}: {}", doc_id, e);
-                            error_count += 1;
-                            None
-                        }
-                    }
-                } else {
-                    None
-                }
-            };
-
-            // Block on the async save operation
-            if let Some(future) = save_future {
-                match futures::executor::block_on(future) {
-                    Ok(event) => {
-                        log::info!("Saved {:?}", event.path);
-                        if let Some(doc) = self.editor.document_mut(doc_id) {
-                            doc.set_last_saved_revision(event.revision, event.save_time);
-                        }
-                        saved_count += 1;
-                    }
-                    Err(e) => {
-                        log::error!("Save failed: {}", e);
-                        error_count += 1;
-                    }
+                Err(e) => {
+                    log::error!("Save failed for {:?}: {}", doc_id, e);
+                    error_count += 1;
                 }
             }
         }
@@ -397,17 +333,16 @@ impl BufferOps for EditorContext {
             if has_unsaved {
                 // Count modified buffers
                 let modified_count = self.editor.documents().filter(|d| d.is_modified()).count();
-                self.confirmation_dialog = ConfirmationDialogSnapshot {
-                    title: "Unsaved Changes".to_string(),
-                    message: format!(
+                self.confirmation_dialog = build_confirmation_dialog(
+                    "Unsaved Changes",
+                    &format!(
                         "{} buffer(s) have unsaved changes. What would you like to do?",
                         modified_count
                     ),
-                    confirm_label: "Save All & Quit".to_string(),
-                    deny_label: Some("Discard All".to_string()),
-                    cancel_label: "Cancel".to_string(),
-                    action: ConfirmationAction::SaveAndQuit,
-                };
+                    "Save All & Quit",
+                    Some("Discard All"),
+                    ConfirmationAction::SaveAndQuit,
+                );
                 self.confirmation_dialog_visible = true;
                 return;
             }
@@ -499,5 +434,38 @@ impl BufferOps for EditorContext {
                 );
             }
         }
+    }
+}
+
+impl EditorContext {
+    /// Flush history and save a single document. Returns the save event on success.
+    fn save_doc_inner(
+        &mut self,
+        doc_id: DocumentId,
+        path: Option<PathBuf>,
+        force: bool,
+    ) -> anyhow::Result<DocumentSavedEvent> {
+        // Flush pending changes to history
+        let view_id = self.editor.tree.focus;
+        {
+            let view = self.editor.tree.get_mut(view_id);
+            if let Some(doc) = self.editor.documents.get_mut(&doc_id) {
+                doc.append_changes_to_history(view);
+            }
+        }
+
+        // Initiate save
+        let save_future = {
+            let doc = self
+                .editor
+                .document_mut(doc_id)
+                .ok_or_else(|| anyhow::anyhow!("No document to save"))?;
+            doc.save::<PathBuf>(path, force)?
+        };
+
+        // Block on the async save
+        let event = futures::executor::block_on(save_future)?;
+        log::info!("Saved to {:?}", event.path);
+        Ok(event)
     }
 }

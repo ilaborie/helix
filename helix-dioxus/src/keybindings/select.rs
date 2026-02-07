@@ -2,6 +2,7 @@
 
 use helix_view::input::{KeyCode, KeyEvent, KeyModifiers};
 
+use super::handle_extend_keys;
 use crate::state::EditorCommand;
 
 /// Handle keyboard input in Select mode.
@@ -14,15 +15,14 @@ pub fn handle_select_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         };
     }
 
+    // Direction keys - extends selection (hjkl + arrows)
+    if let Some(cmds) = handle_extend_keys(key.code) {
+        return cmds;
+    }
+
     match key.code {
         // Exit select mode
         KeyCode::Esc => vec![EditorCommand::ExitSelectMode],
-
-        // Character movement - extends selection
-        KeyCode::Char('h') | KeyCode::Left => vec![EditorCommand::ExtendLeft],
-        KeyCode::Char('l') | KeyCode::Right => vec![EditorCommand::ExtendRight],
-        KeyCode::Char('j') | KeyCode::Down => vec![EditorCommand::ExtendDown],
-        KeyCode::Char('k') | KeyCode::Up => vec![EditorCommand::ExtendUp],
 
         // Word movement - extends selection
         KeyCode::Char('w') => vec![EditorCommand::ExtendWordForward],

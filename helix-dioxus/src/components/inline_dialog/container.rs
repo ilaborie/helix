@@ -36,15 +36,6 @@ impl Default for DialogConstraints {
 }
 
 impl DialogConstraints {
-    /// Create constraints with no limits.
-    pub fn none() -> Self {
-        Self {
-            min_width: None,
-            max_width: None,
-            max_height: None,
-        }
-    }
-
     /// Generate CSS style string for the constraints.
     fn to_style(&self) -> String {
         let mut parts = Vec::new();
@@ -191,8 +182,12 @@ mod tests {
     }
 
     #[test]
-    fn test_constraints_none() {
-        let constraints = DialogConstraints::none();
+    fn test_constraints_no_limits() {
+        let constraints = DialogConstraints {
+            min_width: None,
+            max_width: None,
+            max_height: None,
+        };
         assert!(constraints.to_style().is_empty());
     }
 }

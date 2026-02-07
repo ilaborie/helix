@@ -17,6 +17,7 @@ use crate::keybindings::{
     handle_picker_mode, handle_search_mode, handle_select_mode, handle_space_leader,
     translate_key_event,
 };
+use crate::state::EditorCommand;
 use crate::AppState;
 
 /// Tracks pending key sequence state.
@@ -32,6 +33,14 @@ enum PendingKeySequence {
     BracketPrev,
     /// Waiting for second key after Space
     SpaceLeader,
+    /// Waiting for character after 'f' (find forward)
+    FindForward,
+    /// Waiting for character after 'F' (find backward)
+    FindBackward,
+    /// Waiting for character after 't' (till forward)
+    TillForward,
+    /// Waiting for character after 'T' (till backward)
+    TillBackward,
 }
 
 /// Main application component.
@@ -151,6 +160,38 @@ pub fn App() -> Element {
                         pending_key.set(PendingKeySequence::None);
                         handle_space_leader(&key_event)
                     }
+                    PendingKeySequence::FindForward => {
+                        pending_key.set(PendingKeySequence::None);
+                        if let KeyCode::Char(ch) = key_event.code {
+                            vec![EditorCommand::FindCharForward(ch)]
+                        } else {
+                            vec![]
+                        }
+                    }
+                    PendingKeySequence::FindBackward => {
+                        pending_key.set(PendingKeySequence::None);
+                        if let KeyCode::Char(ch) = key_event.code {
+                            vec![EditorCommand::FindCharBackward(ch)]
+                        } else {
+                            vec![]
+                        }
+                    }
+                    PendingKeySequence::TillForward => {
+                        pending_key.set(PendingKeySequence::None);
+                        if let KeyCode::Char(ch) = key_event.code {
+                            vec![EditorCommand::TillCharForward(ch)]
+                        } else {
+                            vec![]
+                        }
+                    }
+                    PendingKeySequence::TillBackward => {
+                        pending_key.set(PendingKeySequence::None);
+                        if let KeyCode::Char(ch) = key_event.code {
+                            vec![EditorCommand::TillCharBackward(ch)]
+                        } else {
+                            vec![]
+                        }
+                    }
                     PendingKeySequence::None => {
                         // Check for Ctrl modifier first - Ctrl+key combos go to normal mode handler
                         if key_event.modifiers.contains(KeyModifiers::CONTROL) {
@@ -176,6 +217,22 @@ pub fn App() -> Element {
                                 }
                                 KeyCode::Char(' ') => {
                                     pending_key.set(PendingKeySequence::SpaceLeader);
+                                    vec![]
+                                }
+                                KeyCode::Char('f') if snapshot.mode == "NORMAL" => {
+                                    pending_key.set(PendingKeySequence::FindForward);
+                                    vec![]
+                                }
+                                KeyCode::Char('F') if snapshot.mode == "NORMAL" => {
+                                    pending_key.set(PendingKeySequence::FindBackward);
+                                    vec![]
+                                }
+                                KeyCode::Char('t') if snapshot.mode == "NORMAL" => {
+                                    pending_key.set(PendingKeySequence::TillForward);
+                                    vec![]
+                                }
+                                KeyCode::Char('T') if snapshot.mode == "NORMAL" => {
+                                    pending_key.set(PendingKeySequence::TillBackward);
                                     vec![]
                                 }
                                 _ => {

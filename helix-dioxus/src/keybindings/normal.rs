@@ -2,6 +2,7 @@
 
 use helix_view::input::{KeyCode, KeyEvent, KeyModifiers};
 
+use super::handle_move_keys;
 use crate::state::EditorCommand;
 
 /// Handle keyboard input in Normal mode.
@@ -19,13 +20,12 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         };
     }
 
-    match key.code {
-        // Movement
-        KeyCode::Char('h') | KeyCode::Left => vec![EditorCommand::MoveLeft],
-        KeyCode::Char('l') | KeyCode::Right => vec![EditorCommand::MoveRight],
-        KeyCode::Char('j') | KeyCode::Down => vec![EditorCommand::MoveDown],
-        KeyCode::Char('k') | KeyCode::Up => vec![EditorCommand::MoveUp],
+    // Direction keys (hjkl + arrows)
+    if let Some(cmds) = handle_move_keys(key.code) {
+        return cmds;
+    }
 
+    match key.code {
         // Word movement
         KeyCode::Char('w') => vec![EditorCommand::MoveWordForward],
         KeyCode::Char('b') => vec![EditorCommand::MoveWordBackward],
@@ -72,6 +72,17 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
 
         // Command mode
         KeyCode::Char(':') => vec![EditorCommand::EnterCommandMode],
+
+        // Find/till repeat
+        KeyCode::Char(';') => vec![EditorCommand::RepeatLastFind],
+        KeyCode::Char(',') => vec![EditorCommand::ReverseLastFind],
+
+        // Indent/unindent
+        KeyCode::Char('>') => vec![EditorCommand::IndentLine],
+        KeyCode::Char('<') => vec![EditorCommand::UnindentLine],
+
+        // Search word under cursor
+        KeyCode::Char('*') => vec![EditorCommand::SearchWordUnderCursor],
 
         // LSP - Hover (K for documentation like vim)
         KeyCode::Char('K') => vec![EditorCommand::TriggerHover],

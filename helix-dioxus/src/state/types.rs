@@ -248,6 +248,20 @@ pub enum EditorCommand {
     ScrollToLine(usize),
     /// Move cursor to a specific line (0-indexed) and scroll view.
     GoToLine(usize),
+    /// Find character forward on current line.
+    FindCharForward(char),
+    /// Find character backward on current line.
+    FindCharBackward(char),
+    /// Move till (before) character forward on current line.
+    TillCharForward(char),
+    /// Move till (after) character backward on current line.
+    TillCharBackward(char),
+    /// Repeat last find/till motion.
+    RepeatLastFind,
+    /// Reverse repeat last find/till motion.
+    ReverseLastFind,
+    /// Search for the word under the cursor.
+    SearchWordUnderCursor,
 
     // Mode changes
     EnterInsertMode,
@@ -263,8 +277,16 @@ pub enum EditorCommand {
     InsertNewline,
     DeleteCharBackward,
     DeleteCharForward,
+    /// Delete word backward (Ctrl+w in insert mode).
+    DeleteWordBackward,
+    /// Delete to line start (Ctrl+u in insert mode).
+    DeleteToLineStart,
     OpenLineBelow,
     OpenLineAbove,
+    /// Indent the current line or selection.
+    IndentLine,
+    /// Unindent the current line or selection.
+    UnindentLine,
 
     // History
     Undo,
@@ -324,6 +346,14 @@ pub enum EditorCommand {
     PickerBackspace,
     /// Click on a picker item to select and confirm it.
     PickerConfirmItem(usize),
+    /// Jump to first picker item.
+    PickerFirst,
+    /// Jump to last picker item.
+    PickerLast,
+    /// Page up in picker (jump by 10 items).
+    PickerPageUp,
+    /// Page down in picker (jump by 10 items).
+    PickerPageDown,
 
     // Buffer navigation
     BufferBarScrollLeft,

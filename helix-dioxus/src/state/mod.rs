@@ -58,6 +58,8 @@ pub struct EditorContext {
     pub(crate) search_backwards: bool,
     pub(crate) search_input: String,
     pub(crate) last_search: String,
+    /// Last find/till character motion: (char, forward, till).
+    pub(crate) last_find_char: Option<(char, bool, bool)>,
 
     // Picker state - pub(crate) for operations access
     pub(crate) picker_visible: bool,
@@ -229,6 +231,7 @@ impl EditorContext {
             search_backwards: false,
             search_input: String::new(),
             last_search: String::new(),
+            last_find_char: None,
             picker_visible: false,
             picker_items: Vec::new(),
             picker_filter: String::new(),
@@ -332,6 +335,31 @@ impl EditorContext {
             EditorCommand::GoToLine(line) => {
                 self.goto_line_column(line, 0);
             }
+            EditorCommand::FindCharForward(ch) => {
+                self.find_char(doc_id, view_id, ch, true, false);
+            }
+            EditorCommand::FindCharBackward(ch) => {
+                self.find_char(doc_id, view_id, ch, false, false);
+            }
+            EditorCommand::TillCharForward(ch) => {
+                self.find_char(doc_id, view_id, ch, true, true);
+            }
+            EditorCommand::TillCharBackward(ch) => {
+                self.find_char(doc_id, view_id, ch, false, true);
+            }
+            EditorCommand::RepeatLastFind => {
+                if let Some((ch, forward, till)) = self.last_find_char {
+                    self.find_char(doc_id, view_id, ch, forward, till);
+                }
+            }
+            EditorCommand::ReverseLastFind => {
+                if let Some((ch, forward, till)) = self.last_find_char {
+                    self.find_char(doc_id, view_id, ch, !forward, till);
+                }
+            }
+            EditorCommand::SearchWordUnderCursor => {
+                self.search_word_under_cursor(doc_id, view_id);
+            }
 
             // Mode changes
             EditorCommand::EnterInsertMode => self.editor.mode = Mode::Insert,
@@ -353,6 +381,10 @@ impl EditorContext {
             EditorCommand::InsertNewline => self.insert_newline(doc_id, view_id),
             EditorCommand::DeleteCharBackward => self.delete_char_backward(doc_id, view_id),
             EditorCommand::DeleteCharForward => self.delete_char_forward(doc_id, view_id),
+            EditorCommand::DeleteWordBackward => self.delete_word_backward(doc_id, view_id),
+            EditorCommand::DeleteToLineStart => self.delete_to_line_start(doc_id, view_id),
+            EditorCommand::IndentLine => self.indent_line(doc_id, view_id),
+            EditorCommand::UnindentLine => self.unindent_line(doc_id, view_id),
             EditorCommand::OpenLineBelow => {
                 self.open_line_below(doc_id, view_id);
                 self.editor.mode = Mode::Insert;
@@ -477,6 +509,23 @@ impl EditorContext {
             EditorCommand::PickerBackspace => {
                 self.picker_filter.pop();
                 self.picker_selected = 0;
+            }
+            EditorCommand::PickerFirst => {
+                self.picker_selected = 0;
+            }
+            EditorCommand::PickerLast => {
+                let filtered_len = self.filtered_picker_items().len();
+                if filtered_len > 0 {
+                    self.picker_selected = filtered_len - 1;
+                }
+            }
+            EditorCommand::PickerPageUp => {
+                self.picker_selected = self.picker_selected.saturating_sub(10);
+            }
+            EditorCommand::PickerPageDown => {
+                let filtered_len = self.filtered_picker_items().len();
+                self.picker_selected =
+                    (self.picker_selected + 10).min(filtered_len.saturating_sub(1));
             }
             EditorCommand::PickerConfirmItem(idx) => {
                 let filtered = self.filtered_picker_items();
@@ -1156,9 +1205,11 @@ impl EditorContext {
         let sel_start = primary_range.from();
         let sel_end = primary_range.to();
 
-        // Only show selection highlighting in Select mode
-        let is_select_mode = self.editor.mode() == Mode::Select;
-        let has_selection = is_select_mode && sel_end > sel_start;
+        // Show selection highlighting when there is a multi-char selection.
+        // In Normal mode, Helix always has a 1-char selection internally,
+        // so we only highlight when the selection spans more than 1 character
+        // (e.g., after `x` to select a line, or in Select mode).
+        let has_selection = sel_end > sel_start + 1;
 
         let is_modified = doc.is_modified();
 

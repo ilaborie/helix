@@ -1,6 +1,38 @@
 /* helix-dioxus main stylesheet */
 
-/* Base styles */
+/* ───── CSS Custom Properties ───── */
+:root {
+    /* Colors */
+    --bg-primary: #282c34;
+    --bg-secondary: #21252b;
+    --bg-highlight: #2c313a;
+    --bg-selection: #3e4451;
+    --bg-deep: #181a1f;
+    --text: #abb2bf;
+    --text-dim: #5c6370;
+    --text-dimmer: #6c7380;
+    --accent: #61afef;
+    --error: #e06c75;
+    --warning: #e5c07b;
+    --info: #61afef;
+    --hint: #56b6c2;
+    --success: #98c379;
+    --purple: #c678dd;
+    --orange: #d19a66;
+
+    /* Font */
+    --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, Monaco, monospace;
+
+    /* Z-index layers */
+    --z-dropdown: 100;
+    --z-overlay: 200;
+    --z-modal: 300;
+    --z-notification: 300;
+    --z-confirmation: 400;
+    --z-tooltip: 9999;
+}
+
+/* ───── Base styles ───── */
 * {
     box-sizing: border-box;
 }
@@ -8,9 +40,9 @@ body {
     margin: 0;
     padding: 0;
     overflow: hidden;
-    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, Monaco, monospace;
-    background-color: #282c34;
-    color: #abb2bf;
+    font-family: var(--font-mono);
+    background-color: var(--bg-primary);
+    color: var(--text);
     user-select: none;
     -webkit-user-select: none;
 }
@@ -21,17 +53,17 @@ body {
     height: 10px;
 }
 ::-webkit-scrollbar-track {
-    background: #21252b;
+    background: var(--bg-secondary);
 }
 ::-webkit-scrollbar-thumb {
-    background: #5c6370;
+    background: var(--text-dim);
     border-radius: 5px;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: #6c7380;
+    background: var(--text-dimmer);
 }
 ::selection {
-    background-color: #3e4451;
+    background-color: var(--bg-selection);
 }
 
 /* Animations */
@@ -40,16 +72,16 @@ body {
     50% { opacity: 0; }
 }
 
-/* App container */
+/* ───── App container ───── */
 .app-container {
     display: flex;
     flex-direction: column;
     height: 100vh;
-    background-color: #282c34;
+    background-color: var(--bg-primary);
     outline: none;
 }
 
-/* Editor view */
+/* ───── Editor view ───── */
 .editor-view {
     display: flex;
     height: 100%;
@@ -62,18 +94,18 @@ body {
 .gutter {
     padding: 8px 12px 8px 8px;
     text-align: right;
-    color: #5c6370;
-    background-color: #21252b;
+    color: var(--text-dim);
+    background-color: var(--bg-secondary);
     user-select: none;
     min-width: 40px;
     overflow: hidden;
 }
 .gutter-line {
-    background-color: #21252b;
+    background-color: var(--bg-secondary);
 }
 .gutter-line-active {
-    color: #abb2bf;
-    background-color: #21252b;
+    color: var(--text);
+    background-color: var(--bg-secondary);
 }
 
 /* Editor content */
@@ -92,22 +124,22 @@ body {
     position: relative;
 }
 .line-cursor {
-    background-color: #2c313a;
+    background-color: var(--bg-highlight);
     min-height: 1.5em;
     position: relative;
 }
 .line-selected {
-    background-color: #3e4451;
+    background-color: var(--bg-selection);
     min-height: 1.5em;
     position: relative;
 }
 
-/* Buffer bar */
+/* ───── Buffer bar ───── */
 .buffer-bar {
     display: flex;
     align-items: center;
-    background-color: #21252b;
-    border-bottom: 1px solid #181a1f;
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--bg-deep);
     height: 32px;
     padding: 0 4px;
     flex-shrink: 0;
@@ -148,7 +180,7 @@ body {
     justify-content: center;
     cursor: pointer;
     border-radius: 3px;
-    color: #5c6370;
+    color: var(--text-dim);
 }
 
 .icon-wrapper {
@@ -158,13 +190,13 @@ body {
     justify-content: center;
 }
 
-/* Status line */
+/* ───── Status line ───── */
 .statusline {
     display: flex;
     align-items: center;
     height: 24px;
-    background-color: #21252b;
-    border-top: 1px solid #181a1f;
+    background-color: var(--bg-secondary);
+    border-top: 1px solid var(--bg-deep);
     font-size: 12px;
     user-select: none;
 }
@@ -179,7 +211,7 @@ body {
 
 .statusline-filename {
     padding: 0 12px;
-    color: #abb2bf;
+    color: var(--text);
 }
 
 .statusline-spacer {
@@ -188,7 +220,7 @@ body {
 
 .statusline-position {
     padding: 0 12px;
-    color: #5c6370;
+    color: var(--text-dim);
 }
 
 .statusline-diagnostics {
@@ -200,7 +232,7 @@ body {
     font-size: 12px;
 }
 
-/* Picker styles */
+/* ───── Picker styles ───── */
 .picker-overlay {
     position: absolute;
     top: 0;
@@ -212,12 +244,12 @@ body {
     justify-content: center;
     align-items: flex-start;
     padding-top: 80px;
-    z-index: 100;
+    z-index: var(--z-dropdown);
 }
 
 .picker-container {
-    background-color: #21252b;
-    border: 1px solid #3e4451;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--bg-selection);
     border-radius: 6px;
     width: 500px;
     max-height: 450px;
@@ -227,11 +259,11 @@ body {
 
 .picker-header {
     padding: 8px 12px 4px 12px;
-    border-bottom: 1px solid #3e4451;
+    border-bottom: 1px solid var(--bg-selection);
 }
 
 .picker-title {
-    color: #abb2bf;
+    color: var(--text);
     font-size: 12px;
     font-weight: 500;
     margin-bottom: 8px;
@@ -240,25 +272,25 @@ body {
 .picker-search {
     display: flex;
     align-items: center;
-    background-color: #282c34;
-    border: 1px solid #3e4451;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--bg-selection);
     border-radius: 4px;
     padding: 6px 8px;
     margin-bottom: 4px;
 }
 
 .picker-search-input {
-    color: #abb2bf;
+    color: var(--text);
     font-size: 14px;
     flex: 1;
 }
 
 .picker-search-placeholder {
-    color: #5c6370;
+    color: var(--text-dim);
 }
 
 .picker-path {
-    color: #5c6370;
+    color: var(--text-dim);
     font-size: 11px;
     margin-bottom: 4px;
     overflow: hidden;
@@ -274,7 +306,7 @@ body {
 }
 
 .picker-help-text {
-    color: #5c6370;
+    color: var(--text-dim);
     font-size: 12px;
 }
 
@@ -285,7 +317,7 @@ body {
 
 .picker-empty {
     padding: 16px;
-    color: #5c6370;
+    color: var(--text-dim);
     text-align: center;
 }
 
@@ -300,11 +332,11 @@ body {
 }
 
 .picker-item-selected {
-    background-color: #3e4451;
+    background-color: var(--bg-selection);
 }
 
 .picker-item-secondary {
-    color: #5c6370;
+    color: var(--text-dim);
     font-size: 11px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -312,23 +344,23 @@ body {
 }
 
 kbd {
-    background-color: #3e4451;
+    background-color: var(--bg-selection);
     border-radius: 3px;
     padding: 2px 5px;
     font-family: inherit;
     font-size: 11px;
 }
 
-/* Prompt styles */
+/* ───── Prompt styles ───── */
 .prompt {
     height: 24px;
-    background-color: #21252b;
-    border-top: 1px solid #181a1f;
+    background-color: var(--bg-secondary);
+    border-top: 1px solid var(--bg-deep);
     padding: 0 8px;
     display: flex;
     align-items: center;
     font-size: 14px;
-    color: #abb2bf;
+    color: var(--text);
 }
 
 .prompt-cursor {
@@ -339,29 +371,28 @@ kbd {
 }
 
 .prompt-cursor-command {
-    background-color: #61afef;
+    background-color: var(--accent);
 }
 
 .prompt-cursor-search {
-    background-color: #e5c07b;
+    background-color: var(--warning);
 }
 
-/* Highlight styles */
+/* ───── Highlight styles ───── */
 .highlight-text {
     font-size: 14px;
 }
 
 .highlight-match {
-    color: #e5c07b;
+    color: var(--warning);
     font-weight: 600;
     font-size: 14px;
 }
 
-/* Unified indicator gutter (breakpoints, diagnostics, code actions) */
-/* Uses absolute positioning to allow multiple overlapping indicators */
+/* ───── Indicator gutter ───── */
 .indicator-gutter {
     padding: 8px 0;
-    background-color: #21252b;
+    background-color: var(--bg-secondary);
     user-select: none;
     width: 18px;
     min-width: 18px;
@@ -371,10 +402,8 @@ kbd {
 .indicator-gutter-line {
     height: 1.5em;
     position: relative;
-    /* The line is a container for absolutely positioned indicators */
 }
 
-/* Indicator (bottom-right corner) - used for diagnostics and code actions lightbulb */
 .indicator-diagnostic {
     position: absolute;
     bottom: 0;
@@ -389,7 +418,6 @@ kbd {
     opacity: 1;
 }
 
-/* Breakpoint indicator (center) - for future use */
 .indicator-breakpoint {
     position: absolute;
     top: 50%;
@@ -398,13 +426,12 @@ kbd {
     z-index: 3;
 }
 
-/* Jumplist number (bottom-left corner) - for future use */
 .indicator-jumplist {
     position: absolute;
     bottom: 0;
     left: 1px;
     font-size: 9px;
-    color: #5c6370;
+    color: var(--text-dim);
     z-index: 1;
 }
 
@@ -414,7 +441,7 @@ kbd {
     justify-content: center;
 }
 
-/* Error Lens (inline diagnostic messages) */
+/* ───── Error Lens ───── */
 .error-lens {
     display: inline-flex;
     align-items: center;
@@ -425,7 +452,7 @@ kbd {
     white-space: nowrap;
 }
 
-/* Diagnostic underlines - using background gradient for wavy effect */
+/* ───── Diagnostic underlines ───── */
 .diagnostic-underline {
     position: absolute;
     bottom: 0;
@@ -435,42 +462,37 @@ kbd {
     background-size: 4px 3px;
 }
 
-/* Error underline (red wavy) */
 .diagnostic-underline-error {
-    background-image: linear-gradient(135deg, transparent 40%, #e06c75 40%, #e06c75 60%, transparent 60%),
-                      linear-gradient(225deg, transparent 40%, #e06c75 40%, #e06c75 60%, transparent 60%);
+    background-image: linear-gradient(135deg, transparent 40%, var(--error) 40%, var(--error) 60%, transparent 60%),
+                      linear-gradient(225deg, transparent 40%, var(--error) 40%, var(--error) 60%, transparent 60%);
 }
 
-/* Warning underline (yellow wavy) */
 .diagnostic-underline-warning {
-    background-image: linear-gradient(135deg, transparent 40%, #e5c07b 40%, #e5c07b 60%, transparent 60%),
-                      linear-gradient(225deg, transparent 40%, #e5c07b 40%, #e5c07b 60%, transparent 60%);
+    background-image: linear-gradient(135deg, transparent 40%, var(--warning) 40%, var(--warning) 60%, transparent 60%),
+                      linear-gradient(225deg, transparent 40%, var(--warning) 40%, var(--warning) 60%, transparent 60%);
 }
 
-/* Info underline (blue wavy) */
 .diagnostic-underline-info {
-    background-image: linear-gradient(135deg, transparent 40%, #61afef 40%, #61afef 60%, transparent 60%),
-                      linear-gradient(225deg, transparent 40%, #61afef 40%, #61afef 60%, transparent 60%);
+    background-image: linear-gradient(135deg, transparent 40%, var(--info) 40%, var(--info) 60%, transparent 60%),
+                      linear-gradient(225deg, transparent 40%, var(--info) 40%, var(--info) 60%, transparent 60%);
 }
 
-/* Hint underline (cyan dotted) */
 .diagnostic-underline-hint {
-    background-image: linear-gradient(135deg, transparent 40%, #56b6c2 40%, #56b6c2 60%, transparent 60%),
-                      linear-gradient(225deg, transparent 40%, #56b6c2 40%, #56b6c2 60%, transparent 60%);
+    background-image: linear-gradient(135deg, transparent 40%, var(--hint) 40%, var(--hint) 60%, transparent 60%),
+                      linear-gradient(225deg, transparent 40%, var(--hint) 40%, var(--hint) 60%, transparent 60%);
 }
 
-/* Generic inline dialog (base styles for cursor-positioned popups) */
+/* ───── Inline dialogs ───── */
 .inline-dialog {
     position: fixed;
-    background-color: #21252b;
-    border: 1px solid #3e4451;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--bg-selection);
     border-radius: 4px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-    z-index: 200;
+    z-index: var(--z-overlay);
     overflow-y: auto;
 }
 
-/* List-based inline dialog */
 .inline-dialog-list {
     padding: 4px 0;
 }
@@ -490,36 +512,26 @@ kbd {
 }
 
 .inline-dialog-item:hover {
-    background-color: #2c313a;
+    background-color: var(--bg-highlight);
 }
 
 .inline-dialog-item-selected {
-    background-color: #3e4451;
+    background-color: var(--bg-selection);
 }
 
 .inline-dialog-empty {
     padding: 12px;
-    color: #5c6370;
+    color: var(--text-dim);
     text-align: center;
     font-size: 13px;
 }
 
-/* Completion popup (extends .inline-dialog) */
-.completion-popup {
-    /* Base styles inherited from .inline-dialog */
-    /* Completion-specific styles below */
-}
-
-/* Completion items use .inline-dialog-item as base */
-.completion-row {
-    /* Additional completion-specific styles go here */
-}
-
+/* ───── Completion popup ───── */
 .completion-item-kind {
     font-size: 10px;
     padding: 2px 4px;
     border-radius: 2px;
-    background-color: #3e4451;
+    background-color: var(--bg-selection);
     min-width: 24px;
     text-align: center;
 }
@@ -532,7 +544,7 @@ kbd {
 }
 
 .completion-item-detail {
-    color: #5c6370;
+    color: var(--text-dim);
     font-size: 12px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -545,76 +557,65 @@ kbd {
     opacity: 0.6;
 }
 
-/* Hover popup (extends .inline-dialog) */
+/* ───── Hover popup ───── */
 .hover-popup {
-    /* Base styles inherited from .inline-dialog */
     padding: 8px 12px;
     font-size: 13px;
     line-height: 1.5;
 }
 
 .hover-popup code {
-    background-color: #282c34;
+    background-color: var(--bg-primary);
     padding: 2px 4px;
     border-radius: 2px;
 }
 
 .hover-popup pre {
-    background-color: #282c34;
+    background-color: var(--bg-primary);
     padding: 8px;
     border-radius: 4px;
     overflow-x: auto;
     margin: 8px 0;
 }
 
-/* Signature help popup (extends .inline-dialog) */
+/* ───── Signature help popup ───── */
 .signature-help-popup {
-    /* Base styles inherited from .inline-dialog */
     padding: 8px 12px;
     font-size: 13px;
 }
 
 .signature-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
 }
 
 .signature-param-active {
-    color: #e5c07b;
+    color: var(--warning);
     font-weight: bold;
 }
 
 .signature-docs {
     margin-top: 8px;
-    color: #5c6370;
+    color: var(--text-dim);
     font-size: 12px;
 }
 
-/* Inlay hints */
+/* ───── Inlay hints ───── */
 .inlay-hint {
-    color: #5c6370;
+    color: var(--text-dim);
     font-style: italic;
     font-size: 12px;
     opacity: 0.7;
 }
 
 .inlay-hint-type {
-    color: #61afef;
+    color: var(--accent);
 }
 
 .inlay-hint-param {
-    color: #d19a66;
+    color: var(--orange);
 }
 
-/* Code actions menu (extends .inline-dialog) */
-.code-actions-menu {
-    /* Base styles inherited from .inline-dialog and .inline-dialog-list */
-}
-
-/* Code action items use .inline-dialog-item as base */
-.code-action-item {
-    /* Additional code-action specific styles go here */
-}
-
+/* ───── Code actions menu ───── */
 .code-action-icon {
     flex-shrink: 0;
     width: 16px;
@@ -632,7 +633,6 @@ kbd {
 
 .code-action-kind {
     font-size: 10px;
-    /* color and border-color set via inline style */
     background-color: transparent;
     border: 1px solid;
     padding: 1px 5px;
@@ -642,7 +642,6 @@ kbd {
     opacity: 0.8;
 }
 
-/* Quickfix actions get a subtle green background */
 .code-action-quickfix {
     background-color: rgba(152, 195, 121, 0.1);
 }
@@ -662,7 +661,7 @@ kbd {
 
 .code-action-empty {
     padding: 12px;
-    color: #5c6370;
+    color: var(--text-dim);
     text-align: center;
     font-size: 13px;
 }
@@ -672,26 +671,26 @@ kbd {
     display: flex;
     align-items: center;
     padding: 6px 8px;
-    border-bottom: 1px solid #3e4451;
+    border-bottom: 1px solid var(--bg-selection);
     gap: 6px;
 }
 
 .code-actions-search-input {
     flex: 1;
-    color: #abb2bf;
+    color: var(--text);
     font-size: 12px;
 }
 
 .code-actions-search-placeholder {
-    color: #5c6370;
+    color: var(--text-dim);
 }
 
 .code-actions-count {
-    color: #5c6370;
+    color: var(--text-dim);
     font-size: 11px;
 }
 
-/* Location picker */
+/* ───── Location picker ───── */
 .location-picker-overlay {
     position: absolute;
     top: 0;
@@ -703,12 +702,12 @@ kbd {
     justify-content: center;
     align-items: flex-start;
     padding-top: 80px;
-    z-index: 100;
+    z-index: var(--z-dropdown);
 }
 
 .location-picker-container {
-    background-color: #21252b;
-    border: 1px solid #3e4451;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--bg-selection);
     border-radius: 6px;
     width: 600px;
     max-height: 450px;
@@ -718,7 +717,7 @@ kbd {
 
 .location-picker-header {
     padding: 12px;
-    border-bottom: 1px solid #3e4451;
+    border-bottom: 1px solid var(--bg-selection);
     font-weight: 500;
 }
 
@@ -730,35 +729,35 @@ kbd {
 .location-item {
     padding: 8px 12px;
     cursor: pointer;
-    border-bottom: 1px solid #2c313a;
+    border-bottom: 1px solid var(--bg-highlight);
 }
 
 .location-item-selected {
-    background-color: #3e4451;
+    background-color: var(--bg-selection);
 }
 
 .location-path {
-    color: #61afef;
+    color: var(--accent);
     font-size: 13px;
 }
 
 .location-position {
-    color: #5c6370;
+    color: var(--text-dim);
     font-size: 11px;
     margin-left: 8px;
 }
 
 .location-preview {
-    color: #abb2bf;
+    color: var(--text);
     font-size: 12px;
     margin-top: 4px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-/* LSP Status in status bar */
+/* ───── LSP Status ───── */
 .statusline-lsp {
     padding: 0 8px;
     display: flex;
@@ -777,12 +776,12 @@ kbd {
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 100;
+    z-index: var(--z-dropdown);
 }
 
 .lsp-dialog-container {
-    background-color: #21252b;
-    border: 1px solid #3e4451;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--bg-selection);
     border-radius: 6px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
     min-width: 400px;
@@ -791,12 +790,12 @@ kbd {
 
 .lsp-dialog-header {
     padding: 12px 16px;
-    border-bottom: 1px solid #3e4451;
+    border-bottom: 1px solid var(--bg-selection);
     font-weight: bold;
 }
 
 .lsp-dialog-count {
-    color: #5c6370;
+    color: var(--text-dim);
     font-weight: normal;
 }
 
@@ -807,7 +806,7 @@ kbd {
 
 .lsp-dialog-empty {
     padding: 24px 16px;
-    color: #5c6370;
+    color: var(--text-dim);
     text-align: center;
 }
 
@@ -820,11 +819,11 @@ kbd {
 }
 
 .lsp-server-row:hover {
-    background-color: #2c313a;
+    background-color: var(--bg-highlight);
 }
 
 .lsp-server-row-selected {
-    background-color: #3e4451;
+    background-color: var(--bg-selection);
 }
 
 .lsp-server-status {
@@ -855,60 +854,59 @@ kbd {
 }
 
 .lsp-server-languages {
-    color: #5c6370;
+    color: var(--text-dim);
     font-size: 12px;
 }
 
 .lsp-server-active {
-    color: #98c379;
+    color: var(--success);
     font-size: 10px;
 }
 
 .lsp-restart-btn {
     background: transparent;
-    border: 1px solid #3e4451;
+    border: 1px solid var(--bg-selection);
     border-radius: 4px;
-    color: #abb2bf;
+    color: var(--text);
     padding: 4px 8px;
     cursor: pointer;
     font-size: 14px;
 }
 
 .lsp-restart-btn:hover {
-    background-color: #3e4451;
-    color: #61afef;
+    background-color: var(--bg-selection);
+    color: var(--accent);
 }
 
 .lsp-dialog-help {
     padding: 8px 16px;
-    border-top: 1px solid #3e4451;
-    color: #5c6370;
+    border-top: 1px solid var(--bg-selection);
+    color: var(--text-dim);
     font-size: 12px;
     display: flex;
     gap: 16px;
 }
 
 .lsp-dialog-help kbd {
-    background-color: #3e4451;
+    background-color: var(--bg-selection);
     padding: 2px 6px;
     border-radius: 3px;
     margin-right: 4px;
 }
 
-/* Notification toast container */
+/* ───── Notification toasts ───── */
 .notification-container {
     position: fixed;
-    bottom: 32px;  /* Above statusline */
+    bottom: 32px;
     right: 16px;
     display: flex;
     flex-direction: column-reverse;
     gap: 8px;
-    z-index: 300;
+    z-index: var(--z-notification);
     max-width: 400px;
     pointer-events: none;
 }
 
-/* Individual notification toast */
 .notification-toast {
     padding: 10px 12px;
     border-radius: 4px;
@@ -935,26 +933,26 @@ kbd {
 
 .notification-error {
     background: #3d2020;
-    border-left: 3px solid #e06c75;
-    color: #e06c75;
+    border-left: 3px solid var(--error);
+    color: var(--error);
 }
 
 .notification-warning {
     background: #3d3520;
-    border-left: 3px solid #e5c07b;
-    color: #e5c07b;
+    border-left: 3px solid var(--warning);
+    color: var(--warning);
 }
 
 .notification-info {
     background: #1e2a3d;
-    border-left: 3px solid #61afef;
-    color: #61afef;
+    border-left: 3px solid var(--info);
+    color: var(--info);
 }
 
 .notification-success {
     background: #1e3d20;
-    border-left: 3px solid #98c379;
-    color: #98c379;
+    border-left: 3px solid var(--success);
+    color: var(--success);
 }
 
 .notification-icon {
@@ -966,7 +964,7 @@ kbd {
 
 .notification-message {
     flex: 1;
-    color: #abb2bf;
+    color: var(--text);
     line-height: 1.4;
 }
 
@@ -976,7 +974,7 @@ kbd {
     border: none;
     padding: 4px;
     cursor: pointer;
-    color: #5c6370;
+    color: var(--text-dim);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -986,10 +984,10 @@ kbd {
 
 .notification-close:hover {
     background-color: rgba(255, 255, 255, 0.1);
-    color: #abb2bf;
+    color: var(--text);
 }
 
-/* Input dialog */
+/* ───── Input dialog ───── */
 .input-dialog {
     padding: 12px;
 }
@@ -997,45 +995,45 @@ kbd {
 .input-dialog-title {
     font-weight: 500;
     margin-bottom: 8px;
-    color: #abb2bf;
+    color: var(--text);
     font-size: 14px;
 }
 
 .input-dialog-prompt {
-    color: #5c6370;
+    color: var(--text-dim);
     font-size: 12px;
     margin-bottom: 8px;
 }
 
 .input-dialog-input-container {
-    background: #282c34;
-    border: 1px solid #3e4451;
+    background: var(--bg-primary);
+    border: 1px solid var(--bg-selection);
     border-radius: 4px;
     padding: 8px 10px;
-    color: #abb2bf;
+    color: var(--text);
     font-size: 14px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     display: flex;
     align-items: center;
 }
 
 .input-dialog-input-container:focus-within {
-    border-color: #61afef;
+    border-color: var(--accent);
 }
 
 .input-dialog-placeholder {
-    color: #5c6370;
+    color: var(--text-dim);
 }
 
 .input-dialog-value {
-    color: #abb2bf;
+    color: var(--text);
 }
 
 .input-dialog-cursor {
     display: inline-block;
     width: 2px;
     height: 18px;
-    background-color: #61afef;
+    background-color: var(--accent);
     animation: blink 1s step-end infinite;
 }
 
@@ -1043,18 +1041,18 @@ kbd {
     display: flex;
     gap: 16px;
     margin-top: 10px;
-    color: #5c6370;
+    color: var(--text-dim);
     font-size: 12px;
 }
 
 .input-dialog-help kbd {
-    background-color: #3e4451;
+    background-color: var(--bg-selection);
     padding: 2px 6px;
     border-radius: 3px;
     margin-right: 4px;
 }
 
-/* Confirmation dialog */
+/* ───── Confirmation dialog ───── */
 .confirmation-dialog-overlay {
     position: fixed;
     inset: 0;
@@ -1062,12 +1060,12 @@ kbd {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 400;
+    z-index: var(--z-confirmation);
 }
 
 .confirmation-dialog {
-    background: #21252b;
-    border: 1px solid #3e4451;
+    background: var(--bg-secondary);
+    border: 1px solid var(--bg-selection);
     border-radius: 8px;
     padding: 20px;
     min-width: 350px;
@@ -1078,12 +1076,12 @@ kbd {
 .confirmation-dialog-title {
     font-weight: 600;
     font-size: 15px;
-    color: #e5c07b;
+    color: var(--warning);
     margin-bottom: 12px;
 }
 
 .confirmation-dialog-message {
-    color: #abb2bf;
+    color: var(--text);
     font-size: 14px;
     margin-bottom: 20px;
     line-height: 1.5;
@@ -1111,18 +1109,18 @@ kbd {
 }
 
 .confirmation-btn-primary {
-    background: #61afef;
-    color: #282c34;
+    background: var(--accent);
+    color: var(--bg-primary);
 }
 
 .confirmation-btn-danger {
-    background: #e06c75;
-    color: #282c34;
+    background: var(--error);
+    color: var(--bg-primary);
 }
 
 .confirmation-btn-secondary {
-    background: #3e4451;
-    color: #abb2bf;
+    background: var(--bg-selection);
+    color: var(--text);
 }
 
 .confirmation-btn kbd {
@@ -1133,11 +1131,11 @@ kbd {
     border-radius: 2px;
 }
 
-/* Custom editor scrollbar */
+/* ───── Custom editor scrollbar ───── */
 .editor-scrollbar {
     width: 14px;
     height: 100%;
-    background-color: #21252b;
+    background-color: var(--bg-secondary);
     flex-shrink: 0;
     cursor: pointer;
     position: relative;
@@ -1149,9 +1147,8 @@ kbd {
     bottom: 8px;
     left: 2px;
     right: 2px;
-    background-color: #282c34;
+    background-color: var(--bg-primary);
     border-radius: 4px;
-    /* Allow absolute positioning of thumb and markers relative to track */
 }
 
 .scrollbar-thumb {
@@ -1182,7 +1179,7 @@ kbd {
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 9999;
+    z-index: var(--z-tooltip);
     cursor: grabbing;
 }
 
@@ -1196,29 +1193,28 @@ kbd {
 }
 
 /* Z-index by severity: higher severity = higher z-index so errors render on top */
-/* Markers are above thumb (z-index: 0) for visibility and future click handling */
 .scrollbar-marker-search {
-    background-color: #e5c07b;
+    background-color: var(--warning);
     z-index: 1;
 }
 
 .scrollbar-marker-hint {
-    background-color: #56b6c2;
+    background-color: var(--hint);
     z-index: 2;
 }
 
 .scrollbar-marker-info {
-    background-color: #61afef;
+    background-color: var(--info);
     z-index: 3;
 }
 
 .scrollbar-marker-warning {
-    background-color: #e5c07b;
+    background-color: var(--warning);
     z-index: 4;
 }
 
 .scrollbar-marker-error {
-    background-color: #e06c75;
+    background-color: var(--error);
     z-index: 5;
 }
 
@@ -1226,17 +1222,16 @@ kbd {
 .scrollbar-tooltip {
     position: absolute;
     right: 100%;
-    /* top is set dynamically via inline style */
     transform: translateY(-50%);
     margin-right: 8px;
     padding: 6px 10px;
-    background-color: #2c313a;
-    border: 1px solid #3e4451;
+    background-color: var(--bg-highlight);
+    border: 1px solid var(--bg-selection);
     border-radius: 4px;
     font-size: 12px;
     white-space: nowrap;
     max-width: 400px;
-    z-index: 100;
+    z-index: var(--z-dropdown);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     pointer-events: none;
 }
@@ -1253,12 +1248,12 @@ kbd {
 }
 
 .scrollbar-tooltip-line {
-    color: #5c6370;
+    color: var(--text-dim);
     font-size: 11px;
 }
 
 .scrollbar-tooltip-message {
-    color: #abb2bf;
+    color: var(--text);
     font-size: 11px;
     white-space: pre-wrap;
     word-wrap: break-word;
@@ -1267,21 +1262,21 @@ kbd {
 
 /* Tooltip severity colors */
 .scrollbar-tooltip-search .scrollbar-tooltip-severity {
-    color: #e5c07b;
+    color: var(--warning);
 }
 
 .scrollbar-tooltip-error .scrollbar-tooltip-severity {
-    color: #e06c75;
+    color: var(--error);
 }
 
 .scrollbar-tooltip-warning .scrollbar-tooltip-severity {
-    color: #e5c07b;
+    color: var(--warning);
 }
 
 .scrollbar-tooltip-info .scrollbar-tooltip-severity {
-    color: #61afef;
+    color: var(--info);
 }
 
 .scrollbar-tooltip-hint .scrollbar-tooltip-severity {
-    color: #56b6c2;
+    color: var(--hint);
 }

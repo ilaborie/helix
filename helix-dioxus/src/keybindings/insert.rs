@@ -20,6 +20,10 @@ pub fn handle_insert_mode(key: &KeyEvent) -> Vec<EditorCommand> {
             KeyCode::Char(' ') => vec![EditorCommand::TriggerCompletion],
             // Ctrl+. - show code actions (quick fix)
             KeyCode::Char('.') => vec![EditorCommand::ShowCodeActions],
+            // Ctrl+w - delete word backward
+            KeyCode::Char('w') => vec![EditorCommand::DeleteWordBackward],
+            // Ctrl+u - delete to line start
+            KeyCode::Char('u') => vec![EditorCommand::DeleteToLineStart],
             _ => vec![],
         };
     }
