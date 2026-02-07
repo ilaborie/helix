@@ -33,7 +33,35 @@ fn hints_for_context(mode: &str, pending: PendingKeySequence) -> Vec<(&'static s
         ],
         PendingKeySequence::BracketNext => vec![("d", "next diag")],
         PendingKeySequence::BracketPrev => vec![("d", "prev diag")],
-        PendingKeySequence::FindForward
+        PendingKeySequence::MatchPrefix => vec![
+            ("m", "bracket"),
+            ("i", "inside"),
+            ("a", "around"),
+            ("s", "surround"),
+            ("d", "del surr"),
+            ("r", "rep surr"),
+        ],
+        PendingKeySequence::MatchInside | PendingKeySequence::MatchAround => {
+            vec![
+                ("(", "parens"),
+                ("[", "brackets"),
+                ("{", "braces"),
+                ("\"", "quotes"),
+            ]
+        }
+        PendingKeySequence::MatchSurround
+        | PendingKeySequence::MatchDeleteSurround
+        | PendingKeySequence::MatchReplaceSurroundFrom
+        | PendingKeySequence::MatchReplaceSurroundTo(_) => {
+            vec![
+                ("(", "parens"),
+                ("[", "brackets"),
+                ("{", "braces"),
+                ("\"", "quotes"),
+            ]
+        }
+        PendingKeySequence::ReplacePrefix
+        | PendingKeySequence::FindForward
         | PendingKeySequence::FindBackward
         | PendingKeySequence::TillForward
         | PendingKeySequence::TillBackward => {
@@ -81,11 +109,19 @@ fn pending_prefix(pending: PendingKeySequence) -> Option<&'static str> {
         PendingKeySequence::FindBackward => Some("F"),
         PendingKeySequence::TillForward => Some("t"),
         PendingKeySequence::TillBackward => Some("T"),
+        PendingKeySequence::ReplacePrefix => Some("r"),
+        PendingKeySequence::MatchPrefix => Some("m"),
+        PendingKeySequence::MatchInside => Some("mi"),
+        PendingKeySequence::MatchAround => Some("ma"),
+        PendingKeySequence::MatchSurround => Some("ms"),
+        PendingKeySequence::MatchDeleteSurround => Some("md"),
+        PendingKeySequence::MatchReplaceSurroundFrom => Some("mr"),
+        PendingKeySequence::MatchReplaceSurroundTo(_) => Some("mr"),
         PendingKeySequence::None => None,
     }
 }
 
-/// Whether the pending sequence is a find/till character prompt.
+/// Whether the pending sequence is a character prompt (waiting for a single char).
 fn is_char_prompt(pending: PendingKeySequence) -> bool {
     matches!(
         pending,
@@ -93,6 +129,13 @@ fn is_char_prompt(pending: PendingKeySequence) -> bool {
             | PendingKeySequence::FindBackward
             | PendingKeySequence::TillForward
             | PendingKeySequence::TillBackward
+            | PendingKeySequence::ReplacePrefix
+            | PendingKeySequence::MatchInside
+            | PendingKeySequence::MatchAround
+            | PendingKeySequence::MatchSurround
+            | PendingKeySequence::MatchDeleteSurround
+            | PendingKeySequence::MatchReplaceSurroundFrom
+            | PendingKeySequence::MatchReplaceSurroundTo(_)
     )
 }
 

@@ -238,7 +238,15 @@ Shared keybinding logic lives in `keybindings/mod.rs`:
 - `handle_text_input_keys(code, esc, enter, backspace, char_fn)` → shared Esc/Enter/Backspace/Char pattern (used by search/command modes)
 - `handle_list_navigation_keys(code, esc, up, down, enter, backspace?, char_fn?)` → shared list navigation (used by location picker, code actions)
 
-Multi-key sequences (f/F/t/T, g, Space, [, ]) are handled via `PendingKeySequence` enum in `app.rs`.
+Multi-key sequences (f/F/t/T, g, Space, [, ], r, m) are handled via `PendingKeySequence` enum in `app.rs`.
+
+The `m` prefix supports nested sequences:
+- `mm` → match bracket
+- `mi<char>` → select inside pair
+- `ma<char>` → select around pair
+- `ms<char>` → surround add
+- `md<char>` → surround delete
+- `mr<old><new>` → surround replace (3-key sequence)
 
 ### Coding Conventions
 
@@ -337,9 +345,10 @@ cargo clippy -p helix-dioxus --bins
 - [ ] Investigate rust-analyzer diagnostic line reporting - diagnostics may be reported on the line where parsing fails rather than where the actual error is (e.g., unterminated string reports on the next line). Consider requesting upstream fix or mapping diagnostic positions back to the originating code
 
 ### Recently Completed
+- [x] Core tutor commands batch — 21 commands: `;` (collapse selection), `,` (keep primary), `Alt-.` (repeat motion), `c` (change), `e`/`W`/`E`/`B` (word motions), `I` (insert line start), `r` (replace char), `R` (replace with yank), `J` (join), `~`/`` ` ``/`Alt+`` ` (case ops), `mm` (match bracket), `mi`/`ma` (select inside/around), `ms`/`md`/`mr` (surround)
 - [x] Register indicators in help bar — `+` (clipboard), `*` (selection), `/` (search) with active/inactive highlighting, click-to-open dialog with content view and Clear button
 - [x] Keybinding help bar — context-aware shortcut hints above statusline per mode and pending key sequence
-- [x] Find/till character motions (f/F/t/T) with repeat (;) and reverse (,)
+- [x] Find/till character motions (f/F/t/T) with repeat (Alt-.)
 - [x] Indent/unindent (>/<), search word under cursor (*)
 - [x] Insert mode: Ctrl+w (delete word backward), Ctrl+u (delete to line start)
 - [x] Picker: Home/End/PageUp/PageDown navigation

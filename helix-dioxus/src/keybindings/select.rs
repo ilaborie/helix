@@ -27,6 +27,12 @@ pub fn handle_select_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         // Word movement - extends selection
         KeyCode::Char('w') => vec![EditorCommand::ExtendWordForward],
         KeyCode::Char('b') => vec![EditorCommand::ExtendWordBackward],
+        KeyCode::Char('e') => vec![EditorCommand::ExtendWordEnd],
+
+        // WORD movement - extends selection
+        KeyCode::Char('W') => vec![EditorCommand::ExtendLongWordForward],
+        KeyCode::Char('B') => vec![EditorCommand::ExtendLongWordBackward],
+        KeyCode::Char('E') => vec![EditorCommand::ExtendLongWordEnd],
 
         // Line movement - extends selection
         KeyCode::Char('0') | KeyCode::Home => vec![EditorCommand::ExtendLineStart],
@@ -44,8 +50,18 @@ pub fn handle_select_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('y') => vec![EditorCommand::Yank, EditorCommand::ExitSelectMode],
         KeyCode::Char('d') => vec![EditorCommand::DeleteSelection],
 
+        // Change selection (delete + enter insert)
+        KeyCode::Char('c') => vec![EditorCommand::ChangeSelection],
+
+        // Replace with yanked text
+        KeyCode::Char('R') => vec![EditorCommand::ReplaceWithYanked],
+
         // Paste replaces selection
         KeyCode::Char('p') => vec![EditorCommand::DeleteSelection, EditorCommand::Paste],
+
+        // Selection operations
+        KeyCode::Char(';') => vec![EditorCommand::CollapseSelection],
+        KeyCode::Char(',') => vec![EditorCommand::KeepPrimarySelection],
 
         _ => vec![],
     }

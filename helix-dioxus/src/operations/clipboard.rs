@@ -10,6 +10,7 @@ pub trait ClipboardOps {
     fn yank(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn paste(&mut self, doc_id: DocumentId, view_id: ViewId, before: bool);
     fn delete_selection(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn replace_with_yanked(&mut self, doc_id: DocumentId, view_id: ViewId);
 }
 
 impl ClipboardOps for EditorContext {
@@ -84,6 +85,36 @@ impl ClipboardOps for EditorContext {
         doc.apply(&transaction, view_id);
 
         log::info!("Pasted {} characters", clipboard_text.len());
+    }
+
+    /// Replace selection with yanked text (without updating clipboard).
+    fn replace_with_yanked(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        // Read from system clipboard via '+' register, fall back to internal
+        let clipboard_text = self
+            .editor
+            .registers
+            .read('+', &self.editor)
+            .and_then(|mut values| values.next().map(|v| v.into_owned()))
+            .unwrap_or_else(|| self.clipboard.clone());
+
+        if clipboard_text.is_empty() {
+            return;
+        }
+
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let selection = doc.selection(view_id).clone();
+
+        // Replace selection content with clipboard text
+        let transaction =
+            helix_core::Transaction::change_by_selection(doc.text(), &selection, |range| {
+                (
+                    range.from(),
+                    range.to(),
+                    Some(clipboard_text.clone().into()),
+                )
+            });
+
+        doc.apply(&transaction, view_id);
     }
 
     /// Delete the current selection.

@@ -12,6 +12,10 @@ pub trait MovementOps {
     fn move_cursor(&mut self, doc_id: DocumentId, view_id: ViewId, direction: Direction);
     fn move_word_forward(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn move_word_backward(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn move_word_end(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn move_long_word_forward(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn move_long_word_end(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn move_long_word_backward(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn move_line_start(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn move_line_end(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn goto_first_line(&mut self, doc_id: DocumentId, view_id: ViewId);
@@ -21,6 +25,7 @@ pub trait MovementOps {
     fn scroll_up(&mut self, doc_id: DocumentId, view_id: ViewId, lines: usize);
     fn scroll_down(&mut self, doc_id: DocumentId, view_id: ViewId, lines: usize);
     fn scroll_to_line(&mut self, doc_id: DocumentId, view_id: ViewId, target_line: usize);
+    fn match_bracket(&mut self, doc_id: DocumentId, view_id: ViewId);
 }
 
 impl MovementOps for EditorContext {
@@ -83,9 +88,52 @@ impl MovementOps for EditorContext {
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
 
-        // Helix's selection-first model: movements create selections
         let new_selection =
             selection.transform(|range| helix_core::movement::move_prev_word_start(text, range, 1));
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    fn move_word_end(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection =
+            selection.transform(|range| helix_core::movement::move_next_word_end(text, range, 1));
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    fn move_long_word_forward(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection
+            .transform(|range| helix_core::movement::move_next_long_word_start(text, range, 1));
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    fn move_long_word_end(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection
+            .transform(|range| helix_core::movement::move_next_long_word_end(text, range, 1));
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    fn move_long_word_backward(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection
+            .transform(|range| helix_core::movement::move_prev_long_word_start(text, range, 1));
 
         doc.set_selection(view_id, new_selection);
     }
@@ -163,6 +211,24 @@ impl MovementOps for EditorContext {
         let mut offset = doc.view_offset(view_id);
         offset.anchor = text.line_to_char(target);
         doc.set_view_offset(view_id, offset);
+    }
+
+    fn match_bracket(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+        let cursor = selection.primary().cursor(text);
+
+        let syntax = doc.syntax();
+        let new_pos = if let Some(syn) = syntax {
+            helix_core::match_brackets::find_matching_bracket_fuzzy(syn, text, cursor)
+        } else {
+            helix_core::match_brackets::find_matching_bracket_plaintext(text, cursor)
+        };
+
+        if let Some(pos) = new_pos {
+            doc.set_selection(view_id, helix_core::Selection::point(pos));
+        }
     }
 }
 

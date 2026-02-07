@@ -169,6 +169,92 @@ pub fn App() -> Element {
                             vec![]
                         }
                     }
+                    PendingKeySequence::ReplacePrefix => {
+                        pending_key.set(PendingKeySequence::None);
+                        if let KeyCode::Char(ch) = key_event.code {
+                            vec![EditorCommand::ReplaceChar(ch)]
+                        } else {
+                            vec![]
+                        }
+                    }
+                    PendingKeySequence::MatchPrefix => match key_event.code {
+                        KeyCode::Char('m') => {
+                            pending_key.set(PendingKeySequence::None);
+                            vec![EditorCommand::MatchBracket]
+                        }
+                        KeyCode::Char('i') => {
+                            pending_key.set(PendingKeySequence::MatchInside);
+                            vec![]
+                        }
+                        KeyCode::Char('a') => {
+                            pending_key.set(PendingKeySequence::MatchAround);
+                            vec![]
+                        }
+                        KeyCode::Char('s') => {
+                            pending_key.set(PendingKeySequence::MatchSurround);
+                            vec![]
+                        }
+                        KeyCode::Char('d') => {
+                            pending_key.set(PendingKeySequence::MatchDeleteSurround);
+                            vec![]
+                        }
+                        KeyCode::Char('r') => {
+                            pending_key.set(PendingKeySequence::MatchReplaceSurroundFrom);
+                            vec![]
+                        }
+                        _ => {
+                            pending_key.set(PendingKeySequence::None);
+                            vec![]
+                        }
+                    },
+                    PendingKeySequence::MatchInside => {
+                        pending_key.set(PendingKeySequence::None);
+                        if let KeyCode::Char(ch) = key_event.code {
+                            vec![EditorCommand::SelectInsidePair(ch)]
+                        } else {
+                            vec![]
+                        }
+                    }
+                    PendingKeySequence::MatchAround => {
+                        pending_key.set(PendingKeySequence::None);
+                        if let KeyCode::Char(ch) = key_event.code {
+                            vec![EditorCommand::SelectAroundPair(ch)]
+                        } else {
+                            vec![]
+                        }
+                    }
+                    PendingKeySequence::MatchSurround => {
+                        pending_key.set(PendingKeySequence::None);
+                        if let KeyCode::Char(ch) = key_event.code {
+                            vec![EditorCommand::SurroundAdd(ch)]
+                        } else {
+                            vec![]
+                        }
+                    }
+                    PendingKeySequence::MatchDeleteSurround => {
+                        pending_key.set(PendingKeySequence::None);
+                        if let KeyCode::Char(ch) = key_event.code {
+                            vec![EditorCommand::SurroundDelete(ch)]
+                        } else {
+                            vec![]
+                        }
+                    }
+                    PendingKeySequence::MatchReplaceSurroundFrom => {
+                        if let KeyCode::Char(old) = key_event.code {
+                            pending_key.set(PendingKeySequence::MatchReplaceSurroundTo(old));
+                        } else {
+                            pending_key.set(PendingKeySequence::None);
+                        }
+                        vec![]
+                    }
+                    PendingKeySequence::MatchReplaceSurroundTo(old) => {
+                        pending_key.set(PendingKeySequence::None);
+                        if let KeyCode::Char(new) = key_event.code {
+                            vec![EditorCommand::SurroundReplace(old, new)]
+                        } else {
+                            vec![]
+                        }
+                    }
                     PendingKeySequence::None => {
                         // Check for Ctrl modifier first - Ctrl+key combos go to normal mode handler
                         if key_event.modifiers.contains(KeyModifiers::CONTROL) {
@@ -210,6 +296,14 @@ pub fn App() -> Element {
                                 }
                                 KeyCode::Char('T') if snapshot.mode == "NORMAL" => {
                                     pending_key.set(PendingKeySequence::TillBackward);
+                                    vec![]
+                                }
+                                KeyCode::Char('r') if snapshot.mode == "NORMAL" => {
+                                    pending_key.set(PendingKeySequence::ReplacePrefix);
+                                    vec![]
+                                }
+                                KeyCode::Char('m') => {
+                                    pending_key.set(PendingKeySequence::MatchPrefix);
                                     vec![]
                                 }
                                 _ => {

@@ -321,6 +321,10 @@ impl EditorContext {
             EditorCommand::MoveDown => self.move_cursor(doc_id, view_id, Direction::Down),
             EditorCommand::MoveWordForward => self.move_word_forward(doc_id, view_id),
             EditorCommand::MoveWordBackward => self.move_word_backward(doc_id, view_id),
+            EditorCommand::MoveWordEnd => self.move_word_end(doc_id, view_id),
+            EditorCommand::MoveLongWordForward => self.move_long_word_forward(doc_id, view_id),
+            EditorCommand::MoveLongWordEnd => self.move_long_word_end(doc_id, view_id),
+            EditorCommand::MoveLongWordBackward => self.move_long_word_backward(doc_id, view_id),
             EditorCommand::MoveLineStart => self.move_line_start(doc_id, view_id),
             EditorCommand::MoveLineEnd => self.move_line_end(doc_id, view_id),
             EditorCommand::GotoFirstLine => self.goto_first_line(doc_id, view_id),
@@ -352,13 +356,11 @@ impl EditorContext {
                     self.find_char(doc_id, view_id, ch, forward, till);
                 }
             }
-            EditorCommand::ReverseLastFind => {
-                if let Some((ch, forward, till)) = self.last_find_char {
-                    self.find_char(doc_id, view_id, ch, !forward, till);
-                }
-            }
             EditorCommand::SearchWordUnderCursor => {
                 self.search_word_under_cursor(doc_id, view_id);
+            }
+            EditorCommand::MatchBracket => {
+                self.match_bracket(doc_id, view_id);
             }
 
             // Mode changes
@@ -369,6 +371,25 @@ impl EditorContext {
             }
             EditorCommand::EnterInsertModeLineEnd => {
                 self.move_line_end(doc_id, view_id);
+                self.editor.mode = Mode::Insert;
+            }
+            EditorCommand::EnterInsertModeLineStart => {
+                // Move to first non-whitespace character on line
+                let doc = self.editor.document_mut(doc_id).expect("doc exists");
+                let text = doc.text().slice(..);
+                let selection = doc.selection(view_id).clone();
+                let cursor = selection.primary().cursor(text);
+                let line = text.char_to_line(cursor);
+                let line_start = text.line_to_char(line);
+                let mut pos = line_start;
+                for c in text.line(line).chars() {
+                    if c.is_whitespace() && c != '\n' {
+                        pos += 1;
+                    } else {
+                        break;
+                    }
+                }
+                doc.set_selection(view_id, helix_core::Selection::point(pos));
                 self.editor.mode = Mode::Insert;
             }
             EditorCommand::ExitInsertMode => self.editor.mode = Mode::Normal,
@@ -393,6 +414,17 @@ impl EditorContext {
                 self.open_line_above(doc_id, view_id);
                 self.editor.mode = Mode::Insert;
             }
+            EditorCommand::ChangeSelection => self.change_selection(doc_id, view_id),
+            EditorCommand::ReplaceChar(ch) => self.replace_char(doc_id, view_id, ch),
+            EditorCommand::JoinLines => self.join_lines(doc_id, view_id),
+            EditorCommand::ToggleCase => self.toggle_case(doc_id, view_id),
+            EditorCommand::ToLowercase => self.to_lowercase(doc_id, view_id),
+            EditorCommand::ToUppercase => self.to_uppercase(doc_id, view_id),
+            EditorCommand::SurroundAdd(ch) => self.surround_add(doc_id, view_id, ch),
+            EditorCommand::SurroundDelete(ch) => self.surround_delete(doc_id, view_id, ch),
+            EditorCommand::SurroundReplace(old, new) => {
+                self.surround_replace(doc_id, view_id, old, new);
+            }
 
             // Selection operations
             EditorCommand::ExtendLeft => self.extend_selection(doc_id, view_id, Direction::Left),
@@ -401,16 +433,27 @@ impl EditorContext {
             EditorCommand::ExtendDown => self.extend_selection(doc_id, view_id, Direction::Down),
             EditorCommand::ExtendWordForward => self.extend_word_forward(doc_id, view_id),
             EditorCommand::ExtendWordBackward => self.extend_word_backward(doc_id, view_id),
+            EditorCommand::ExtendWordEnd => self.extend_word_end(doc_id, view_id),
+            EditorCommand::ExtendLongWordForward => self.extend_long_word_forward(doc_id, view_id),
+            EditorCommand::ExtendLongWordEnd => self.extend_long_word_end(doc_id, view_id),
+            EditorCommand::ExtendLongWordBackward => {
+                self.extend_long_word_backward(doc_id, view_id);
+            }
             EditorCommand::ExtendLineStart => self.extend_line_start(doc_id, view_id),
             EditorCommand::ExtendLineEnd => self.extend_line_end(doc_id, view_id),
             EditorCommand::SelectLine => self.select_line(doc_id, view_id),
             EditorCommand::ExtendLine => self.extend_line(doc_id, view_id),
+            EditorCommand::CollapseSelection => self.collapse_selection(doc_id, view_id),
+            EditorCommand::KeepPrimarySelection => self.keep_primary_selection(doc_id, view_id),
+            EditorCommand::SelectInsidePair(ch) => self.select_inside_pair(doc_id, view_id, ch),
+            EditorCommand::SelectAroundPair(ch) => self.select_around_pair(doc_id, view_id, ch),
 
             // Clipboard operations
             EditorCommand::Yank => self.yank(doc_id, view_id),
             EditorCommand::Paste => self.paste(doc_id, view_id, false),
             EditorCommand::PasteBefore => self.paste(doc_id, view_id, true),
             EditorCommand::DeleteSelection => self.delete_selection(doc_id, view_id),
+            EditorCommand::ReplaceWithYanked => self.replace_with_yanked(doc_id, view_id),
 
             // History operations
             EditorCommand::Undo => self.undo(doc_id, view_id),

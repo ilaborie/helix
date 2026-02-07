@@ -7,7 +7,18 @@ use crate::state::EditorCommand;
 
 /// Handle keyboard input in Normal mode.
 pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
-    // Handle Ctrl+key combinations first
+    // Handle Alt+key combinations
+    if key.modifiers.contains(KeyModifiers::ALT) {
+        return match key.code {
+            // Alt+. = repeat last motion (find/till)
+            KeyCode::Char('.') => vec![EditorCommand::RepeatLastFind],
+            // Alt+` = convert to uppercase
+            KeyCode::Char('`') => vec![EditorCommand::ToUppercase],
+            _ => vec![],
+        };
+    }
+
+    // Handle Ctrl+key combinations
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         return match key.code {
             KeyCode::Char('c') => vec![EditorCommand::ToggleLineComment],
@@ -29,6 +40,12 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         // Word movement
         KeyCode::Char('w') => vec![EditorCommand::MoveWordForward],
         KeyCode::Char('b') => vec![EditorCommand::MoveWordBackward],
+        KeyCode::Char('e') => vec![EditorCommand::MoveWordEnd],
+
+        // WORD movement (long words)
+        KeyCode::Char('W') => vec![EditorCommand::MoveLongWordForward],
+        KeyCode::Char('B') => vec![EditorCommand::MoveLongWordBackward],
+        KeyCode::Char('E') => vec![EditorCommand::MoveLongWordEnd],
 
         // Line movement
         KeyCode::Char('0') | KeyCode::Home => vec![EditorCommand::MoveLineStart],
@@ -41,10 +58,14 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
 
         // Mode changes
         KeyCode::Char('i') => vec![EditorCommand::EnterInsertMode],
+        KeyCode::Char('I') => vec![EditorCommand::EnterInsertModeLineStart],
         KeyCode::Char('a') => vec![EditorCommand::EnterInsertModeAfter],
         KeyCode::Char('A') => vec![EditorCommand::EnterInsertModeLineEnd],
         KeyCode::Char('o') => vec![EditorCommand::OpenLineBelow],
         KeyCode::Char('O') => vec![EditorCommand::OpenLineAbove],
+
+        // Change selection (delete + enter insert)
+        KeyCode::Char('c') => vec![EditorCommand::ChangeSelection],
 
         // History
         KeyCode::Char('u') => vec![EditorCommand::Undo],
@@ -58,6 +79,9 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
 
         // Delete selection (works in normal mode due to selection-first model)
         KeyCode::Char('d') => vec![EditorCommand::DeleteSelection],
+
+        // Replace with yanked text
+        KeyCode::Char('R') => vec![EditorCommand::ReplaceWithYanked],
 
         // Clipboard
         KeyCode::Char('p') => vec![EditorCommand::Paste],
@@ -73,9 +97,9 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         // Command mode
         KeyCode::Char(':') => vec![EditorCommand::EnterCommandMode],
 
-        // Find/till repeat
-        KeyCode::Char(';') => vec![EditorCommand::RepeatLastFind],
-        KeyCode::Char(',') => vec![EditorCommand::ReverseLastFind],
+        // Selection operations
+        KeyCode::Char(';') => vec![EditorCommand::CollapseSelection],
+        KeyCode::Char(',') => vec![EditorCommand::KeepPrimarySelection],
 
         // Indent/unindent
         KeyCode::Char('>') => vec![EditorCommand::IndentLine],
@@ -83,6 +107,13 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
 
         // Search word under cursor
         KeyCode::Char('*') => vec![EditorCommand::SearchWordUnderCursor],
+
+        // Join lines
+        KeyCode::Char('J') => vec![EditorCommand::JoinLines],
+
+        // Case operations
+        KeyCode::Char('~') => vec![EditorCommand::ToggleCase],
+        KeyCode::Char('`') => vec![EditorCommand::ToLowercase],
 
         // LSP - Hover (K for documentation like vim)
         KeyCode::Char('K') => vec![EditorCommand::TriggerHover],

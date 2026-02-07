@@ -260,17 +260,27 @@ pub enum EditorCommand {
     TillCharForward(char),
     /// Move till (after) character backward on current line.
     TillCharBackward(char),
+    /// Move to end of word.
+    MoveWordEnd,
+    /// Move to next long word (WORD) start.
+    MoveLongWordForward,
+    /// Move to end of long word (WORD).
+    MoveLongWordEnd,
+    /// Move to previous long word (WORD) start.
+    MoveLongWordBackward,
     /// Repeat last find/till motion.
     RepeatLastFind,
-    /// Reverse repeat last find/till motion.
-    ReverseLastFind,
     /// Search for the word under the cursor.
     SearchWordUnderCursor,
+    /// Jump to matching bracket.
+    MatchBracket,
 
     // Mode changes
     EnterInsertMode,
     EnterInsertModeAfter,
     EnterInsertModeLineEnd,
+    /// Insert at first non-whitespace of line.
+    EnterInsertModeLineStart,
     ExitInsertMode,
     EnterSelectMode,
     ExitSelectMode,
@@ -291,6 +301,24 @@ pub enum EditorCommand {
     IndentLine,
     /// Unindent the current line or selection.
     UnindentLine,
+    /// Change selection: delete + enter insert mode.
+    ChangeSelection,
+    /// Replace each character in selection with the given character.
+    ReplaceChar(char),
+    /// Join lines in selection.
+    JoinLines,
+    /// Toggle case of characters in selection.
+    ToggleCase,
+    /// Convert selection to lowercase.
+    ToLowercase,
+    /// Convert selection to uppercase.
+    ToUppercase,
+    /// Add surround pair around selection.
+    SurroundAdd(char),
+    /// Delete surround pair.
+    SurroundDelete(char),
+    /// Replace surround pair (old, new).
+    SurroundReplace(char, char),
 
     // History
     Undo,
@@ -307,10 +335,26 @@ pub enum EditorCommand {
     ExtendDown,
     ExtendWordForward,
     ExtendWordBackward,
+    /// Extend selection to word end.
+    ExtendWordEnd,
+    /// Extend selection to next long word start.
+    ExtendLongWordForward,
+    /// Extend selection to long word end.
+    ExtendLongWordEnd,
+    /// Extend selection to previous long word start.
+    ExtendLongWordBackward,
     ExtendLineStart,
     ExtendLineEnd,
     SelectLine,
     ExtendLine,
+    /// Collapse selection to cursor position (;).
+    CollapseSelection,
+    /// Keep only primary selection, remove others (,).
+    KeepPrimarySelection,
+    /// Select inside a bracket/quote pair.
+    SelectInsidePair(char),
+    /// Select around a bracket/quote pair.
+    SelectAroundPair(char),
 
     // Clipboard operations
     Yank,
@@ -319,6 +363,8 @@ pub enum EditorCommand {
 
     // Delete
     DeleteSelection,
+    /// Replace selection with yanked text (R).
+    ReplaceWithYanked,
 
     // Search
     EnterSearchMode {
@@ -673,6 +719,22 @@ pub enum PendingKeySequence {
     TillForward,
     /// Waiting for character after 'T' (till backward)
     TillBackward,
+    /// Waiting for character after 'r' (replace char)
+    ReplacePrefix,
+    /// Waiting for second key after 'm' (match/surround)
+    MatchPrefix,
+    /// Waiting for character after 'mi' (select inside pair)
+    MatchInside,
+    /// Waiting for character after 'ma' (select around pair)
+    MatchAround,
+    /// Waiting for character after 'ms' (surround add)
+    MatchSurround,
+    /// Waiting for character after 'md' (surround delete)
+    MatchDeleteSurround,
+    /// Waiting for first character after 'mr' (surround replace: old char)
+    MatchReplaceSurroundFrom,
+    /// Waiting for second character after 'mr<old>' (surround replace: new char)
+    MatchReplaceSurroundTo(char),
 }
 
 /// A single register's state for display in the help bar.

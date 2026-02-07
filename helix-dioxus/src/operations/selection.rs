@@ -9,10 +9,18 @@ pub trait SelectionOps {
     fn extend_selection(&mut self, doc_id: DocumentId, view_id: ViewId, direction: Direction);
     fn extend_word_forward(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn extend_word_backward(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn extend_word_end(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn extend_long_word_forward(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn extend_long_word_end(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn extend_long_word_backward(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn extend_line_start(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn extend_line_end(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn select_line(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn extend_line(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn collapse_selection(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn keep_primary_selection(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn select_inside_pair(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char);
+    fn select_around_pair(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char);
 }
 
 impl SelectionOps for EditorContext {
@@ -79,6 +87,58 @@ impl SelectionOps for EditorContext {
 
         let new_selection = selection.transform(|range| {
             let new_range = helix_core::movement::move_prev_word_start(text, range, 1);
+            helix_core::Range::new(range.anchor, new_range.head)
+        });
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    fn extend_word_end(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection.transform(|range| {
+            let new_range = helix_core::movement::move_next_word_end(text, range, 1);
+            helix_core::Range::new(range.anchor, new_range.head)
+        });
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    fn extend_long_word_forward(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection.transform(|range| {
+            let new_range = helix_core::movement::move_next_long_word_start(text, range, 1);
+            helix_core::Range::new(range.anchor, new_range.head)
+        });
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    fn extend_long_word_end(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection.transform(|range| {
+            let new_range = helix_core::movement::move_next_long_word_end(text, range, 1);
+            helix_core::Range::new(range.anchor, new_range.head)
+        });
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    fn extend_long_word_backward(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection.transform(|range| {
+            let new_range = helix_core::movement::move_prev_long_word_start(text, range, 1);
             helix_core::Range::new(range.anchor, new_range.head)
         });
 
@@ -159,6 +219,61 @@ impl SelectionOps for EditorContext {
         });
 
         doc.set_selection(view_id, new_selection);
+    }
+
+    /// Collapse selection to cursor position (`;` in Helix).
+    fn collapse_selection(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection.transform(|range| {
+            let cursor = range.cursor(text);
+            helix_core::Range::point(cursor)
+        });
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    /// Keep only primary selection, remove others (`,` in Helix).
+    fn keep_primary_selection(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let selection = doc.selection(view_id).clone();
+        let primary = selection.primary();
+        doc.set_selection(
+            view_id,
+            helix_core::Selection::single(primary.anchor, primary.head),
+        );
+    }
+
+    /// Select inside a bracket/quote pair (`mi` in Helix).
+    fn select_inside_pair(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+        let primary = selection.primary();
+
+        if let Ok((open, close)) = helix_core::surround::find_nth_pairs_pos(text, ch, primary, 1) {
+            // Inside: exclude the delimiters
+            let new_anchor = open + 1;
+            let new_head = close;
+            if new_anchor < new_head {
+                doc.set_selection(view_id, helix_core::Selection::single(new_anchor, new_head));
+            }
+        }
+    }
+
+    /// Select around a bracket/quote pair (`ma` in Helix).
+    fn select_around_pair(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+        let primary = selection.primary();
+
+        if let Ok((open, close)) = helix_core::surround::find_nth_pairs_pos(text, ch, primary, 1) {
+            // Around: include the delimiters
+            doc.set_selection(view_id, helix_core::Selection::single(open, close + 1));
+        }
     }
 }
 

@@ -2,6 +2,7 @@
 
 use helix_core::history::UndoKind;
 use helix_core::RopeSlice;
+use helix_view::document::Mode;
 use helix_view::{DocumentId, ViewId};
 
 use crate::state::EditorContext;
@@ -51,6 +52,15 @@ pub trait EditingOps {
     fn unindent_line(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn earlier(&mut self, steps: usize);
     fn later(&mut self, steps: usize);
+    fn change_selection(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn replace_char(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char);
+    fn join_lines(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn toggle_case(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn to_lowercase(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn to_uppercase(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn surround_add(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char);
+    fn surround_delete(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char);
+    fn surround_replace(&mut self, doc_id: DocumentId, view_id: ViewId, old: char, new: char);
 }
 
 impl EditingOps for EditorContext {
@@ -367,6 +377,239 @@ impl EditingOps for EditorContext {
         if !doc.later(view, UndoKind::Steps(steps)) {
             log::info!("Already at newest change");
         }
+    }
+
+    /// Change selection: delete selected text and enter insert mode.
+    fn change_selection(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let primary = doc.selection(view_id).primary();
+        let from = primary.from();
+        let to = primary.to();
+
+        if from < to {
+            let ranges = std::iter::once((from, to));
+            let transaction = helix_core::Transaction::delete(doc.text(), ranges);
+            doc.apply(&transaction, view_id);
+        }
+
+        self.editor.mode = Mode::Insert;
+    }
+
+    /// Replace each character in selection with the given character.
+    fn replace_char(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let transaction =
+            helix_core::Transaction::change_by_selection(doc.text(), &selection, |range| {
+                let replacement: String = text
+                    .slice(range.from()..range.to())
+                    .chars()
+                    .map(|c| if c == '\n' || c == '\r' { c } else { ch })
+                    .collect();
+                (range.from(), range.to(), Some(replacement.into()))
+            });
+
+        doc.apply(&transaction, view_id);
+    }
+
+    /// Join lines: replace newlines + leading whitespace with a single space.
+    fn join_lines(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+        let primary = selection.primary();
+
+        let (start_line, end_line) = selected_line_range(text, primary.anchor, primary.head);
+
+        // If only one line, join with the next line
+        let end_line = if start_line == end_line {
+            (start_line + 1).min(text.len_lines().saturating_sub(1))
+        } else {
+            end_line
+        };
+
+        if start_line >= end_line {
+            return;
+        }
+
+        // Build changes: replace each line break (+ leading whitespace on next line) with a space
+        let mut changes = Vec::new();
+        for line in start_line..end_line {
+            let line_end = text.line_to_char(line) + text.line(line).len_chars();
+            // Find end of leading whitespace on next line
+            let next_line_start = text.line_to_char(line + 1);
+            let mut ws_end = next_line_start;
+            for c in text.line(line + 1).chars() {
+                if c.is_whitespace() && c != '\n' {
+                    ws_end += 1;
+                } else {
+                    break;
+                }
+            }
+            // Replace from before the newline to end of whitespace with a single space
+            let join_start = line_end.saturating_sub(1); // the newline char
+            changes.push((join_start, ws_end, Some(" ".into())));
+        }
+
+        let transaction = helix_core::Transaction::change(doc.text(), changes.into_iter());
+        doc.apply(&transaction, view_id);
+    }
+
+    /// Toggle case of each character in selection.
+    fn toggle_case(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let transaction =
+            helix_core::Transaction::change_by_selection(doc.text(), &selection, |range| {
+                let toggled: String = text
+                    .slice(range.from()..range.to())
+                    .chars()
+                    .map(|c| {
+                        if c.is_uppercase() {
+                            c.to_lowercase().next().unwrap_or(c)
+                        } else {
+                            c.to_uppercase().next().unwrap_or(c)
+                        }
+                    })
+                    .collect();
+                (range.from(), range.to(), Some(toggled.into()))
+            });
+
+        doc.apply(&transaction, view_id);
+    }
+
+    /// Convert selection to lowercase.
+    fn to_lowercase(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let transaction =
+            helix_core::Transaction::change_by_selection(doc.text(), &selection, |range| {
+                let lower: String = text
+                    .slice(range.from()..range.to())
+                    .chars()
+                    .flat_map(char::to_lowercase)
+                    .collect();
+                (range.from(), range.to(), Some(lower.into()))
+            });
+
+        doc.apply(&transaction, view_id);
+    }
+
+    /// Convert selection to uppercase.
+    fn to_uppercase(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let transaction =
+            helix_core::Transaction::change_by_selection(doc.text(), &selection, |range| {
+                let upper: String = text
+                    .slice(range.from()..range.to())
+                    .chars()
+                    .flat_map(char::to_uppercase)
+                    .collect();
+                (range.from(), range.to(), Some(upper.into()))
+            });
+
+        doc.apply(&transaction, view_id);
+    }
+
+    /// Add surround pair around selection.
+    fn surround_add(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char) {
+        let (open, close) = surround_pair(ch);
+
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let selection = doc.selection(view_id).clone();
+
+        let transaction =
+            helix_core::Transaction::change_by_selection(doc.text(), &selection, |range| {
+                let from = range.from();
+                let to = range.to();
+                let replacement = format!("{open}{}{close}", doc.text().slice(from..to));
+                (from, to, Some(replacement.into()))
+            });
+
+        doc.apply(&transaction, view_id);
+    }
+
+    /// Delete surround pair.
+    fn surround_delete(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let surround_result =
+            helix_core::surround::get_surround_pos(doc.syntax(), text, &selection, Some(ch), 1);
+
+        let Ok(positions) = surround_result else {
+            return;
+        };
+
+        // Positions come in pairs: [open, close, open, close, ...]
+        let mut changes: Vec<(usize, usize, Option<helix_core::Tendril>)> = Vec::new();
+        for pair in positions.chunks(2) {
+            if pair.len() == 2 {
+                changes.push((pair[1], pair[1] + 1, None)); // delete close first (higher pos)
+                changes.push((pair[0], pair[0] + 1, None)); // delete open
+            }
+        }
+        // Sort by position descending so we don't invalidate offsets
+        changes.sort_by(|a, b| b.0.cmp(&a.0));
+        // But Transaction expects ascending order
+        changes.reverse();
+
+        if !changes.is_empty() {
+            let transaction = helix_core::Transaction::change(doc.text(), changes.into_iter());
+            doc.apply(&transaction, view_id);
+        }
+    }
+
+    /// Replace surround pair.
+    fn surround_replace(&mut self, doc_id: DocumentId, view_id: ViewId, old: char, new: char) {
+        let (new_open, new_close) = surround_pair(new);
+
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let surround_result =
+            helix_core::surround::get_surround_pos(doc.syntax(), text, &selection, Some(old), 1);
+
+        let Ok(positions) = surround_result else {
+            return;
+        };
+
+        let mut changes: Vec<(usize, usize, Option<helix_core::Tendril>)> = Vec::new();
+        for pair in positions.chunks(2) {
+            if pair.len() == 2 {
+                changes.push((pair[0], pair[0] + 1, Some(new_open.to_string().into())));
+                changes.push((pair[1], pair[1] + 1, Some(new_close.to_string().into())));
+            }
+        }
+        // Transaction expects ascending order
+        changes.sort_by(|a, b| a.0.cmp(&b.0));
+
+        if !changes.is_empty() {
+            let transaction = helix_core::Transaction::change(doc.text(), changes.into_iter());
+            doc.apply(&transaction, view_id);
+        }
+    }
+}
+
+/// Get the matching open/close pair for a surround character.
+fn surround_pair(ch: char) -> (char, char) {
+    match ch {
+        '(' | ')' => ('(', ')'),
+        '[' | ']' => ('[', ']'),
+        '{' | '}' => ('{', '}'),
+        '<' | '>' => ('<', '>'),
+        _ => (ch, ch), // quotes etc.
     }
 }
 
