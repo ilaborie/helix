@@ -1293,16 +1293,97 @@ with many matches, consider pre-computing a byte-to-char lookup table. Added TOD
 
 ---
 
+## 2026-02-07: Core Tutor Commands — 21 New Editing/Motion/Surround Commands
+
+### Progress
+Implemented the most impactful missing commands taught in the Helix tutor, bringing the Dioxus frontend much closer to feature parity with the terminal UI.
+
+### Commands Added
+
+**Fixed keybindings (correctness fix):**
+- `;` → `CollapseSelection` (was incorrectly mapped to RepeatLastFind)
+- `,` → `KeepPrimarySelection` (was incorrectly mapped to ReverseLastFind)
+- `Alt-.` → `RepeatLastFind` (correct Helix binding for repeat last find/till)
+- Removed `ReverseLastFind` command (no default Helix binding)
+
+**Word motions:**
+- `e` — move to word end (`MoveWordEnd`)
+- `W`/`E`/`B` — WORD motions (whitespace-delimited words)
+- All word motions work in both normal (move) and select (extend) modes
+
+**Editing commands:**
+- `c` — change selection (delete + enter insert mode)
+- `I` — insert at first non-whitespace of line
+- `r<char>` — replace characters in selection (two-step via `ReplacePrefix`)
+- `R` — replace selection with yanked text (without updating clipboard)
+- `J` — join lines (replace newlines + leading whitespace with space)
+
+**Case commands:**
+- `~` — toggle case
+- `` ` `` — convert to lowercase
+- `` Alt+` `` — convert to uppercase
+
+**Bracket matching:**
+- `mm` — jump to matching bracket (uses tree-sitter when available, plaintext fallback)
+
+**Select inside/around:**
+- `mi<char>` — select inside bracket/quote pair (e.g., `mi(`, `mi"`)
+- `ma<char>` — select around bracket/quote pair
+
+**Surround operations:**
+- `ms<char>` — add surround pair around selection
+- `md<char>` — delete surround pair
+- `mr<old><new>` — replace surround pair (3-key sequence)
+
+### Architecture: Nested Pending Key Sequences
+The `m` prefix introduces multi-level pending key sequences:
+- `PendingKeySequence::MatchPrefix` → waits for `m`/`i`/`a`/`s`/`d`/`r`
+- `MatchInside`/`MatchAround`/`MatchSurround`/`MatchDeleteSurround` → waits for char
+- `MatchReplaceSurroundFrom` → waits for old char → `MatchReplaceSurroundTo(old)` → waits for new char
+
+This is the first 3-key sequence (`mr<old><new>`) in the codebase.
+
+### Implementation Details
+- **Word motions** use `helix_core::movement::move_next_word_end`, `move_next_long_word_start/end`, `move_prev_long_word_start`
+- **Replace char** uses `Transaction::change_by_selection`, preserving newlines
+- **Join lines** builds changes for each line break in selection range
+- **Case ops** use `Transaction::change_by_selection` with char-level transformations
+- **Match bracket** uses `find_matching_bracket_fuzzy()` (with syntax) or `find_matching_bracket_plaintext()` (without)
+- **Select inside/around** uses `helix_core::surround::find_nth_pairs_pos()`
+- **Surround delete/replace** uses `helix_core::surround::get_surround_pos()`
+- **Surround add** wraps selection content with open/close chars via `Transaction::change_by_selection`
+
+### Files Modified (11 files, +769/-16 lines)
+- `state/types.rs` — +15 EditorCommand variants, +8 PendingKeySequence variants
+- `state/mod.rs` — +15 match arms in `handle_command()`, `EnterInsertModeLineStart` impl
+- `operations/movement.rs` — `move_word_end`, 3 WORD motions, `match_bracket`
+- `operations/editing.rs` — `change_selection`, `replace_char`, `join_lines`, `toggle_case`, `to_lower/uppercase`, 3 surround ops
+- `operations/selection.rs` — 4 extend word/WORD ops, `collapse_selection`, `keep_primary_selection`, `select_inside/around_pair`
+- `operations/clipboard.rs` — `replace_with_yanked`
+- `keybindings/normal.rs` — +15 key mappings, Alt modifier handling
+- `keybindings/select.rs` — +8 key mappings
+- `app.rs` — +10 pending key sequence handlers
+- `components/keybinding_help.rs` — context-aware hints for all new pending states
+- `CLAUDE.md` — updated roadmap and documentation
+
+### Verification
+- `cargo check` — passes
+- `cargo fmt --all --check` — clean
+- `cargo test -p helix-dioxus --lib` — all 29 tests pass
+- No new clippy warnings in helix-dioxus
+
+---
+
 ## Planned Enhancements
 
 ### Helix Commands & Modes
 - [x] Buffer management commands (`:reload`, `:wa`, `:qa`, `:bca`, `:bco`)
 - [x] Directory commands (`:cd`, `:pwd`)
 - [x] History navigation (`:earlier`, `:later`)
+- [x] Match mode (`m` prefix - matching brackets, surround)
+- [x] Core motions (`e`, `W`/`E`/`B`, `I`, `c`, `r`, `R`, `J`, case ops)
+- [x] Selection operations (`;` collapse, `,` keep primary, `mi`/`ma`)
 - [ ] Support remaining helix commands (comprehensive coverage)
-- [ ] Space mode (leader key menu)
-- [ ] Goto mode (`g` prefix commands)
-- [ ] Match mode (`m` prefix - matching brackets, surround)
 - [ ] Right/Left bracket modes (`]`/`[` prefix - next/prev item navigation)
 
 ### Configuration
