@@ -53,11 +53,8 @@ pub fn handle_select_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         // Change selection (delete + enter insert)
         KeyCode::Char('c') => vec![EditorCommand::ChangeSelection],
 
-        // Replace with yanked text
-        KeyCode::Char('R') => vec![EditorCommand::ReplaceWithYanked],
-
-        // Paste replaces selection
-        KeyCode::Char('p') => vec![EditorCommand::DeleteSelection, EditorCommand::Paste],
+        // Replace with yanked text / paste replaces selection
+        KeyCode::Char('R' | 'p') => vec![EditorCommand::ReplaceWithYanked],
 
         // Selection operations
         KeyCode::Char(';') => vec![EditorCommand::CollapseSelection],

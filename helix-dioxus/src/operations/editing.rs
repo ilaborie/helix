@@ -379,14 +379,35 @@ impl EditingOps for EditorContext {
         }
     }
 
-    /// Change selection: delete selected text and enter insert mode.
+    /// Change selection: yank to register, delete selected text and enter insert mode.
     fn change_selection(&mut self, doc_id: DocumentId, view_id: ViewId) {
-        let doc = self.editor.document_mut(doc_id).expect("doc exists");
-        let primary = doc.selection(view_id).primary();
-        let from = primary.from();
-        let to = primary.to();
+        let register = self.take_register();
+
+        // Extract selection data (immutable borrow)
+        let (selected_text, from, to) = {
+            let doc = self.editor.document(doc_id).expect("doc exists");
+            let text = doc.text().slice(..);
+            let primary = doc.selection(view_id).primary();
+            let selected: String = text.slice(primary.from()..primary.to()).into();
+            (selected, primary.from(), primary.to())
+        };
+
+        // Yank to target register (skip for '_' black hole)
+        if register != '_' {
+            if let Err(e) = self
+                .editor
+                .registers
+                .write(register, vec![selected_text.clone()])
+            {
+                log::warn!("Failed to write to register '{}': {e}", register);
+            }
+            if register == '+' {
+                self.clipboard.clone_from(&selected_text);
+            }
+        }
 
         if from < to {
+            let doc = self.editor.document_mut(doc_id).expect("doc exists");
             let ranges = std::iter::once((from, to));
             let transaction = helix_core::Transaction::delete(doc.text(), ranges);
             doc.apply(&transaction, view_id);

@@ -238,7 +238,11 @@ Shared keybinding logic lives in `keybindings/mod.rs`:
 - `handle_text_input_keys(code, esc, enter, backspace, char_fn)` → shared Esc/Enter/Backspace/Char pattern (used by search/command modes)
 - `handle_list_navigation_keys(code, esc, up, down, enter, backspace?, char_fn?)` → shared list navigation (used by location picker, code actions)
 
-Multi-key sequences (f/F/t/T, g, Space, [, ], r, m) are handled via `PendingKeySequence` enum in `app.rs`.
+Multi-key sequences (f/F/t/T, g, Space, [, ], r, m, ") are handled via `PendingKeySequence` enum in `app.rs`.
+
+The `"` prefix selects a register for the next yank/paste/delete:
+- `"<char>` → sets `editor.selected_register` (consumed by next clipboard/editing op)
+- Examples: `"ay` (yank to `a`), `"ap` (paste from `a`), `"_d` (delete to black hole)
 
 The `m` prefix supports nested sequences:
 - `mm` → match bracket
@@ -328,7 +332,7 @@ cargo clippy -p helix-dioxus --bins
 - [ ] Add custom hooks (`use_editor_state`, `use_keybinding`)
 - [x] ~~Consider splitting picker into `FilePicker`, `BufferPicker` components~~ Split into picker/ folder
 - [ ] Add integration tests for key operations
-- [ ] Named registers (`"a`–`"z`) — register selection before yank/paste (e.g., `"ay`, `"ap`)
+- [x] ~~Named registers (`"a`–`"z`) — register selection before yank/paste (e.g., `"ay`, `"ap`)~~ Full register support with `"` prefix key, named/special registers, black hole `_`, statusline indicator
 - [ ] Register picker (`:reg` command) — picker-style overlay showing all populated registers
 
 ### UI Improvements (RustRover-inspired)
@@ -345,6 +349,7 @@ cargo clippy -p helix-dioxus --bins
 - [ ] Investigate rust-analyzer diagnostic line reporting - diagnostics may be reported on the line where parsing fails rather than where the actual error is (e.g., unterminated string reports on the next line). Consider requesting upstream fix or mapping diagnostic positions back to the originating code
 
 ### Recently Completed
+- [x] Named registers — `"` prefix key for register selection (`"ay`, `"ap`, `"_d`), `take_register()` helper, black hole register `_`, statusline `reg=` indicator, help bar hints, select mode `p` fix (`ReplaceWithYanked`)
 - [x] Core tutor commands batch — 21 commands: `;` (collapse selection), `,` (keep primary), `Alt-.` (repeat motion), `c` (change), `e`/`W`/`E`/`B` (word motions), `I` (insert line start), `r` (replace char), `R` (replace with yank), `J` (join), `~`/`` ` ``/`Alt+`` ` (case ops), `mm` (match bracket), `mi`/`ma` (select inside/around), `ms`/`md`/`mr` (surround)
 - [x] Register indicators in help bar — `+` (clipboard), `*` (selection), `/` (search) with active/inactive highlighting, click-to-open dialog with content view and Clear button
 - [x] Keybinding help bar — context-aware shortcut hints above statusline per mode and pending key sequence

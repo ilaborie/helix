@@ -60,6 +60,12 @@ fn hints_for_context(mode: &str, pending: PendingKeySequence) -> Vec<(&'static s
                 ("\"", "quotes"),
             ]
         }
+        PendingKeySequence::RegisterPrefix => vec![
+            ("a-z", "named"),
+            ("+", "clipboard"),
+            ("_", "black hole"),
+            ("\"", "default"),
+        ],
         PendingKeySequence::ReplacePrefix
         | PendingKeySequence::FindForward
         | PendingKeySequence::FindBackward
@@ -81,6 +87,7 @@ fn hints_for_context(mode: &str, pending: PendingKeySequence) -> Vec<(&'static s
                 ("y", "yank"),
                 ("p", "replace"),
                 ("x", "line"),
+                ("\"", "register"),
             ],
             _ => vec![
                 ("i", "insert"),
@@ -91,6 +98,7 @@ fn hints_for_context(mode: &str, pending: PendingKeySequence) -> Vec<(&'static s
                 ("p", "paste"),
                 ("/", "search"),
                 (":", "command"),
+                ("\"", "register"),
                 ("g..", "goto"),
                 ("Spc..", "leader"),
             ],
@@ -109,6 +117,7 @@ fn pending_prefix(pending: PendingKeySequence) -> Option<&'static str> {
         PendingKeySequence::FindBackward => Some("F"),
         PendingKeySequence::TillForward => Some("t"),
         PendingKeySequence::TillBackward => Some("T"),
+        PendingKeySequence::RegisterPrefix => Some("\""),
         PendingKeySequence::ReplacePrefix => Some("r"),
         PendingKeySequence::MatchPrefix => Some("m"),
         PendingKeySequence::MatchInside => Some("mi"),

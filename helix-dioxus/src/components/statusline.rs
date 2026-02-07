@@ -98,6 +98,7 @@ pub fn StatusLine(version: ReadSignal<usize>, on_change: EventHandler<()>) -> El
     let error_count = snapshot.error_count;
     let warning_count = snapshot.warning_count;
     let lsp_servers = snapshot.lsp_servers.clone();
+    let selected_register = snapshot.selected_register;
 
     // Mode-specific colors
     let (mode_bg, mode_fg) = match mode.as_str() {
@@ -178,6 +179,15 @@ pub fn StatusLine(version: ReadSignal<usize>, on_change: EventHandler<()>) -> El
             // Spacer
             div {
                 class: "statusline-spacer",
+            }
+
+            // Selected register indicator
+            if let Some(reg) = selected_register {
+                div {
+                    class: "statusline-register",
+                    style: "color: var(--orange); padding: 0 6px;",
+                    "reg={reg}"
+                }
             }
 
             // Position info

@@ -201,6 +201,8 @@ pub struct EditorSnapshot {
     // Register state
     /// Register snapshots for display in the help bar.
     pub registers: Vec<RegisterSnapshot>,
+    /// Currently selected register for the next operation (e.g., `"a`).
+    pub selected_register: Option<char>,
 
     // Application state
     pub should_quit: bool,
@@ -602,6 +604,8 @@ pub enum EditorCommand {
     Later(usize),
 
     // Register management
+    /// Set the selected register for the next yank/paste/delete operation.
+    SetSelectedRegister(char),
     /// Clear a register by name ('+' = clipboard, '/' = search).
     ClearRegister(char),
 }
@@ -721,6 +725,8 @@ pub enum PendingKeySequence {
     TillBackward,
     /// Waiting for character after 'r' (replace char)
     ReplacePrefix,
+    /// Waiting for register name after '"'
+    RegisterPrefix,
     /// Waiting for second key after 'm' (match/surround)
     MatchPrefix,
     /// Waiting for character after 'mi' (select inside pair)

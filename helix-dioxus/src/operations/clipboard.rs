@@ -14,8 +14,10 @@ pub trait ClipboardOps {
 }
 
 impl ClipboardOps for EditorContext {
-    /// Yank (copy) the current selection to clipboard.
+    /// Yank (copy) the current selection to the selected register.
     fn yank(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let register = self.take_register();
+
         let doc = self.editor.document(doc_id).expect("doc exists");
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id);
@@ -23,25 +25,46 @@ impl ClipboardOps for EditorContext {
 
         // Extract selected text
         let selected_text: String = text.slice(primary.from()..primary.to()).into();
-        self.clipboard.clone_from(&selected_text);
 
-        // Write to system clipboard via '+' register
-        if let Err(e) = self.editor.registers.write('+', vec![selected_text]) {
-            log::warn!("Failed to write to system clipboard: {e}");
+        // Write to the target register
+        if let Err(e) = self
+            .editor
+            .registers
+            .write(register, vec![selected_text.clone()])
+        {
+            log::warn!("Failed to write to register '{}': {e}", register);
         }
 
-        log::info!("Yanked {} characters", self.clipboard.len());
+        // Sync internal clipboard when using '+' register
+        if register == '+' {
+            self.clipboard.clone_from(&selected_text);
+        }
+
+        log::info!(
+            "Yanked {} characters to register '{}'",
+            selected_text.len(),
+            register
+        );
     }
 
-    /// Paste from clipboard.
+    /// Paste from the selected register.
     fn paste(&mut self, doc_id: DocumentId, view_id: ViewId, before: bool) {
-        // Read from system clipboard via '+' register, fall back to internal
+        let register = self.take_register();
+
+        // Read from target register; for '+' fall back to internal clipboard
         let clipboard_text = self
             .editor
             .registers
-            .read('+', &self.editor)
+            .read(register, &self.editor)
             .and_then(|mut values| values.next().map(|v| v.into_owned()))
-            .unwrap_or_else(|| self.clipboard.clone());
+            .or_else(|| {
+                if register == '+' {
+                    Some(self.clipboard.clone())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_default();
 
         if clipboard_text.is_empty() {
             return;
@@ -84,18 +107,31 @@ impl ClipboardOps for EditorContext {
         );
         doc.apply(&transaction, view_id);
 
-        log::info!("Pasted {} characters", clipboard_text.len());
+        log::info!(
+            "Pasted {} characters from register '{}'",
+            clipboard_text.len(),
+            register
+        );
     }
 
-    /// Replace selection with yanked text (without updating clipboard).
+    /// Replace selection with text from the selected register (without updating that register).
     fn replace_with_yanked(&mut self, doc_id: DocumentId, view_id: ViewId) {
-        // Read from system clipboard via '+' register, fall back to internal
+        let register = self.take_register();
+
+        // Read from target register; for '+' fall back to internal clipboard
         let clipboard_text = self
             .editor
             .registers
-            .read('+', &self.editor)
+            .read(register, &self.editor)
             .and_then(|mut values| values.next().map(|v| v.into_owned()))
-            .unwrap_or_else(|| self.clipboard.clone());
+            .or_else(|| {
+                if register == '+' {
+                    Some(self.clipboard.clone())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_default();
 
         if clipboard_text.is_empty() {
             return;
@@ -104,7 +140,7 @@ impl ClipboardOps for EditorContext {
         let doc = self.editor.document_mut(doc_id).expect("doc exists");
         let selection = doc.selection(view_id).clone();
 
-        // Replace selection content with clipboard text
+        // Replace selection content with register text
         let transaction =
             helix_core::Transaction::change_by_selection(doc.text(), &selection, |range| {
                 (
@@ -117,8 +153,10 @@ impl ClipboardOps for EditorContext {
         doc.apply(&transaction, view_id);
     }
 
-    /// Delete the current selection.
+    /// Delete the current selection, yanking to the selected register.
     fn delete_selection(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let register = self.take_register();
+
         // Extract selected text and range (immutable borrow)
         let (selected_text, from, to) = {
             let doc = self.editor.document(doc_id).expect("doc exists");
@@ -128,10 +166,19 @@ impl ClipboardOps for EditorContext {
             (selected, primary.from(), primary.to())
         };
 
-        // Yank to internal and system clipboard
-        self.clipboard.clone_from(&selected_text);
-        if let Err(e) = self.editor.registers.write('+', vec![selected_text]) {
-            log::warn!("Failed to write to system clipboard: {e}");
+        // Yank to target register (skip for '_' black hole register)
+        if register != '_' {
+            if let Err(e) = self
+                .editor
+                .registers
+                .write(register, vec![selected_text.clone()])
+            {
+                log::warn!("Failed to write to register '{}': {e}", register);
+            }
+            // Sync internal clipboard when using '+' register
+            if register == '+' {
+                self.clipboard.clone_from(&selected_text);
+            }
         }
 
         // Delete the selection
@@ -154,48 +201,117 @@ mod tests {
     use super::*;
 
     #[test]
-    fn yank_copies_to_clipboard() {
+    fn yank_copies_to_default_register() {
         let mut ctx = test_context("#[hello|]# world\n");
         let (doc_id, view_id) = doc_view(&ctx);
+        ctx.yank(doc_id, view_id);
+        // Default register is '"' (unnamed), not '+'
+        let content = ctx
+            .editor
+            .registers
+            .read('"', &ctx.editor)
+            .and_then(|mut v| v.next().map(|s| s.into_owned()))
+            .unwrap_or_default();
+        assert_eq!(content, "hello");
+    }
+
+    #[test]
+    fn yank_to_named_register() {
+        let mut ctx = test_context("#[hello|]# world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.editor.selected_register = Some('a');
+        ctx.yank(doc_id, view_id);
+        let content = ctx
+            .editor
+            .registers
+            .read('a', &ctx.editor)
+            .and_then(|mut v| v.next().map(|s| s.into_owned()))
+            .unwrap_or_default();
+        assert_eq!(content, "hello");
+    }
+
+    #[test]
+    fn yank_to_clipboard_syncs_internal() {
+        let mut ctx = test_context("#[hello|]# world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.editor.selected_register = Some('+');
         ctx.yank(doc_id, view_id);
         assert_eq!(ctx.clipboard, "hello");
     }
 
     #[test]
-    fn delete_selection_removes_text_and_yanks() {
+    fn paste_from_named_register() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        // Write "world" to register 'a'
+        ctx.editor
+            .registers
+            .write('a', vec!["world".to_string()])
+            .expect("write succeeds");
+        ctx.editor.selected_register = Some('a');
+        ctx.paste(doc_id, view_id, false);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "hworldello\n");
+    }
+
+    #[test]
+    fn delete_selection_to_named_register() {
         let mut ctx = test_context("#[hello|]# world\n");
         let (doc_id, view_id) = doc_view(&ctx);
+        ctx.editor.selected_register = Some('b');
         ctx.delete_selection(doc_id, view_id);
-        assert_eq!(ctx.clipboard, "hello");
+        let content = ctx
+            .editor
+            .registers
+            .read('b', &ctx.editor)
+            .and_then(|mut v| v.next().map(|s| s.into_owned()))
+            .unwrap_or_default();
+        assert_eq!(content, "hello");
         let (_view, doc) = helix_view::current_ref!(ctx.editor);
         let text: String = doc.text().slice(..).into();
         assert_eq!(text, " world\n");
-        assert_eq!(ctx.editor.mode, Mode::Normal);
     }
 
     #[test]
-    fn replace_with_yanked_replaces_selection() {
+    fn delete_selection_black_hole_register() {
         let mut ctx = test_context("#[hello|]# world\n");
         let (doc_id, view_id) = doc_view(&ctx);
-        // First yank "hello"
-        ctx.yank(doc_id, view_id);
-        assert_eq!(ctx.clipboard, "hello");
+        ctx.editor.selected_register = Some('_');
+        ctx.delete_selection(doc_id, view_id);
+        // Black hole register should not store anything
+        let content = ctx
+            .editor
+            .registers
+            .read('_', &ctx.editor)
+            .and_then(|mut v| v.next().map(|s| s.into_owned()));
+        assert!(content.is_none() || content.as_deref() == Some(""));
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, " world\n");
+    }
 
-        // Now select "world" and replace with yanked
-        let doc = ctx.editor.document_mut(doc_id).expect("doc exists");
-        doc.set_selection(view_id, helix_core::Selection::single(6, 11));
-
+    #[test]
+    fn replace_with_yanked_from_named_register() {
+        let mut ctx = test_context("#[hello|]# world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        // Write "REPLACED" to register 'c'
+        ctx.editor
+            .registers
+            .write('c', vec!["REPLACED".to_string()])
+            .expect("write succeeds");
+        ctx.editor.selected_register = Some('c');
         ctx.replace_with_yanked(doc_id, view_id);
         let (_view, doc) = helix_view::current_ref!(ctx.editor);
         let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "hello hello\n");
+        assert_eq!(text, "REPLACED world\n");
     }
 
     #[test]
-    fn replace_with_yanked_empty_clipboard_noop() {
+    fn replace_with_yanked_empty_register_noop() {
         let mut ctx = test_context("#[hello|]# world\n");
         let (doc_id, view_id) = doc_view(&ctx);
-        // Empty clipboard — should do nothing
+        ctx.editor.selected_register = Some('z');
         ctx.replace_with_yanked(doc_id, view_id);
         let (_view, doc) = helix_view::current_ref!(ctx.editor);
         let text: String = doc.text().slice(..).into();

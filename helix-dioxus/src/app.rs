@@ -169,6 +169,14 @@ pub fn App() -> Element {
                             vec![]
                         }
                     }
+                    PendingKeySequence::RegisterPrefix => {
+                        pending_key.set(PendingKeySequence::None);
+                        if let KeyCode::Char(ch) = key_event.code {
+                            vec![EditorCommand::SetSelectedRegister(ch)]
+                        } else {
+                            vec![]
+                        }
+                    }
                     PendingKeySequence::ReplacePrefix => {
                         pending_key.set(PendingKeySequence::None);
                         if let KeyCode::Char(ch) = key_event.code {
@@ -304,6 +312,10 @@ pub fn App() -> Element {
                                 }
                                 KeyCode::Char('m') => {
                                     pending_key.set(PendingKeySequence::MatchPrefix);
+                                    vec![]
+                                }
+                                KeyCode::Char('"') => {
+                                    pending_key.set(PendingKeySequence::RegisterPrefix);
                                     vec![]
                                 }
                                 _ => {

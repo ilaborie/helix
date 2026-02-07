@@ -290,6 +290,14 @@ impl EditorContext {
         })
     }
 
+    /// Take the selected register (consuming it) or return the default yank register.
+    pub(crate) fn take_register(&mut self) -> char {
+        self.editor
+            .selected_register
+            .take()
+            .unwrap_or_else(|| self.editor.config().default_yank_register)
+    }
+
     /// Process pending commands.
     pub fn process_commands(&mut self) {
         while let Ok(cmd) = self.command_rx.try_recv() {
@@ -921,6 +929,9 @@ impl EditorContext {
             }
 
             // Register management
+            EditorCommand::SetSelectedRegister(ch) => {
+                self.editor.selected_register = Some(ch);
+            }
             EditorCommand::ClearRegister(name) => match name {
                 '+' => {
                     self.clipboard.clear();
@@ -1455,6 +1466,7 @@ impl EditorContext {
             confirmation_dialog_visible: self.confirmation_dialog_visible,
             confirmation_dialog: self.confirmation_dialog.clone(),
             registers: self.collect_register_snapshots(),
+            selected_register: self.editor.selected_register,
             should_quit: self.should_quit,
         }
     }
