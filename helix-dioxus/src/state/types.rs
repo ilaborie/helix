@@ -644,6 +644,29 @@ pub struct ConfirmationDialogSnapshot {
     pub action: ConfirmationAction,
 }
 
+/// Tracks pending key sequence state for multi-key commands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PendingKeySequence {
+    #[default]
+    None,
+    /// Waiting for second key after 'g'
+    GPrefix,
+    /// Waiting for second key after ']'
+    BracketNext,
+    /// Waiting for second key after '['
+    BracketPrev,
+    /// Waiting for second key after Space
+    SpaceLeader,
+    /// Waiting for character after 'f' (find forward)
+    FindForward,
+    /// Waiting for character after 'F' (find backward)
+    FindBackward,
+    /// Waiting for character after 't' (till forward)
+    TillForward,
+    /// Waiting for character after 'T' (till backward)
+    TillBackward,
+}
+
 /// A single global search result for the picker.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GlobalSearchResult {

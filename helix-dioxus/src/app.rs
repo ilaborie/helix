@@ -7,8 +7,8 @@ use helix_view::input::{KeyCode, KeyModifiers};
 
 use crate::components::{
     BufferBar, CodeActionsMenu, CommandPrompt, CompletionPopup, ConfirmationDialog, EditorView,
-    GenericPicker, HoverPopup, InputDialog, LocationPicker, LspStatusDialog, NotificationContainer,
-    SearchPrompt, SignatureHelpPopup, StatusLine,
+    GenericPicker, HoverPopup, InputDialog, KeybindingHelpBar, LocationPicker, LspStatusDialog,
+    NotificationContainer, SearchPrompt, SignatureHelpPopup, StatusLine,
 };
 use crate::keybindings::{
     handle_bracket_next, handle_bracket_prev, handle_code_actions_mode, handle_command_mode,
@@ -17,31 +17,8 @@ use crate::keybindings::{
     handle_picker_mode, handle_search_mode, handle_select_mode, handle_space_leader,
     translate_key_event,
 };
-use crate::state::EditorCommand;
+use crate::state::{EditorCommand, PendingKeySequence};
 use crate::AppState;
-
-/// Tracks pending key sequence state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-enum PendingKeySequence {
-    #[default]
-    None,
-    /// Waiting for second key after 'g'
-    GPrefix,
-    /// Waiting for second key after ']'
-    BracketNext,
-    /// Waiting for second key after '['
-    BracketPrev,
-    /// Waiting for second key after Space
-    SpaceLeader,
-    /// Waiting for character after 'f' (find forward)
-    FindForward,
-    /// Waiting for character after 'F' (find backward)
-    FindBackward,
-    /// Waiting for character after 't' (till forward)
-    TillForward,
-    /// Waiting for character after 'T' (till backward)
-    TillBackward,
-}
 
 /// Main application component.
 #[component]
@@ -313,6 +290,9 @@ pub fn App() -> Element {
                     backwards: snapshot.search_backwards,
                 }
             }
+
+            // Keybinding help bar (above statusline)
+            KeybindingHelpBar { mode: snapshot.mode.clone(), pending: *pending_key.read() }
 
             // Status line at the bottom
             StatusLine {

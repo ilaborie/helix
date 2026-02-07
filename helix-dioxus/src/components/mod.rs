@@ -11,6 +11,7 @@ mod editor_view;
 mod hover;
 mod inline_dialog;
 mod input_dialog;
+mod keybinding_help;
 mod location_picker;
 mod lsp_dialog;
 mod notification;
@@ -32,6 +33,7 @@ pub use editor_view::EditorView;
 pub use hover::HoverPopup;
 // Note: inline_dialog types are used internally by input_dialog.rs via super::inline_dialog
 pub use input_dialog::InputDialog;
+pub use keybinding_help::KeybindingHelpBar;
 pub use location_picker::LocationPicker;
 pub use lsp_dialog::LspStatusDialog;
 pub use notification::NotificationContainer;

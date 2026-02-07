@@ -16,8 +16,8 @@ mod types;
 pub use types::{
     BufferInfo, ConfirmationAction, ConfirmationDialogSnapshot, Direction, EditorCommand,
     EditorSnapshot, GlobalSearchResult, InputDialogKind, InputDialogSnapshot, LineSnapshot,
-    NotificationSeverity, NotificationSnapshot, PickerIcon, PickerItem, PickerMode,
-    ScrollbarDiagnostic, TokenSpan,
+    NotificationSeverity, NotificationSnapshot, PendingKeySequence, PickerIcon, PickerItem,
+    PickerMode, ScrollbarDiagnostic, TokenSpan,
 };
 
 use std::path::PathBuf;

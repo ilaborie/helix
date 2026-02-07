@@ -41,9 +41,13 @@ helix-dioxus/src/
 │   ├── code_actions.rs         # Code actions menu (uses InlineListDialog)
 │   ├── completion.rs           # Completion popup (uses InlineListDialog)
 │   ├── confirmation_dialog.rs  # Confirmation dialog (quit with unsaved changes)
+│   ├── diagnostics.rs          # Diagnostic rendering helpers
 │   ├── hover.rs                # Hover popup (uses InlineDialogContainer)
 │   ├── input_dialog.rs         # Input dialog (rename symbol, etc.)
+│   ├── location_picker.rs      # Location picker for LSP references/definitions
+│   ├── lsp_dialog.rs           # LSP server status dialog
 │   ├── notification.rs         # Notification toast container
+│   ├── scrollbar.rs            # Custom scrollbar with diagnostic markers
 │   ├── signature_help.rs       # Signature help (uses InlineDialogContainer)
 │   └── prompt.rs               # Command/search prompts
 │
@@ -64,8 +68,9 @@ helix-dioxus/src/
 │   └── cli.rs                  # CliOps: execute_command
 │
 └── keybindings/                # Key Handling
-    ├── mod.rs                  # Re-exports handlers
+    ├── mod.rs                  # Re-exports + shared helpers (direction_from_key, handle_move_keys, etc.)
     ├── translate.rs            # Dioxus KeyboardEvent → helix KeyEvent translation
+    ├── completion.rs           # handle_completion_mode, location_picker, code_actions, lsp_dialog
     ├── normal.rs               # handle_normal_mode
     ├── insert.rs               # handle_insert_mode
     ├── select.rs               # handle_select_mode
@@ -134,12 +139,21 @@ Functions defined in `script.js`:
 - `focusAppContainer()` - focuses app on mount
 - `scrollCursorIntoView()` - scrolls cursor into view
 
+**CSS Custom Properties** (`styles.css` uses `:root` variables for theming):
+- Colors: `--bg-primary`, `--bg-secondary`, `--bg-highlight`, `--bg-selection`, `--bg-deep`, `--text`, `--text-dim`, `--text-dimmer`, `--accent`, `--error`, `--warning`, `--info`, `--hint`, `--success`, `--purple`, `--orange`
+- Font: `--font-mono`
+- Z-index layers: `--z-dropdown` (100), `--z-overlay` (200), `--z-modal` (300), `--z-notification` (300), `--z-confirmation` (400), `--z-tooltip` (9999)
+
 **CSS Classes** (defined in `styles.css`):
 - `.app-container`, `.editor-view`, `.gutter`, `.content`
 - `.buffer-bar`, `.buffer-tab`, `.statusline`
 - `.picker-*` (overlay, container, header, list, item)
 - `.prompt`, `.prompt-cursor`
 - `.completion-*`, `.hover-*`, `.code-action-*` (LSP popups)
+- `.inline-dialog`, `.inline-dialog-list`, `.inline-dialog-item` (cursor-positioned popups)
+- `.notification-*` (toast notifications)
+- `.confirmation-*` (modal confirmation dialogs)
+- `.editor-scrollbar`, `.scrollbar-*` (custom scrollbar with markers)
 
 **Dynamic Styles**: Styles requiring Rust variables remain inline:
 - Mode colors: `style: "background-color: {mode_bg};"`
@@ -215,6 +229,17 @@ CSS classes:
 1. Register the event type in `events.rs`
 2. Dispatch the event at the appropriate time in `lsp_events.rs`
 
+### Keybinding Helpers Pattern
+
+Shared keybinding logic lives in `keybindings/mod.rs`:
+- `direction_from_key(code)` → maps hjkl/arrows to `Direction`
+- `handle_move_keys(code)` → direction → `MoveLeft/Right/Up/Down`
+- `handle_extend_keys(code)` → direction → `ExtendLeft/Right/Up/Down`
+- `handle_text_input_keys(code, esc, enter, backspace, char_fn)` → shared Esc/Enter/Backspace/Char pattern (used by search/command modes)
+- `handle_list_navigation_keys(code, esc, up, down, enter, backspace?, char_fn?)` → shared list navigation (used by location picker, code actions)
+
+Multi-key sequences (f/F/t/T, g, Space, [, ]) are handled via `PendingKeySequence` enum in `app.rs`.
+
 ### Coding Conventions
 
 - Keep components under 300 lines
@@ -223,7 +248,8 @@ CSS classes:
 - Always call `process_commands_sync()` after sending commands
 - Follow Rust derive order: Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default
 - Fields that need cross-module access use `pub(crate)`
-- Extract static CSS to `styles.css`, keep dynamic styles inline in RSX
+- Extract static CSS to `styles.css` with CSS custom properties, keep dynamic styles inline in RSX
+- Use CSS custom properties (`var(--name)`) instead of hardcoded color values in CSS
 
 ## Build Commands
 
@@ -255,9 +281,9 @@ cargo clippy -p helix-dioxus --bins
 - When running `cargo test`, use `--bins` flag to skip examples: `cargo test -p helix-dioxus --bins`
 - Or exclude examples: `cargo test -p helix-dioxus --lib`
 
-### Selection appears in Normal mode after movement
-- Cause: Helix always has 1-char selection internally
-- Solution: Only render selection in Select mode (`has_selection` tied to mode)
+### Selection visibility
+- Helix always has a 1-char selection internally (even in Normal mode)
+- Solution: Show selection highlighting only when `sel_end > sel_start + 1` (multi-char selections in any mode)
 
 ### Component not re-rendering after state change
 - Cause: Dioxus 0.7 requires reading signal to subscribe
@@ -285,12 +311,12 @@ cargo clippy -p helix-dioxus --bins
 ### Planned Enhancements
 - [ ] Keybinding help bar above statusline showing common shortcuts (context-aware per mode)
 - [ ] Command panel as picker-style UI with fuzzy search
-- [ ] File-type specific icons in buffer bar
-- [ ] Mouse click support in picker
+- [x] ~~File-type specific icons in buffer bar~~ Added file-type icons
+- [x] ~~Mouse click support in picker~~ Added picker mouse clicks
 - [x] ~~LSP integration for diagnostics and completions~~ Diagnostics display with gutter icons, error lens, wavy underlines, and status bar counts
 - [ ] Multiple splits/views support
 - [ ] System clipboard integration
-- [ ] Extract theme colors to `theme.rs` or `colors.rs`
+- [x] ~~Extract theme colors to `theme.rs` or `colors.rs`~~ Extracted to CSS custom properties in `:root`
 - [ ] Add custom hooks (`use_editor_state`, `use_keybinding`)
 - [x] ~~Consider splitting picker into `FilePicker`, `BufferPicker` components~~ Split into picker/ folder
 - [ ] Add integration tests for key operations
@@ -306,14 +332,17 @@ cargo clippy -p helix-dioxus --bins
 - [ ] Investigate rust-analyzer diagnostic line reporting - diagnostics may be reported on the line where parsing fails rather than where the actual error is (e.g., unterminated string reports on the next line). Consider requesting upstream fix or mapping diagnostic positions back to the originating code
 
 ### Recently Completed
-- [x] Confirmation dialog for quit/close with unsaved changes - modal dialog with y/n/Esc keybindings, Save & Quit / Don't Save / Cancel options
-- [x] LSP document synchronization - register helix_event hooks to send `textDocument/didChange` to LSP, fixing rename corruption bug
-- [x] Code actions search box - typing filters actions by title (case-insensitive), shows filtered/total count, arrows for navigation
-- [x] Replaced unicode/emoji icons with Lucide icons throughout (statusline, LSP dialog, diagnostics)
-- [x] Implemented LSP server restart functionality via `Registry::restart_server()`
-- [x] Added diagnostic wavy underlines using CSS gradients
-- [x] Error Lens now shows on previous non-empty line when diagnostic is on empty line
-- [x] LSP progress tracking - status bar shows "Indexing" (blue) when LSP is still loading/indexing the project
-- [x] Generic inline dialog components - `InlineDialogContainer` and `InlineListDialog` for cursor-positioned popups
-- [x] Code actions color fix - icon and kind badge colored, title uses normal text color
-- [x] LSP dialog shows progress message below server name (e.g., "Loading workspace", "Building proc-macros")
+- [x] Find/till character motions (f/F/t/T) with repeat (;) and reverse (,)
+- [x] Indent/unindent (>/<), search word under cursor (*)
+- [x] Insert mode: Ctrl+w (delete word backward), Ctrl+u (delete to line start)
+- [x] Picker: Home/End/PageUp/PageDown navigation
+- [x] CSS custom properties - extracted all hardcoded colors/z-indices to `:root` variables
+- [x] Keybinding refactoring - shared helpers for move/extend/text-input/list-navigation patterns
+- [x] Buffer save refactoring - `save_doc_inner` helper, `build_confirmation_dialog` helper
+- [x] Selection visibility fix - show multi-char selections in all modes (not just Select)
+- [x] Removed unused `inlay_hints.rs` module and dead code comments
+- [x] Confirmation dialog for quit/close with unsaved changes
+- [x] LSP document synchronization - register helix_event hooks
+- [x] Scrollbar with diagnostic and search result markers, tooltips
+- [x] Generic inline dialog components
+- [x] LSP progress tracking, server restart, code actions search
