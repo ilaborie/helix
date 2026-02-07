@@ -328,4 +328,140 @@ mod tests {
         ctx.extend_line(doc_id, view_id);
         assert_state(&ctx, "#[hello\nworld\n|]#foo\n");
     }
+
+    // --- collapse_selection ---
+
+    #[test]
+    fn collapse_selection_multi_char() {
+        let mut ctx = test_context("#[hello|]# world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.collapse_selection(doc_id, view_id);
+        // Collapse to cursor position (point selection = 1 char)
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.to() - sel.from(), 1, "should be a point selection");
+    }
+
+    #[test]
+    fn collapse_selection_already_point() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.collapse_selection(doc_id, view_id);
+        assert_state(&ctx, "#[h|]#ello\n");
+    }
+
+    // --- keep_primary_selection ---
+
+    #[test]
+    fn keep_primary_selection_single() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.keep_primary_selection(doc_id, view_id);
+        assert_state(&ctx, "#[h|]#ello\n");
+    }
+
+    // --- extend_word_end ---
+
+    #[test]
+    fn extend_word_end_basic() {
+        // #[|h]# means head=0, anchor=1
+        let mut ctx = test_context("#[|h]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.extend_word_end(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        // Anchor preserved from original range (1), head moves to word end
+        assert_eq!(sel.anchor, 1, "anchor should stay at 1");
+        assert!(sel.head >= 4, "head should be at or past 'o': {:?}", sel);
+    }
+
+    // --- extend_long_word_forward ---
+
+    #[test]
+    fn extend_long_word_forward_basic() {
+        let mut ctx = test_context("#[|h]#ello.world foo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.extend_long_word_forward(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.anchor, 1, "anchor should stay at 1");
+        assert!(sel.head >= 12, "head should be at 'f': {:?}", sel);
+    }
+
+    // --- extend_long_word_end ---
+
+    #[test]
+    fn extend_long_word_end_basic() {
+        let mut ctx = test_context("#[|h]#ello.world foo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.extend_long_word_end(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.anchor, 1, "anchor should stay at 1");
+        assert!(sel.head >= 10, "head should be at or past 'd': {:?}", sel);
+    }
+
+    // --- extend_long_word_backward ---
+
+    #[test]
+    fn extend_long_word_backward_basic() {
+        // #[|f]# means head=12, anchor=13
+        let mut ctx = test_context("hello.world #[|f]#oo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.extend_long_word_backward(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.anchor, 13, "anchor should stay at 13");
+        assert_eq!(sel.head, 0, "head should be at start of 'hello.world'");
+    }
+
+    // --- select_inside_pair ---
+
+    #[test]
+    fn select_inside_pair_parens() {
+        let mut ctx = test_context("(he#[l|]#lo)\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.select_inside_pair(doc_id, view_id, '(');
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        // Inside parens: anchor=1, head=6 → text.slice(1..6) = "hello"
+        assert_eq!(sel.from(), 1, "should start after '('");
+        assert_eq!(sel.to(), 6, "head at closing delimiter position");
+    }
+
+    #[test]
+    fn select_inside_pair_quotes() {
+        let mut ctx = test_context("\"he#[l|]#lo\"\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.select_inside_pair(doc_id, view_id, '"');
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.from(), 1, "should start after '\"'");
+        assert_eq!(sel.to(), 6, "head at closing delimiter position");
+    }
+
+    // --- select_around_pair ---
+
+    #[test]
+    fn select_around_pair_parens() {
+        let mut ctx = test_context("(he#[l|]#lo)\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.select_around_pair(doc_id, view_id, '(');
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        // Around parens: anchor=0, head=close+1=7 → text.slice(0..7) = "(hello)"
+        assert_eq!(sel.from(), 0, "should include '('");
+        assert_eq!(sel.to(), 7, "should include past ')'");
+    }
+
+    #[test]
+    fn select_around_pair_brackets() {
+        let mut ctx = test_context("[he#[l|]#lo]\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.select_around_pair(doc_id, view_id, '[');
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.from(), 0, "should include '['");
+        assert_eq!(sel.to(), 7, "should include past ']'");
+    }
 }

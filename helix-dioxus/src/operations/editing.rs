@@ -677,4 +677,206 @@ mod tests {
         ctx.unindent_line(doc_id, view_id);
         assert_state(&ctx, "#[|h]#ello\n");
     }
+
+    // --- change_selection ---
+
+    #[test]
+    fn change_selection_deletes_and_enters_insert() {
+        // Select "hello" then change it
+        let mut ctx = test_context("#[hello|]# world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.change_selection(doc_id, view_id);
+        // "hello" deleted, cursor at position 0, insert mode
+        assert_eq!(ctx.editor.mode, Mode::Insert);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, " world\n");
+    }
+
+    #[test]
+    fn change_selection_point_enters_insert() {
+        // Point selection (single char) — should still enter insert
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.change_selection(doc_id, view_id);
+        assert_eq!(ctx.editor.mode, Mode::Insert);
+    }
+
+    // --- replace_char ---
+
+    #[test]
+    fn replace_char_single_char() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.replace_char(doc_id, view_id, 'X');
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "Xello\n");
+    }
+
+    #[test]
+    fn replace_char_multi_char_selection() {
+        let mut ctx = test_context("#[hel|]#lo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.replace_char(doc_id, view_id, '.');
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "...lo\n");
+    }
+
+    #[test]
+    fn replace_char_preserves_newlines() {
+        let mut ctx = test_context("#[hello\nworld|]#\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.replace_char(doc_id, view_id, '.');
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, ".....\n.....\n");
+    }
+
+    // --- join_lines ---
+
+    #[test]
+    fn join_lines_two_lines() {
+        let mut ctx = test_context("#[h|]#ello\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.join_lines(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "hello world\n");
+    }
+
+    #[test]
+    fn join_lines_strips_leading_whitespace() {
+        let mut ctx = test_context("#[h|]#ello\n    world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.join_lines(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "hello world\n");
+    }
+
+    #[test]
+    fn join_lines_multi_line_selection() {
+        // Select 3 lines, join them all
+        let mut ctx = test_context("#[|h]#ello\nworld\nfoo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.select_line(doc_id, view_id);
+        ctx.select_line(doc_id, view_id);
+        ctx.select_line(doc_id, view_id);
+        ctx.join_lines(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "hello world foo\n");
+    }
+
+    // --- toggle_case ---
+
+    #[test]
+    fn toggle_case_swaps() {
+        let mut ctx = test_context("#[Hello|]#\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.toggle_case(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "hELLO\n");
+    }
+
+    #[test]
+    fn toggle_case_single_char() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.toggle_case(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "Hello\n");
+    }
+
+    // --- to_lowercase / to_uppercase ---
+
+    #[test]
+    fn to_lowercase_converts() {
+        let mut ctx = test_context("#[HELLO|]#\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.to_lowercase(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "hello\n");
+    }
+
+    #[test]
+    fn to_uppercase_converts() {
+        let mut ctx = test_context("#[hello|]#\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.to_uppercase(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "HELLO\n");
+    }
+
+    // --- surround_add ---
+
+    #[test]
+    fn surround_add_parens() {
+        let mut ctx = test_context("#[hello|]#\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.surround_add(doc_id, view_id, '(');
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "(hello)\n");
+    }
+
+    #[test]
+    fn surround_add_quotes() {
+        let mut ctx = test_context("#[hello|]#\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.surround_add(doc_id, view_id, '"');
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "\"hello\"\n");
+    }
+
+    #[test]
+    fn surround_add_brackets() {
+        let mut ctx = test_context("#[hello|]#\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.surround_add(doc_id, view_id, '[');
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "[hello]\n");
+    }
+
+    // --- surround_delete ---
+
+    #[test]
+    fn surround_delete_parens() {
+        let mut ctx = test_context("(#[hello|]#)\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.surround_delete(doc_id, view_id, '(');
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "hello\n");
+    }
+
+    // --- surround_replace ---
+
+    #[test]
+    fn surround_replace_parens_to_brackets() {
+        let mut ctx = test_context("(#[hello|]#)\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.surround_replace(doc_id, view_id, '(', '[');
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "[hello]\n");
+    }
+
+    #[test]
+    fn surround_replace_quotes_to_parens() {
+        let mut ctx = test_context("\"#[hello|]#\"\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.surround_replace(doc_id, view_id, '"', '(');
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "(hello)\n");
+    }
 }

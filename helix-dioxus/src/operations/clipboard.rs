@@ -146,3 +146,59 @@ impl ClipboardOps for EditorContext {
         self.editor.mode = Mode::Normal;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::test_helpers::{doc_view, test_context};
+
+    use super::*;
+
+    #[test]
+    fn yank_copies_to_clipboard() {
+        let mut ctx = test_context("#[hello|]# world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.yank(doc_id, view_id);
+        assert_eq!(ctx.clipboard, "hello");
+    }
+
+    #[test]
+    fn delete_selection_removes_text_and_yanks() {
+        let mut ctx = test_context("#[hello|]# world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.delete_selection(doc_id, view_id);
+        assert_eq!(ctx.clipboard, "hello");
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, " world\n");
+        assert_eq!(ctx.editor.mode, Mode::Normal);
+    }
+
+    #[test]
+    fn replace_with_yanked_replaces_selection() {
+        let mut ctx = test_context("#[hello|]# world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        // First yank "hello"
+        ctx.yank(doc_id, view_id);
+        assert_eq!(ctx.clipboard, "hello");
+
+        // Now select "world" and replace with yanked
+        let doc = ctx.editor.document_mut(doc_id).expect("doc exists");
+        doc.set_selection(view_id, helix_core::Selection::single(6, 11));
+
+        ctx.replace_with_yanked(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "hello hello\n");
+    }
+
+    #[test]
+    fn replace_with_yanked_empty_clipboard_noop() {
+        let mut ctx = test_context("#[hello|]# world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        // Empty clipboard — should do nothing
+        ctx.replace_with_yanked(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "hello world\n");
+    }
+}

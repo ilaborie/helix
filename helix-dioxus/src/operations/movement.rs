@@ -407,4 +407,77 @@ mod tests {
         ctx.move_cursor(doc_id, view_id, Direction::Up);
         assert_state(&ctx, "he#[l|]#lo\nworld\n");
     }
+
+    #[test]
+    fn move_word_end_basic() {
+        let mut ctx = test_context("#[h|]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.move_word_end(doc_id, view_id);
+        // word end moves to last char of current word
+        let (view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view.id).primary();
+        // Should land at 'o' (index 4) — the end of "hello"
+        assert!(sel.head >= 4, "head should be at or past 'o': {:?}", sel);
+    }
+
+    #[test]
+    fn move_long_word_forward_skips_punctuation() {
+        let mut ctx = test_context("#[h|]#ello.world foo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.move_long_word_forward(doc_id, view_id);
+        // WORD motion treats punctuation as part of word, so jumps past "hello.world"
+        let (view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view.id).primary();
+        // Should land at 'f' (index 12) — start of "foo"
+        assert!(sel.head >= 12, "head should be at 'f': {:?}", sel);
+    }
+
+    #[test]
+    fn move_long_word_end_skips_punctuation() {
+        let mut ctx = test_context("#[h|]#ello.world foo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.move_long_word_end(doc_id, view_id);
+        // WORD end should land at end of "hello.world"
+        let (view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view.id).primary();
+        // 'd' is at index 10
+        assert!(sel.head >= 10, "head should be at or past 'd': {:?}", sel);
+    }
+
+    #[test]
+    fn move_long_word_backward_skips_punctuation() {
+        let mut ctx = test_context("hello.world #[f|]#oo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.move_long_word_backward(doc_id, view_id);
+        // WORD backward should move head to start of "hello.world"
+        let (view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view.id).primary();
+        assert_eq!(sel.from(), 0, "should start at 'hello.world': {:?}", sel);
+    }
+
+    #[test]
+    fn match_bracket_parens() {
+        // Plaintext bracket matching (no syntax tree)
+        let mut ctx = test_context("#[(|]#a + b)\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.match_bracket(doc_id, view_id);
+        assert_state(&ctx, "(a + b#[)|]#\n");
+    }
+
+    #[test]
+    fn match_bracket_reverse() {
+        let mut ctx = test_context("(a + b#[)|]#\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.match_bracket(doc_id, view_id);
+        assert_state(&ctx, "#[(|]#a + b)\n");
+    }
+
+    #[test]
+    fn match_bracket_no_match() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.match_bracket(doc_id, view_id);
+        // No bracket at cursor — should not move
+        assert_state(&ctx, "#[h|]#ello\n");
+    }
 }
