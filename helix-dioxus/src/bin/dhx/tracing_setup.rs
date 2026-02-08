@@ -1,4 +1,4 @@
-//! Tracing configuration for helix-dioxus.
+//! Tracing configuration for the dhx binary.
 //!
 //! This module sets up the tracing subscriber with custom filtering to suppress
 //! noisy webview events like `SelectionDidChange` that pollute the console output.
@@ -10,6 +10,7 @@ use std::fs::File;
 use std::io;
 use std::sync::Mutex;
 
+use helix_dioxus::config::LoggingConfig;
 use tracing::{Event, Subscriber};
 use tracing_subscriber::fmt::format::Writer;
 use tracing_subscriber::fmt::{self, FmtContext, FormatEvent, FormatFields};
@@ -18,32 +19,17 @@ use tracing_subscriber::registry::LookupSpan;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 
-/// Patterns to filter out from log output.
-/// These are substrings that, if found in a log message, will cause it to be suppressed.
-const SUPPRESSED_PATTERNS: &[&str] = &[
-    "SelectionDidChange",
-    "Dispatched unknown event",
-    "mousemove",
-    "mouseenter",
-    "mouseleave",
-    "pointermove",
-    "pointerenter",
-    "pointerleave",
-    // Add more patterns here as needed
-];
-
-/// Log file path
-const LOG_FILE: &str = "/tmp/helix-dioxus.log";
-
 /// Custom event formatter that filters out messages containing suppressed patterns.
 struct FilteringFormatter {
     inner: fmt::format::Format,
+    suppressed_patterns: Vec<String>,
 }
 
 impl FilteringFormatter {
-    fn new() -> Self {
+    fn new(suppressed_patterns: Vec<String>) -> Self {
         Self {
             inner: fmt::format::Format::default(),
+            suppressed_patterns,
         }
     }
 }
@@ -67,9 +53,10 @@ where
         self.inner.format_event(ctx, capture_writer, event)?;
 
         // Check if message contains any suppressed patterns
-        let should_suppress = SUPPRESSED_PATTERNS
+        let should_suppress = self
+            .suppressed_patterns
             .iter()
-            .any(|pattern| message_buf.contains(pattern));
+            .any(|pattern| message_buf.contains(pattern.as_str()));
 
         if should_suppress {
             // Don't write anything - effectively suppresses the message
@@ -81,60 +68,57 @@ where
     }
 }
 
-/// Initialize the tracing subscriber with custom filtering.
+/// Initialize the tracing subscriber with configuration from `LoggingConfig`.
 ///
 /// This sets up:
-/// - Environment-based filtering via `RUST_LOG` (defaults to `info`)
+/// - Environment-based filtering via `RUST_LOG` (defaults to configured level)
 /// - Custom message filtering to suppress noisy webview events
-/// - Output to file at `/tmp/helix-dioxus.log`
+/// - Output to configured log file (falls back to stderr)
 ///
 /// # Panics
 ///
 /// Panics if a global subscriber has already been set.
-pub fn init() {
-    // Create a base filter from RUST_LOG env var, defaulting to info level
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+pub fn init(config: &LoggingConfig) {
+    // Create a base filter from RUST_LOG env var, defaulting to configured level
+    let env_filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.level));
+
+    let suppressed = config.suppressed_patterns.clone();
 
     // Try to create log file, fall back to stderr if it fails
-    if let Ok(log_file) = File::create(LOG_FILE) {
-        // Log to file
+    let log_file = config
+        .log_file
+        .as_ref()
+        .and_then(|path| File::create(path).ok());
+
+    if let Some(log_file) = log_file {
+        let path_display = config
+            .log_file
+            .as_ref()
+            .map_or_else(String::new, |p| p.display().to_string());
+
         let fmt_layer = fmt::layer()
             .with_target(false)
             .with_ansi(false)
             .with_writer(Mutex::new(log_file))
-            .event_format(FilteringFormatter::new());
+            .event_format(FilteringFormatter::new(suppressed));
 
         tracing_subscriber::registry()
             .with(env_filter)
             .with(fmt_layer)
             .init();
 
-        eprintln!("Logging to {LOG_FILE}");
+        eprintln!("Logging to {path_display}");
     } else {
         // Fall back to stderr
         let fmt_layer = fmt::layer()
             .with_target(false)
             .with_writer(io::stderr)
-            .event_format(FilteringFormatter::new());
+            .event_format(FilteringFormatter::new(suppressed));
 
         tracing_subscriber::registry()
             .with(env_filter)
             .with(fmt_layer)
             .init();
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn suppressed_patterns_contains_selection_did_change() {
-        assert!(SUPPRESSED_PATTERNS.contains(&"SelectionDidChange"));
-    }
-
-    #[test]
-    fn suppressed_patterns_contains_dispatched_unknown_event() {
-        assert!(SUPPRESSED_PATTERNS.contains(&"Dispatched unknown event"));
     }
 }

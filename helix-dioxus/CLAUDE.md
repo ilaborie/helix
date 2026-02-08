@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with the helix-dioxus cr
 
 ## Architecture
 
-helix-dioxus is a Dioxus 0.7 desktop frontend for the Helix text editor.
+helix-dioxus is a Dioxus 0.7 desktop frontend for the Helix text editor, structured as a library crate with a `dhx` binary.
 
 ### Key Architectural Pattern
 
@@ -17,12 +17,15 @@ helix-dioxus is a Dioxus 0.7 desktop frontend for the Helix text editor.
 
 ```
 helix-dioxus/src/
-├── main.rs                     # Entry point (anemic: tracing, helix loader, args, launch)
-├── lib.rs                      # Library root: launch(), AppState, module declarations
+├── lib.rs                      # Library root: launch(), AppState, public module declarations
+├── config.rs                   # DhxConfig: window, font, logging settings (from dhx.toml)
 ├── app.rs                      # Root App component
-├── args.rs                     # Command-line argument parsing
 ├── events.rs                   # Event registration for helix_event (MUST run before hooks)
-├── tracing.rs                  # Logging configuration
+│
+├── bin/dhx/                    # Binary entry point
+│   ├── main.rs                 # CLI: loads config, inits tracing/loader, launches app
+│   ├── args.rs                 # Command-line argument parsing → StartupAction
+│   └── tracing_setup.rs        # Tracing subscriber init from LoggingConfig
 │
 ├── components/                 # UI Components
 │   ├── mod.rs                  # Re-exports
@@ -52,8 +55,8 @@ helix-dioxus/src/
 │   └── prompt.rs               # Command/search prompts
 │
 ├── state/                      # State Management
-│   ├── mod.rs                  # EditorContext, command dispatch
-│   ├── types.rs                # Data structures (EditorSnapshot, etc.)
+│   ├── mod.rs                  # EditorContext, command dispatch, config loading
+│   ├── types.rs                # Data structures (EditorSnapshot, StartupAction, etc.)
 │   └── lsp_events.rs           # LspEventOps: poll_lsp_events, diagnostics handling
 │
 ├── operations/                 # Editor Operations (extension traits)
@@ -269,7 +272,7 @@ The `m` prefix supports nested sequences:
 # Development build
 cargo build -p helix-dioxus
 
-# Run with file
+# Run with file (binary is named 'dhx')
 cargo run -p helix-dioxus -- <file>
 
 # Run with directory (opens file picker)
@@ -278,11 +281,62 @@ cargo run -p helix-dioxus -- <directory>
 # Run with glob pattern
 cargo run -p helix-dioxus -- "src/*.rs"
 
-# Check compilation
-cargo check -p helix-dioxus
+# Check compilation (both library and binary)
+cargo check -p helix-dioxus --bins --lib
 
 # Lint
-cargo clippy -p helix-dioxus --bins
+cargo clippy -p helix-dioxus --bins --lib
+
+# Tests (use --lib to skip examples)
+cargo test -p helix-dioxus --lib
+
+# Documentation
+cargo doc -p helix-dioxus --no-deps
+```
+
+## Library Usage
+
+helix-dioxus can be used as a library to build custom IDE-like applications:
+
+```rust
+use helix_dioxus::{DhxConfig, StartupAction};
+
+fn main() -> anyhow::Result<()> {
+    let config = DhxConfig::default()
+        .with_window_title("My IDE")
+        .with_font_size(16.0);
+
+    helix_loader::initialize_config_file(None);
+    helix_loader::initialize_log_file(None);
+
+    let runtime = tokio::runtime::Runtime::new()?;
+    let _guard = runtime.enter();
+
+    helix_dioxus::launch(config, StartupAction::None)
+}
+```
+
+### Configuration
+
+**Two-layer config strategy:**
+- **Shared with helix-term**: `~/.config/helix/config.toml` (`[editor]` settings, `theme`) and `languages.toml` (LSP config)
+- **GUI-specific**: `~/.config/helix/dhx.toml` for window, font, and logging settings
+
+```toml
+# ~/.config/helix/dhx.toml
+[window]
+title = "My IDE"
+width = 1400.0
+height = 900.0
+
+[font]
+family = "'Fira Code', monospace"
+size = 16.0
+ligatures = true
+
+[logging]
+level = "debug"
+log_file = "/tmp/my-ide.log"
 ```
 
 ## Keybinding Comparison

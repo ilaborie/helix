@@ -17,7 +17,7 @@ pub use types::{
     BufferInfo, ConfirmationAction, ConfirmationDialogSnapshot, Direction, EditorCommand,
     EditorSnapshot, GlobalSearchResult, InputDialogKind, InputDialogSnapshot, LineSnapshot,
     NotificationSeverity, NotificationSnapshot, PendingKeySequence, PickerIcon, PickerItem,
-    PickerMode, RegisterSnapshot, ScrollbarDiagnostic, TokenSpan,
+    PickerMode, RegisterSnapshot, ScrollbarDiagnostic, StartupAction, TokenSpan,
 };
 
 use std::path::PathBuf;
@@ -180,23 +180,31 @@ pub struct EditorContext {
 impl EditorContext {
     /// Create a new editor context with the given file.
     pub fn new(
+        _dhx_config: &crate::config::DhxConfig,
         file: Option<PathBuf>,
         command_rx: mpsc::Receiver<EditorCommand>,
         command_tx: mpsc::Sender<EditorCommand>,
     ) -> Result<Self> {
-        // Load syntax configuration
-        let syn_loader = helix_core::config::default_lang_config();
-        let syn_loader = helix_core::syntax::Loader::new(syn_loader)?;
+        // Load syntax configuration (user languages.toml merged with defaults)
+        let syn_loader = helix_core::config::user_lang_loader().unwrap_or_else(|err| {
+            log::warn!("Failed to load user language config: {err}");
+            helix_core::config::default_lang_loader()
+        });
         let syn_loader = Arc::new(arc_swap::ArcSwap::from_pointee(syn_loader));
 
-        // Load theme
-        let theme_loader = helix_view::theme::Loader::new(&[]);
+        // Load theme with proper search paths (user config dir + runtime dirs)
+        let mut theme_parent_dirs = vec![helix_loader::config_dir()];
+        theme_parent_dirs.extend(helix_loader::runtime_dirs().iter().cloned());
+        let theme_loader = helix_view::theme::Loader::new(&theme_parent_dirs);
         let theme_loader = Arc::new(theme_loader);
 
-        // Create editor configuration
-        let config = helix_view::editor::Config::default();
-        let config: Arc<dyn arc_swap::access::DynAccess<helix_view::editor::Config>> =
-            Arc::new(arc_swap::ArcSwap::from_pointee(config));
+        // Load editor configuration from config.toml [editor] section
+        let editor_config = load_editor_config();
+        let editor_config: Arc<dyn arc_swap::access::DynAccess<helix_view::editor::Config>> =
+            Arc::new(arc_swap::ArcSwap::from_pointee(editor_config));
+
+        // Load theme name from config.toml
+        let theme_name = load_theme_name();
 
         // Create handlers and register essential hooks
         let handlers = create_handlers();
@@ -206,9 +214,19 @@ impl EditorContext {
             helix_view::graphics::Rect::new(0, 0, 120, 40),
             theme_loader,
             syn_loader,
-            config,
+            editor_config,
             handlers,
         );
+
+        // Apply user-configured theme
+        if let Some(theme) = theme_name {
+            if let Ok(loaded_theme) = editor.theme_loader.load(&theme) {
+                editor.set_theme(loaded_theme);
+                log::info!("Applied theme: {theme}");
+            } else {
+                log::warn!("Failed to load theme: {theme}, using default");
+            }
+        }
 
         // Initialize syntax highlighting scopes from the theme
         // This is required for the highlighter to produce meaningful highlights
@@ -3214,4 +3232,45 @@ fn create_handlers() -> helix_view::handlers::Handlers {
     helix_view::handlers::register_hooks(&handlers);
 
     handlers
+}
+
+/// Load editor configuration from the user's `config.toml` `[editor]` section.
+///
+/// Falls back to defaults if the file doesn't exist or can't be parsed.
+fn load_editor_config() -> helix_view::editor::Config {
+    let config_path = helix_loader::config_file();
+    let content = match std::fs::read_to_string(&config_path) {
+        Ok(c) => c,
+        Err(_) => return helix_view::editor::Config::default(),
+    };
+
+    // Parse the TOML and extract the [editor] section
+    let toml_val: toml::Value = match toml::from_str(&content) {
+        Ok(v) => v,
+        Err(err) => {
+            log::warn!("Failed to parse config.toml: {err}");
+            return helix_view::editor::Config::default();
+        }
+    };
+
+    match toml_val.get("editor") {
+        Some(editor_val) => editor_val.clone().try_into().unwrap_or_else(|err| {
+            log::warn!("Failed to deserialize [editor] config: {err}");
+            helix_view::editor::Config::default()
+        }),
+        None => helix_view::editor::Config::default(),
+    }
+}
+
+/// Load the theme name from the user's `config.toml`.
+///
+/// Returns `None` if no theme is specified or the file can't be read.
+fn load_theme_name() -> Option<String> {
+    let config_path = helix_loader::config_file();
+    let content = std::fs::read_to_string(config_path).ok()?;
+    let toml_val: toml::Value = toml::from_str(&content).ok()?;
+    toml_val
+        .get("theme")
+        .and_then(toml::Value::as_str)
+        .map(String::from)
 }

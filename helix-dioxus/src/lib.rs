@@ -1,14 +1,29 @@
-//! Helix Dioxus - A GUI frontend for Helix editor
+//! Helix Dioxus - A library for building GUI frontends for the Helix text editor
 //!
 //! This crate provides a Dioxus-based desktop GUI for the Helix text editor,
 //! reusing helix-core and helix-view for the editing engine.
+//!
+//! ## Quick Start
+//!
+//! ```no_run
+//! use helix_dioxus::{DhxConfig, StartupAction};
+//!
+//! fn main() -> anyhow::Result<()> {
+//!     let config = DhxConfig::load_default()?;
+//!     helix_loader::initialize_config_file(None);
+//!     helix_loader::initialize_log_file(None);
+//!     let runtime = tokio::runtime::Runtime::new()?;
+//!     let _guard = runtime.enter();
+//!     helix_dioxus::launch(config, StartupAction::None)
+//! }
+//! ```
 //!
 //! ## Architecture
 //!
 //! Since `helix_view::Editor` contains non-Send/Sync types (Cell, trait objects, etc.),
 //! we cannot share it directly via Dioxus context. Instead:
 //!
-//! 1. EditorContext lives on the main thread and is never shared
+//! 1. `EditorContext` lives on the main thread and is never shared
 //! 2. We create snapshots of editor state for rendering
 //! 3. Commands are sent via channels and processed on the main thread
 //! 4. The Dioxus app runs in a single-threaded context
@@ -20,25 +35,28 @@ use std::sync::mpsc;
 use anyhow::Result;
 use dioxus::desktop::tao::window::Icon;
 
+// Public library modules
+pub mod components;
+pub mod config;
+pub mod events;
+pub mod keybindings;
+pub mod lsp;
+pub mod operations;
+pub mod state;
+
+// Internal modules
 mod app;
-pub mod args;
-mod components;
-mod events;
-mod keybindings;
-mod lsp;
-mod operations;
-mod state;
-pub mod tracing;
 
 #[cfg(test)]
 mod test_helpers;
 
-use args::StartupAction;
-use state::{EditorCommand, EditorContext, EditorSnapshot};
+// Convenience re-exports
+pub use config::DhxConfig;
+pub use state::{EditorCommand, EditorContext, EditorSnapshot, StartupAction};
 
 // Thread-local storage for EditorContext to allow synchronous command processing
 thread_local! {
-    static EDITOR_CTX: RefCell<Option<Rc<RefCell<EditorContext>>>> = const { RefCell::new(None) };
+    pub(crate) static EDITOR_CTX: RefCell<Option<Rc<RefCell<EditorContext>>>> = const { RefCell::new(None) };
 }
 
 /// Custom JavaScript for the webview.
@@ -56,7 +74,12 @@ fn load_icon() -> Option<Icon> {
 ///
 /// This function initializes the editor context based on the startup action,
 /// sets up the Dioxus application, and starts the event loop.
-pub fn launch(startup_action: StartupAction) -> Result<()> {
+///
+/// Before calling this, ensure:
+/// - `helix_loader::initialize_config_file(None)` has been called
+/// - `helix_loader::initialize_log_file(None)` has been called
+/// - A Tokio runtime is active (via `Runtime::enter()`)
+pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
     // Register helix-view events with helix_event.
     // This must be done before creating handlers that register hooks for these events.
     events::register();
@@ -67,11 +90,11 @@ pub fn launch(startup_action: StartupAction) -> Result<()> {
     // Initialize editor context based on startup action
     let (mut editor_ctx, pending_commands) = match &startup_action {
         StartupAction::None | StartupAction::OpenFilePicker => (
-            EditorContext::new(None, command_rx, command_tx.clone())?,
+            EditorContext::new(&config, None, command_rx, command_tx.clone())?,
             Vec::new(),
         ),
         StartupAction::OpenFile(path) => (
-            EditorContext::new(Some(path.clone()), command_rx, command_tx.clone())?,
+            EditorContext::new(&config, Some(path.clone()), command_rx, command_tx.clone())?,
             Vec::new(),
         ),
         StartupAction::OpenFiles(files) => {
@@ -84,7 +107,7 @@ pub fn launch(startup_action: StartupAction) -> Result<()> {
                 .map(EditorCommand::OpenFile)
                 .collect();
             (
-                EditorContext::new(first, command_rx, command_tx.clone())?,
+                EditorContext::new(&config, first, command_rx, command_tx.clone())?,
                 rest,
             )
         }
@@ -121,17 +144,23 @@ pub fn launch(startup_action: StartupAction) -> Result<()> {
     let editor_ctx_clone = editor_ctx.clone();
     let snapshot_ref = app_state.snapshot.clone();
 
+    // Build custom head with font CSS injection and JavaScript
+    let custom_head = format!("{}\n<script>{CUSTOM_SCRIPT}</script>", config.font_css());
+
     // Launch Dioxus desktop app
     dioxus::LaunchBuilder::desktop()
         .with_cfg(
             dioxus::desktop::Config::new()
                 .with_window(
                     dioxus::desktop::WindowBuilder::new()
-                        .with_title("helix-dioxus")
-                        .with_inner_size(dioxus::desktop::LogicalSize::new(1200.0, 800.0))
+                        .with_title(&config.window.title)
+                        .with_inner_size(dioxus::desktop::LogicalSize::new(
+                            config.window.width,
+                            config.window.height,
+                        ))
                         .with_window_icon(load_icon()),
                 )
-                .with_custom_head(format!("<script>{CUSTOM_SCRIPT}</script>"))
+                .with_custom_head(custom_head)
                 .with_custom_event_handler(move |_event, _target| {
                     // Process commands on each event loop iteration
                     if let Ok(mut ctx) = editor_ctx_clone.try_borrow_mut() {

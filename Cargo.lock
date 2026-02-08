@@ -3081,8 +3081,10 @@ dependencies = [
  "once_cell",
  "parking_lot",
  "rfd 0.15.4",
+ "serde",
  "thiserror 2.0.18",
  "tokio",
+ "toml 0.8.2",
  "tracing",
  "tracing-subscriber",
 ]

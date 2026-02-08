@@ -10,9 +10,13 @@ categories.workspace = true
 repository.workspace = true
 homepage.workspace = true
 
+[lib]
+name = "helix_dioxus"
+path = "src/lib.rs"
+
 [[bin]]
-name = "hx-dioxus"
-path = "src/main.rs"
+name = "dhx"
+path = "src/bin/dhx/main.rs"
 
 [features]
 default = []
@@ -37,6 +41,10 @@ futures = "0.3"
 log = "0.4"
 tracing = { version = "0.1", features = ["log"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
 
 # Error handling
 anyhow = "1"

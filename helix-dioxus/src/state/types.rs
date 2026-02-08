@@ -12,6 +12,19 @@ use crate::lsp::{
     HoverSnapshot, InlayHintSnapshot, LocationSnapshot, LspServerSnapshot, SignatureHelpSnapshot,
 };
 
+/// Determines what action to take on startup.
+#[derive(Debug, Clone)]
+pub enum StartupAction {
+    /// No argument provided - open scratch buffer.
+    None,
+    /// Single file to open.
+    OpenFile(PathBuf),
+    /// Multiple files to open (from glob pattern or multiple args).
+    OpenFiles(Vec<PathBuf>),
+    /// Directory argument - open file picker in that directory.
+    OpenFilePicker,
+}
+
 /// Buffer info for the tab bar.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BufferInfo {
@@ -779,7 +792,7 @@ pub enum PendingKeySequence {
     MatchDeleteSurround,
     /// Waiting for first character after 'mr' (surround replace: old char)
     MatchReplaceSurroundFrom,
-    /// Waiting for second character after 'mr<old>' (surround replace: new char)
+    /// Waiting for second character after `mr<old>` (surround replace: new char)
     MatchReplaceSurroundTo(char),
 }
 

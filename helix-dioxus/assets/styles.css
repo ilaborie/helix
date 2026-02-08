@@ -20,8 +20,10 @@
     --purple: #c678dd;
     --orange: #d19a66;
 
-    /* Font */
+    /* Font (overridden by DhxConfig font_css injection) */
     --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, Monaco, monospace;
+    --font-size: 14px;
+    --font-ligatures: normal;
 
     /* Cursor */
     --cursor-normal: #61afef;
@@ -91,7 +93,8 @@ body {
     display: flex;
     height: 100%;
     overflow: hidden;
-    font-size: 14px;
+    font-size: var(--font-size);
+    font-feature-settings: var(--font-ligatures);
     line-height: 1.5;
 }
 

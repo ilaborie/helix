@@ -31,6 +31,8 @@ fn init() -> tokio::runtime::EnterGuard<'static> {
     use std::sync::Once;
     static EVENTS_INIT: Once = Once::new();
     EVENTS_INIT.call_once(|| {
+        helix_loader::initialize_config_file(None);
+        helix_loader::initialize_log_file(None);
         crate::events::register();
     });
 
@@ -57,7 +59,9 @@ pub fn test_context(annotated: &str) -> EditorContext {
     let (text, selection) = print(annotated);
     let (tx, rx) = mpsc::channel();
 
-    let mut ctx = EditorContext::new(None, rx, tx).expect("EditorContext creation should succeed");
+    let config = crate::config::DhxConfig::default();
+    let mut ctx =
+        EditorContext::new(&config, None, rx, tx).expect("EditorContext creation should succeed");
 
     // Replace the scratch buffer content with our test text
     {

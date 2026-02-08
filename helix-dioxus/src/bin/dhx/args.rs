@@ -1,19 +1,8 @@
-//! Command-line argument parsing.
+//! Command-line argument parsing for the dhx binary.
 
 use std::path::PathBuf;
 
-/// Determines what action to take based on command line arguments.
-#[derive(Debug, Clone)]
-pub enum StartupAction {
-    /// No argument provided - open scratch buffer.
-    None,
-    /// Single file to open.
-    OpenFile(PathBuf),
-    /// Multiple files to open (from glob pattern or multiple args).
-    OpenFiles(Vec<PathBuf>),
-    /// Directory argument - open file picker in that directory.
-    OpenFilePicker,
-}
+use helix_dioxus::StartupAction;
 
 /// Parse command-line arguments and determine the startup action.
 pub fn parse_args() -> StartupAction {
