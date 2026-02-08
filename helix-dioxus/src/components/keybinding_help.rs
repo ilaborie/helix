@@ -76,6 +76,16 @@ fn hints_for_context(mode: &str, pending: PendingKeySequence) -> Vec<(&'static s
             ("_", "black hole"),
             ("\"", "default"),
         ],
+        PendingKeySequence::ViewPrefix | PendingKeySequence::ViewPrefixSticky => vec![
+            ("z/c", "center"),
+            ("t", "top"),
+            ("b", "bottom"),
+            ("j/k", "scroll"),
+            ("C-f/b", "page"),
+            ("C-d/u", "half"),
+            ("/", "search"),
+            ("n/N", "next/prev"),
+        ],
         PendingKeySequence::ReplacePrefix
         | PendingKeySequence::FindForward
         | PendingKeySequence::FindBackward
@@ -138,6 +148,8 @@ fn pending_prefix(pending: PendingKeySequence) -> Option<&'static str> {
         PendingKeySequence::MatchDeleteSurround => Some("md"),
         PendingKeySequence::MatchReplaceSurroundFrom => Some("mr"),
         PendingKeySequence::MatchReplaceSurroundTo(_) => Some("mr"),
+        PendingKeySequence::ViewPrefix => Some("z"),
+        PendingKeySequence::ViewPrefixSticky => Some("Z"),
         PendingKeySequence::None => None,
     }
 }

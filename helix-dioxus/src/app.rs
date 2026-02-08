@@ -15,7 +15,7 @@ use crate::keybindings::{
     handle_completion_mode, handle_confirmation_mode, handle_g_prefix, handle_input_dialog_mode,
     handle_insert_mode, handle_location_picker_mode, handle_lsp_dialog_mode, handle_normal_mode,
     handle_picker_mode, handle_search_mode, handle_select_mode, handle_space_leader,
-    translate_key_event,
+    handle_view_prefix, translate_key_event,
 };
 use crate::state::{EditorCommand, PendingKeySequence};
 use crate::AppState;
@@ -279,6 +279,23 @@ pub fn App() -> Element {
                             vec![]
                         }
                     }
+                    PendingKeySequence::ViewPrefix => {
+                        pending_key.set(PendingKeySequence::None);
+                        handle_view_prefix(&key_event)
+                    }
+                    PendingKeySequence::ViewPrefixSticky => {
+                        if key_event.code == KeyCode::Esc {
+                            pending_key.set(PendingKeySequence::None);
+                            vec![]
+                        } else {
+                            let cmds = handle_view_prefix(&key_event);
+                            // Exit sticky mode on unrecognized key
+                            if cmds.is_empty() {
+                                pending_key.set(PendingKeySequence::None);
+                            }
+                            cmds
+                        }
+                    }
                     PendingKeySequence::None => {
                         // Check for Ctrl modifier first - Ctrl+key combos go to normal mode handler
                         if key_event.modifiers.contains(KeyModifiers::CONTROL) {
@@ -332,6 +349,14 @@ pub fn App() -> Element {
                                 }
                                 KeyCode::Char('"') => {
                                     pending_key.set(PendingKeySequence::RegisterPrefix);
+                                    vec![]
+                                }
+                                KeyCode::Char('z') => {
+                                    pending_key.set(PendingKeySequence::ViewPrefix);
+                                    vec![]
+                                }
+                                KeyCode::Char('Z') => {
+                                    pending_key.set(PendingKeySequence::ViewPrefixSticky);
                                     vec![]
                                 }
                                 _ => {

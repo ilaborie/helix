@@ -399,6 +399,9 @@ impl EditorContext {
             EditorCommand::MatchBracket => {
                 self.match_bracket(doc_id, view_id);
             }
+            EditorCommand::AlignViewCenter => self.align_view_center(doc_id, view_id),
+            EditorCommand::AlignViewTop => self.align_view_top(doc_id, view_id),
+            EditorCommand::AlignViewBottom => self.align_view_bottom(doc_id, view_id),
 
             // Mode changes
             EditorCommand::EnterInsertMode => self.editor.mode = Mode::Insert,

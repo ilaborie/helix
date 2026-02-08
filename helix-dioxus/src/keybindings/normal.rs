@@ -5,6 +5,48 @@ use helix_view::input::{KeyCode, KeyEvent, KeyModifiers};
 use super::handle_move_keys;
 use crate::state::EditorCommand;
 
+/// Handle view mode sub-keys (after `z` or `Z` prefix).
+///
+/// Returns commands for alignment, scrolling, and search operations.
+/// Returns an empty vec for unrecognized keys (or Esc).
+pub fn handle_view_prefix(key: &KeyEvent) -> Vec<EditorCommand> {
+    // Handle Ctrl+key combinations
+    if key.modifiers.contains(KeyModifiers::CONTROL) {
+        return match key.code {
+            KeyCode::Char('b') => vec![EditorCommand::PageUp],
+            KeyCode::Char('f') => vec![EditorCommand::PageDown],
+            KeyCode::Char('u') => vec![EditorCommand::HalfPageUp],
+            KeyCode::Char('d') => vec![EditorCommand::HalfPageDown],
+            _ => vec![],
+        };
+    }
+
+    match key.code {
+        // Alignment
+        KeyCode::Char('z') | KeyCode::Char('c') => vec![EditorCommand::AlignViewCenter],
+        KeyCode::Char('t') => vec![EditorCommand::AlignViewTop],
+        KeyCode::Char('b') => vec![EditorCommand::AlignViewBottom],
+
+        // Scroll by line
+        KeyCode::Char('k') | KeyCode::Up => vec![EditorCommand::ScrollUp(1)],
+        KeyCode::Char('j') | KeyCode::Down => vec![EditorCommand::ScrollDown(1)],
+
+        // Page scroll
+        KeyCode::PageUp => vec![EditorCommand::PageUp],
+        KeyCode::PageDown => vec![EditorCommand::PageDown],
+        KeyCode::Backspace => vec![EditorCommand::HalfPageUp],
+        KeyCode::Char(' ') => vec![EditorCommand::HalfPageDown],
+
+        // Search
+        KeyCode::Char('/') => vec![EditorCommand::EnterSearchMode { backwards: false }],
+        KeyCode::Char('?') => vec![EditorCommand::EnterSearchMode { backwards: true }],
+        KeyCode::Char('n') => vec![EditorCommand::SearchNext],
+        KeyCode::Char('N') => vec![EditorCommand::SearchPrevious],
+
+        _ => vec![],
+    }
+}
+
 /// Handle keyboard input in Normal mode.
 pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
     // Handle Alt+key combinations

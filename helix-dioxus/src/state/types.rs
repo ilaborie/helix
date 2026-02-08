@@ -301,6 +301,12 @@ pub enum EditorCommand {
     HalfPageDown,
     /// Move to first non-whitespace character on line (gs).
     GotoFirstNonWhitespace,
+    /// Align view so cursor is centered vertically (zz / zc).
+    AlignViewCenter,
+    /// Align view so cursor is at the top (zt).
+    AlignViewTop,
+    /// Align view so cursor is at the bottom (zb).
+    AlignViewBottom,
 
     // Mode changes
     EnterInsertMode,
@@ -794,6 +800,10 @@ pub enum PendingKeySequence {
     MatchReplaceSurroundFrom,
     /// Waiting for second character after `mr<old>` (surround replace: new char)
     MatchReplaceSurroundTo(char),
+    /// Waiting for sub-key after 'z' (one-shot view mode)
+    ViewPrefix,
+    /// Waiting for sub-key after 'Z' (sticky view mode — stays until Esc)
+    ViewPrefixSticky,
 }
 
 /// A single register's state for display in the help bar.

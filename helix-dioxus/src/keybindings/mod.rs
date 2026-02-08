@@ -28,7 +28,7 @@ pub use input_dialog::handle_input_dialog_mode;
 pub use insert::handle_insert_mode;
 pub use normal::{
     handle_bracket_next, handle_bracket_prev, handle_g_prefix, handle_normal_mode,
-    handle_space_leader,
+    handle_space_leader, handle_view_prefix,
 };
 pub use picker::handle_picker_mode;
 pub use search::handle_search_mode;

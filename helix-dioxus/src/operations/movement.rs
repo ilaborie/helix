@@ -1,6 +1,6 @@
 //! Movement operations for the editor.
 
-use helix_view::{DocumentId, ViewId};
+use helix_view::{Align, DocumentId, ViewId};
 
 use crate::state::{Direction, EditorContext};
 
@@ -32,6 +32,9 @@ pub trait MovementOps {
     fn scroll_down(&mut self, doc_id: DocumentId, view_id: ViewId, lines: usize);
     fn scroll_to_line(&mut self, doc_id: DocumentId, view_id: ViewId, target_line: usize);
     fn match_bracket(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn align_view_center(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn align_view_top(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn align_view_bottom(&mut self, doc_id: DocumentId, view_id: ViewId);
 }
 
 impl MovementOps for EditorContext {
@@ -263,6 +266,21 @@ impl MovementOps for EditorContext {
         if let Some(pos) = new_pos {
             doc.set_selection(view_id, helix_core::Selection::point(pos));
         }
+    }
+
+    fn align_view_center(&mut self, _doc_id: DocumentId, _view_id: ViewId) {
+        let (view, doc) = helix_view::current!(self.editor);
+        helix_view::align_view(doc, view, Align::Center);
+    }
+
+    fn align_view_top(&mut self, _doc_id: DocumentId, _view_id: ViewId) {
+        let (view, doc) = helix_view::current!(self.editor);
+        helix_view::align_view(doc, view, Align::Top);
+    }
+
+    fn align_view_bottom(&mut self, _doc_id: DocumentId, _view_id: ViewId) {
+        let (view, doc) = helix_view::current!(self.editor);
+        helix_view::align_view(doc, view, Align::Bottom);
     }
 }
 
