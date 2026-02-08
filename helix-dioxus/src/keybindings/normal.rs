@@ -12,6 +12,8 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         return match key.code {
             // Alt+. = repeat last motion (find/till)
             KeyCode::Char('.') => vec![EditorCommand::RepeatLastFind],
+            // Alt+; = flip selections (swap anchor and head)
+            KeyCode::Char(';') => vec![EditorCommand::FlipSelections],
             // Alt+` = convert to uppercase
             KeyCode::Char('`') => vec![EditorCommand::ToUppercase],
             _ => vec![],
@@ -21,10 +23,14 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
     // Handle Ctrl+key combinations
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         return match key.code {
+            KeyCode::Char('b') => vec![EditorCommand::PageUp],
             KeyCode::Char('c') => vec![EditorCommand::ToggleLineComment],
-            KeyCode::Char('r') => vec![EditorCommand::Redo],
+            KeyCode::Char('d') => vec![EditorCommand::HalfPageDown],
+            KeyCode::Char('f') => vec![EditorCommand::PageDown],
             KeyCode::Char('h') => vec![EditorCommand::PreviousBuffer],
             KeyCode::Char('l') => vec![EditorCommand::NextBuffer],
+            KeyCode::Char('r') => vec![EditorCommand::Redo],
+            KeyCode::Char('u') => vec![EditorCommand::HalfPageUp],
             // Ctrl+Space or Ctrl+. - show code actions (quick fix)
             KeyCode::Char(' ') | KeyCode::Char('.') => vec![EditorCommand::ShowCodeActions],
             _ => vec![],
@@ -108,6 +114,9 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         // Search word under cursor
         KeyCode::Char('*') => vec![EditorCommand::SearchWordUnderCursor],
 
+        // Select all
+        KeyCode::Char('%') => vec![EditorCommand::SelectAll],
+
         // Join lines
         KeyCode::Char('J') => vec![EditorCommand::JoinLines],
 
@@ -129,12 +138,24 @@ pub fn handle_g_prefix(key: &KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('g') => vec![EditorCommand::GotoFirstLine],
         // gd - go to definition
         KeyCode::Char('d') => vec![EditorCommand::GotoDefinition],
-        // gr - go to references
-        KeyCode::Char('r') => vec![EditorCommand::GotoReferences],
-        // gy - go to type definition
-        KeyCode::Char('y') => vec![EditorCommand::GotoTypeDefinition],
+        // ge - go to last line
+        KeyCode::Char('e') => vec![EditorCommand::GotoLastLine],
+        // gh - go to line start
+        KeyCode::Char('h') => vec![EditorCommand::MoveLineStart],
         // gi - go to implementation
         KeyCode::Char('i') => vec![EditorCommand::GotoImplementation],
+        // gl - go to line end
+        KeyCode::Char('l') => vec![EditorCommand::MoveLineEnd],
+        // gn - next buffer
+        KeyCode::Char('n') => vec![EditorCommand::NextBuffer],
+        // gp - previous buffer
+        KeyCode::Char('p') => vec![EditorCommand::PreviousBuffer],
+        // gr - go to references
+        KeyCode::Char('r') => vec![EditorCommand::GotoReferences],
+        // gs - go to first non-whitespace character on line
+        KeyCode::Char('s') => vec![EditorCommand::GotoFirstNonWhitespace],
+        // gy - go to type definition
+        KeyCode::Char('y') => vec![EditorCommand::GotoTypeDefinition],
         _ => vec![],
     }
 }
@@ -144,6 +165,8 @@ pub fn handle_bracket_next(key: &KeyEvent) -> Vec<EditorCommand> {
     match key.code {
         // ]d - next diagnostic
         KeyCode::Char('d') => vec![EditorCommand::NextDiagnostic],
+        // ] Space - add newline below
+        KeyCode::Char(' ') => vec![EditorCommand::AddNewlineBelow],
         _ => vec![],
     }
 }
@@ -153,6 +176,8 @@ pub fn handle_bracket_prev(key: &KeyEvent) -> Vec<EditorCommand> {
     match key.code {
         // [d - previous diagnostic
         KeyCode::Char('d') => vec![EditorCommand::PrevDiagnostic],
+        // [ Space - add newline above
+        KeyCode::Char(' ') => vec![EditorCommand::AddNewlineAbove],
         _ => vec![],
     }
 }
@@ -162,26 +187,57 @@ pub fn handle_space_leader(key: &KeyEvent) -> Vec<EditorCommand> {
     match key.code {
         // Space / - global search
         KeyCode::Char('/') => vec![EditorCommand::ShowGlobalSearch],
+        // Space ? - command palette
+        KeyCode::Char('?') => vec![EditorCommand::ShowCommandPanel],
         // Space a - show code actions
         KeyCode::Char('a') => vec![EditorCommand::ShowCodeActions],
         // Space c - toggle line comment
         KeyCode::Char('c') => vec![EditorCommand::ToggleLineComment],
         // Space C - toggle block comment
         KeyCode::Char('C') => vec![EditorCommand::ToggleBlockComment],
+        // Space b - buffer picker
+        KeyCode::Char('b') => vec![EditorCommand::ShowBufferPicker],
         // Space d - document diagnostics
         KeyCode::Char('d') => vec![EditorCommand::ShowDocumentDiagnostics],
         // Space D - workspace diagnostics
         KeyCode::Char('D') => vec![EditorCommand::ShowWorkspaceDiagnostics],
-        // Space f - format document
-        KeyCode::Char('f') => vec![EditorCommand::FormatDocument],
-        // Space i - toggle inlay hints
+        // Space f - file picker
+        KeyCode::Char('f') => vec![EditorCommand::ShowFilePicker],
+        // Space i - toggle inlay hints (custom extension)
         KeyCode::Char('i') => vec![EditorCommand::ToggleInlayHints],
+        // Space k - hover
+        KeyCode::Char('k') => vec![EditorCommand::TriggerHover],
+        // Space p - paste from system clipboard
+        KeyCode::Char('p') => {
+            vec![
+                EditorCommand::SetSelectedRegister('+'),
+                EditorCommand::Paste,
+            ]
+        }
+        // Space P - paste from system clipboard before
+        KeyCode::Char('P') => {
+            vec![
+                EditorCommand::SetSelectedRegister('+'),
+                EditorCommand::PasteBefore,
+            ]
+        }
         // Space r - rename symbol
         KeyCode::Char('r') => vec![EditorCommand::RenameSymbol],
+        // Space R - replace selections with clipboard
+        KeyCode::Char('R') => {
+            vec![
+                EditorCommand::SetSelectedRegister('+'),
+                EditorCommand::ReplaceWithYanked,
+            ]
+        }
         // Space s - document symbols
         KeyCode::Char('s') => vec![EditorCommand::ShowDocumentSymbols],
         // Space S - workspace symbols
         KeyCode::Char('S') => vec![EditorCommand::ShowWorkspaceSymbols],
+        // Space y - yank to system clipboard
+        KeyCode::Char('y') => {
+            vec![EditorCommand::SetSelectedRegister('+'), EditorCommand::Yank]
+        }
         _ => vec![],
     }
 }

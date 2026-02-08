@@ -44,6 +44,8 @@ pub trait SearchOps {
     fn execute_search(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn search_next(&mut self, doc_id: DocumentId, view_id: ViewId, reverse: bool);
     fn do_search(&mut self, doc_id: DocumentId, view_id: ViewId, pattern: &str, backwards: bool);
+    fn extend_search_next(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn extend_search_prev(&mut self, doc_id: DocumentId, view_id: ViewId);
 }
 
 impl EditorContext {
@@ -174,6 +176,104 @@ impl SearchOps for EditorContext {
             }
         } else {
             log::info!("Pattern '{}' not found", pattern);
+        }
+    }
+
+    /// Extend selection to next search match (n in select mode).
+    fn extend_search_next(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        if self.last_search.is_empty() {
+            log::info!("No previous search");
+            return;
+        }
+
+        let pattern = self.last_search.clone();
+        let backwards = self.search_backwards;
+
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text();
+        let text_slice = text.slice(..);
+        let selection = doc.selection(view_id).clone();
+        let primary = selection.primary();
+        let cursor_char = primary.cursor(text_slice);
+        let pattern_char_len = pattern.chars().count();
+
+        let text_str: String = text_slice.into();
+        let cursor_byte = text.char_to_byte(cursor_char);
+
+        let found_byte_pos = if backwards {
+            text_str[..cursor_byte].rfind(&pattern)
+        } else {
+            let start_char = (cursor_char + 1).min(text.len_chars());
+            let start_byte = text.char_to_byte(start_char);
+            text_str[start_byte..]
+                .find(&pattern)
+                .map(|pos| pos + start_byte)
+        };
+
+        let final_byte_pos = found_byte_pos.or_else(|| {
+            if backwards {
+                text_str.rfind(&pattern)
+            } else {
+                text_str.find(&pattern)
+            }
+        });
+
+        if let Some(byte_pos) = final_byte_pos {
+            let char_pos = text.byte_to_char(byte_pos);
+            let char_end = char_pos + pattern_char_len;
+            // Extend: preserve original anchor, move head to match end
+            let new_head = if backwards { char_pos } else { char_end };
+            let new_selection = helix_core::Selection::single(primary.anchor, new_head);
+            doc.set_selection(view_id, new_selection);
+        }
+    }
+
+    /// Extend selection to previous search match (N in select mode).
+    fn extend_search_prev(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        if self.last_search.is_empty() {
+            log::info!("No previous search");
+            return;
+        }
+
+        let pattern = self.last_search.clone();
+        let backwards = !self.search_backwards; // Reverse direction
+
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text();
+        let text_slice = text.slice(..);
+        let selection = doc.selection(view_id).clone();
+        let primary = selection.primary();
+        let cursor_char = primary.cursor(text_slice);
+        let pattern_char_len = pattern.chars().count();
+
+        let text_str: String = text_slice.into();
+        let cursor_byte = text.char_to_byte(cursor_char);
+
+        let found_byte_pos = if backwards {
+            text_str[..cursor_byte].rfind(&pattern)
+        } else {
+            let start_char = (cursor_char + 1).min(text.len_chars());
+            let start_byte = text.char_to_byte(start_char);
+            text_str[start_byte..]
+                .find(&pattern)
+                .map(|pos| pos + start_byte)
+        };
+
+        let final_byte_pos = found_byte_pos.or_else(|| {
+            if backwards {
+                text_str.rfind(&pattern)
+            } else {
+                text_str.find(&pattern)
+            }
+        });
+
+        if let Some(byte_pos) = final_byte_pos {
+            let char_pos = text.byte_to_char(byte_pos);
+            let char_end = char_pos + pattern_char_len;
+            // Extend: preserve original anchor, move head
+            let new_head = if backwards { char_pos } else { char_end };
+            let new_selection = helix_core::Selection::single(primary.anchor, new_head);
+            doc.set_selection(view_id, new_selection);
         }
     }
 }

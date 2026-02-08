@@ -7,6 +7,9 @@ use crate::state::{Direction, EditorContext};
 /// Number of lines per page for page up/down movement.
 const PAGE_SIZE: usize = 20;
 
+/// Number of lines for half-page up/down movement.
+const HALF_PAGE_SIZE: usize = PAGE_SIZE / 2;
+
 /// Extension trait for movement operations.
 pub trait MovementOps {
     fn move_cursor(&mut self, doc_id: DocumentId, view_id: ViewId, direction: Direction);
@@ -20,8 +23,11 @@ pub trait MovementOps {
     fn move_line_end(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn goto_first_line(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn goto_last_line(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn goto_first_nonwhitespace(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn page_up(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn page_down(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn half_page_up(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn half_page_down(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn scroll_up(&mut self, doc_id: DocumentId, view_id: ViewId, lines: usize);
     fn scroll_down(&mut self, doc_id: DocumentId, view_id: ViewId, lines: usize);
     fn scroll_to_line(&mut self, doc_id: DocumentId, view_id: ViewId, target_line: usize);
@@ -183,12 +189,40 @@ impl MovementOps for EditorContext {
         doc.set_selection(view_id, helix_core::Selection::point(line_start));
     }
 
+    fn goto_first_nonwhitespace(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+        let cursor = selection.primary().cursor(text);
+        let line = text.char_to_line(cursor);
+        let line_start = text.line_to_char(line);
+
+        let mut pos = line_start;
+        for c in text.line(line).chars() {
+            if c.is_whitespace() && c != '\n' {
+                pos += 1;
+            } else {
+                break;
+            }
+        }
+
+        doc.set_selection(view_id, helix_core::Selection::point(pos));
+    }
+
     fn page_up(&mut self, doc_id: DocumentId, view_id: ViewId) {
         self.move_vertical_by(doc_id, view_id, -(PAGE_SIZE as isize));
     }
 
     fn page_down(&mut self, doc_id: DocumentId, view_id: ViewId) {
         self.move_vertical_by(doc_id, view_id, PAGE_SIZE as isize);
+    }
+
+    fn half_page_up(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        self.move_vertical_by(doc_id, view_id, -(HALF_PAGE_SIZE as isize));
+    }
+
+    fn half_page_down(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        self.move_vertical_by(doc_id, view_id, HALF_PAGE_SIZE as isize);
     }
 
     fn scroll_up(&mut self, doc_id: DocumentId, view_id: ViewId, lines: usize) {
@@ -280,6 +314,54 @@ impl EditorContext {
                 }
             }
             doc.set_selection(view_id, helix_core::Selection::point(pos));
+        }
+    }
+
+    /// Find a character on the current line and extend selection to it.
+    ///
+    /// Like `find_char` but preserves the original anchor (for select mode).
+    pub(crate) fn extend_find_char(
+        &mut self,
+        doc_id: DocumentId,
+        view_id: ViewId,
+        ch: char,
+        forward: bool,
+        till: bool,
+    ) {
+        // Remember this motion for repeat
+        self.last_find_char = Some((ch, forward, till));
+
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+        let primary = selection.primary();
+
+        let cursor = primary.cursor(text);
+        let line = text.char_to_line(cursor);
+        let line_start = text.line_to_char(line);
+        let line_end = line_start + text.line(line).len_chars().saturating_sub(1);
+
+        let target = if forward {
+            let start = cursor + 1;
+            (start..=line_end).find(|&pos| text.char(pos) == ch)
+        } else if cursor == 0 {
+            None
+        } else {
+            (line_start..cursor).rev().find(|&pos| text.char(pos) == ch)
+        };
+
+        if let Some(mut pos) = target {
+            if till {
+                if forward {
+                    pos = pos.saturating_sub(1).max(cursor);
+                } else {
+                    pos = (pos + 1).min(line_end);
+                }
+            }
+            // Extend: preserve original anchor, move head
+            let new_head = if forward { pos + 1 } else { pos };
+            let new_selection = helix_core::Selection::single(primary.anchor, new_head);
+            doc.set_selection(view_id, new_selection);
         }
     }
 

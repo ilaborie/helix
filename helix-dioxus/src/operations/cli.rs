@@ -145,6 +145,11 @@ impl CliOps for EditorContext {
                 self.show_register_picker();
             }
 
+            // Command panel
+            "cmd" | "commands" => {
+                self.show_command_panel();
+            }
+
             // History navigation
             "earlier" => {
                 let steps = args.and_then(|a| a.parse().ok()).unwrap_or(1);

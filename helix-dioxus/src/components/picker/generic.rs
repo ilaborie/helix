@@ -58,6 +58,7 @@ pub fn GenericPicker(
         PickerMode::References => "References",
         PickerMode::Definitions => "Definitions",
         PickerMode::Registers => "Registers",
+        PickerMode::Commands => "Commands",
     };
 
     rsx! {

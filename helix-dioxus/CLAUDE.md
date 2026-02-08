@@ -285,6 +285,10 @@ cargo check -p helix-dioxus
 cargo clippy -p helix-dioxus --bins
 ```
 
+## Keybinding Comparison
+
+See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dioxus bindings and standard Helix defaults, including matches, deviations, custom extensions, and missing bindings.
+
 ## Troubleshooting
 
 ### Test file with intentional error (examples/test_error.rs)
@@ -322,11 +326,11 @@ cargo clippy -p helix-dioxus --bins
 
 ### Planned Enhancements
 - [x] ~~Keybinding help bar above statusline showing common shortcuts (context-aware per mode)~~ Context-aware help bar with register indicators
-- [ ] Command panel as picker-style UI with fuzzy search
+- [x] ~~Command panel as picker-style UI with fuzzy search~~ `Space p` or `:cmd`/`:commands` opens GenericPicker with ~40 commands, fuzzy filter, keybinding hints
 - [x] ~~File-type specific icons in buffer bar~~ Added file-type icons
 - [x] ~~Mouse click support in picker~~ Added picker mouse clicks
 - [x] ~~LSP integration for diagnostics and completions~~ Diagnostics display with gutter icons, error lens, wavy underlines, and status bar counts
-- [ ] Multiple splits/views support
+- ~~Multiple splits/views support~~ **Not supported** — single-view design decision
 - [x] ~~System clipboard integration~~ Uses `Editor.registers` with `'+'` register for system clipboard
 - [x] ~~Extract theme colors to `theme.rs` or `colors.rs`~~ Extracted to CSS custom properties in `:root`
 - [ ] Add custom hooks (`use_editor_state`, `use_keybinding`)
@@ -348,7 +352,12 @@ cargo clippy -p helix-dioxus --bins
 ### LSP Improvements
 - [ ] Investigate rust-analyzer diagnostic line reporting - diagnostics may be reported on the line where parsing fails rather than where the actual error is (e.g., unterminated string reports on the next line). Consider requesting upstream fix or mapping diagnostic positions back to the originating code
 
+### Design Decisions
+- **Window/Splits**: Not supported — helix-dioxus uses a single-view design. `C-w` prefix and `Space w` sub-menu will not be implemented.
+
 ### Recently Completed
+- [x] Keybinding gap reduction (3 batches, ~30 new bindings) — Batch 1: wire existing commands (`C-b`/`C-f` page, `ge`/`gh`/`gl`/`gn`/`gp` goto, `Space b` buffer picker, insert `C-h`/`C-d`/`C-j`). Batch 2: new operations (`C-u`/`C-d` half-page, `%` select all, `A-;` flip selections, `gs` first non-whitespace, `] Space`/`[ Space` add newline, `C-k` kill to line end, `A-d` delete word forward). Batch 3: select mode extend variants (`f`/`F`/`t`/`T`/`r` in select mode, `n`/`N` extend search next/prev, mode-aware dispatch in `app.rs`)
+- [x] Command panel — `Space p` or `:cmd`/`:commands` opens GenericPicker with ~40 editor commands, fuzzy filter, keybinding hints as secondary text, `Terminal` icon (cyan), deferred dispatch via `command_tx`
 - [x] Register picker — `:reg`/`:registers` command opens GenericPicker showing all registers, populated first, confirm sets `editor.selected_register` for next yank/paste
 - [x] Named registers — `"` prefix key for register selection (`"ay`, `"ap`, `"_d`), `take_register()` helper, black hole register `_`, statusline `reg=` indicator, help bar hints, select mode `p` fix (`ReplaceWithYanked`)
 - [x] Core tutor commands batch — 21 commands: `;` (collapse selection), `,` (keep primary), `Alt-.` (repeat motion), `c` (change), `e`/`W`/`E`/`B` (word motions), `I` (insert line start), `r` (replace char), `R` (replace with yank), `J` (join), `~`/`` ` ``/`Alt+`` ` (case ops), `mm` (match bracket), `mi`/`ma` (select inside/around), `ms`/`md`/`mr` (surround)

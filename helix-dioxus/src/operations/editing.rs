@@ -61,6 +61,10 @@ pub trait EditingOps {
     fn surround_add(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char);
     fn surround_delete(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char);
     fn surround_replace(&mut self, doc_id: DocumentId, view_id: ViewId, old: char, new: char);
+    fn delete_word_forward(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn kill_to_line_end(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn add_newline_below(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn add_newline_above(&mut self, doc_id: DocumentId, view_id: ViewId);
 }
 
 impl EditingOps for EditorContext {
@@ -620,6 +624,106 @@ impl EditingOps for EditorContext {
             let transaction = helix_core::Transaction::change(doc.text(), changes.into_iter());
             doc.apply(&transaction, view_id);
         }
+    }
+
+    /// Delete word forward from cursor (Alt+d in insert mode).
+    fn delete_word_forward(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+        let cursor = selection.primary().cursor(text);
+        let len = text.len_chars();
+
+        if cursor >= len {
+            return;
+        }
+
+        // Skip non-whitespace (word chars) forward
+        let mut end = cursor;
+        while end < len && !text.char(end).is_whitespace() {
+            end += 1;
+        }
+        // Skip whitespace forward
+        while end < len && text.char(end).is_whitespace() && text.char(end) != '\n' {
+            end += 1;
+        }
+
+        // If we didn't move past any word chars, at least delete whitespace
+        if end == cursor {
+            while end < len && text.char(end).is_whitespace() && text.char(end) != '\n' {
+                end += 1;
+            }
+            // Still nothing? Delete at least one char
+            if end == cursor {
+                end = cursor + 1;
+            }
+        }
+
+        let ranges = std::iter::once((cursor, end));
+        let transaction = helix_core::Transaction::delete(doc.text(), ranges);
+        doc.apply(&transaction, view_id);
+    }
+
+    /// Kill to line end from cursor (Ctrl+k in insert mode).
+    fn kill_to_line_end(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+        let cursor = selection.primary().cursor(text);
+
+        let line = text.char_to_line(cursor);
+        let line_end = text.line_to_char(line) + text.line(line).len_chars();
+        // Exclude the newline character itself
+        let end = if line_end > 0 && text.char(line_end.saturating_sub(1)) == '\n' {
+            line_end.saturating_sub(1)
+        } else {
+            line_end
+        };
+
+        if cursor >= end {
+            return;
+        }
+
+        let ranges = std::iter::once((cursor, end));
+        let transaction = helix_core::Transaction::delete(doc.text(), ranges);
+        doc.apply(&transaction, view_id);
+    }
+
+    /// Add a newline below current line without entering insert mode (`] Space`).
+    fn add_newline_below(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+        let cursor = selection.primary().cursor(text);
+        let line = text.char_to_line(cursor);
+        let line_end = text.line_to_char(line) + text.line(line).len_chars();
+
+        // Insert newline at end of current line (before the existing newline, or at end)
+        let insert_pos = if line_end > 0 && text.char(line_end.saturating_sub(1)) == '\n' {
+            line_end.saturating_sub(1)
+        } else {
+            line_end
+        };
+
+        let insert_selection = helix_core::Selection::point(insert_pos);
+        let transaction =
+            helix_core::Transaction::insert(doc.text(), &insert_selection, "\n".into());
+        doc.apply(&transaction, view_id);
+    }
+
+    /// Add a newline above current line without entering insert mode (`[ Space`).
+    fn add_newline_above(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+        let cursor = selection.primary().cursor(text);
+        let line = text.char_to_line(cursor);
+        let line_start = text.line_to_char(line);
+
+        let insert_selection = helix_core::Selection::point(line_start);
+        let transaction =
+            helix_core::Transaction::insert(doc.text(), &insert_selection, "\n".into());
+        doc.apply(&transaction, view_id);
     }
 }
 

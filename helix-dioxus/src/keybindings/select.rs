@@ -53,8 +53,19 @@ pub fn handle_select_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         // Change selection (delete + enter insert)
         KeyCode::Char('c') => vec![EditorCommand::ChangeSelection],
 
+        // Extend search
+        KeyCode::Char('n') => vec![EditorCommand::ExtendSearchNext],
+        KeyCode::Char('N') => vec![EditorCommand::ExtendSearchPrev],
+
         // Replace with yanked text / paste replaces selection
         KeyCode::Char('R' | 'p') => vec![EditorCommand::ReplaceWithYanked],
+
+        // Toggle back to normal mode
+        KeyCode::Char('v') => vec![EditorCommand::ExitSelectMode],
+
+        // Indent/unindent
+        KeyCode::Char('>') => vec![EditorCommand::IndentLine],
+        KeyCode::Char('<') => vec![EditorCommand::UnindentLine],
 
         // Selection operations
         KeyCode::Char(';') => vec![EditorCommand::CollapseSelection],

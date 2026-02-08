@@ -166,6 +166,10 @@ pub struct EditorContext {
     /// Cancellation signal for running global search.
     pub(crate) global_search_cancel: Option<tokio::sync::watch::Sender<bool>>,
 
+    // Command panel state - pub(crate) for operations access
+    /// Commands stored for the command panel picker (indexed by picker item ID).
+    pub(crate) command_panel_commands: Vec<EditorCommand>,
+
     // Application state - pub(crate) for operations access
     pub(crate) should_quit: bool,
 
@@ -285,6 +289,8 @@ impl EditorContext {
             global_search_results: Vec::new(),
             global_search_running: false,
             global_search_cancel: None,
+            // Command panel state
+            command_panel_commands: Vec::new(),
             should_quit: false,
             snapshot_version: 0,
         })
@@ -339,6 +345,11 @@ impl EditorContext {
             EditorCommand::GotoLastLine => self.goto_last_line(doc_id, view_id),
             EditorCommand::PageUp => self.page_up(doc_id, view_id),
             EditorCommand::PageDown => self.page_down(doc_id, view_id),
+            EditorCommand::HalfPageUp => self.half_page_up(doc_id, view_id),
+            EditorCommand::HalfPageDown => self.half_page_down(doc_id, view_id),
+            EditorCommand::GotoFirstNonWhitespace => {
+                self.goto_first_nonwhitespace(doc_id, view_id);
+            }
             EditorCommand::ScrollUp(lines) => self.scroll_up(doc_id, view_id, lines),
             EditorCommand::ScrollDown(lines) => self.scroll_down(doc_id, view_id, lines),
             EditorCommand::ScrollToLine(target_line) => {
@@ -411,7 +422,9 @@ impl EditorContext {
             EditorCommand::DeleteCharBackward => self.delete_char_backward(doc_id, view_id),
             EditorCommand::DeleteCharForward => self.delete_char_forward(doc_id, view_id),
             EditorCommand::DeleteWordBackward => self.delete_word_backward(doc_id, view_id),
+            EditorCommand::DeleteWordForward => self.delete_word_forward(doc_id, view_id),
             EditorCommand::DeleteToLineStart => self.delete_to_line_start(doc_id, view_id),
+            EditorCommand::KillToLineEnd => self.kill_to_line_end(doc_id, view_id),
             EditorCommand::IndentLine => self.indent_line(doc_id, view_id),
             EditorCommand::UnindentLine => self.unindent_line(doc_id, view_id),
             EditorCommand::OpenLineBelow => {
@@ -428,6 +441,8 @@ impl EditorContext {
             EditorCommand::ToggleCase => self.toggle_case(doc_id, view_id),
             EditorCommand::ToLowercase => self.to_lowercase(doc_id, view_id),
             EditorCommand::ToUppercase => self.to_uppercase(doc_id, view_id),
+            EditorCommand::AddNewlineBelow => self.add_newline_below(doc_id, view_id),
+            EditorCommand::AddNewlineAbove => self.add_newline_above(doc_id, view_id),
             EditorCommand::SurroundAdd(ch) => self.surround_add(doc_id, view_id, ch),
             EditorCommand::SurroundDelete(ch) => self.surround_delete(doc_id, view_id, ch),
             EditorCommand::SurroundReplace(old, new) => {
@@ -455,6 +470,26 @@ impl EditorContext {
             EditorCommand::KeepPrimarySelection => self.keep_primary_selection(doc_id, view_id),
             EditorCommand::SelectInsidePair(ch) => self.select_inside_pair(doc_id, view_id, ch),
             EditorCommand::SelectAroundPair(ch) => self.select_around_pair(doc_id, view_id, ch),
+            EditorCommand::SelectAll => self.select_all(doc_id, view_id),
+            EditorCommand::FlipSelections => self.flip_selections(doc_id, view_id),
+            EditorCommand::ExtendFindCharForward(ch) => {
+                self.extend_find_char(doc_id, view_id, ch, true, false);
+            }
+            EditorCommand::ExtendFindCharBackward(ch) => {
+                self.extend_find_char(doc_id, view_id, ch, false, false);
+            }
+            EditorCommand::ExtendTillCharForward(ch) => {
+                self.extend_find_char(doc_id, view_id, ch, true, true);
+            }
+            EditorCommand::ExtendTillCharBackward(ch) => {
+                self.extend_find_char(doc_id, view_id, ch, false, true);
+            }
+            EditorCommand::ExtendSearchNext => {
+                self.extend_search_next(doc_id, view_id);
+            }
+            EditorCommand::ExtendSearchPrev => {
+                self.extend_search_prev(doc_id, view_id);
+            }
 
             // Clipboard operations
             EditorCommand::Yank => self.yank(doc_id, view_id),
@@ -552,6 +587,7 @@ impl EditorContext {
                 self.picker_selected = 0;
                 self.picker_mode = PickerMode::default();
                 self.picker_current_path = None;
+                self.command_panel_commands.clear();
             }
             EditorCommand::PickerInput(c) => {
                 self.picker_filter.push(c);
@@ -932,6 +968,11 @@ impl EditorContext {
             EditorCommand::SetSelectedRegister(ch) => {
                 self.editor.selected_register = Some(ch);
             }
+            // Command panel
+            EditorCommand::ShowCommandPanel => {
+                self.show_command_panel();
+            }
+
             EditorCommand::ClearRegister(name) => match name {
                 '+' => {
                     self.clipboard.clear();

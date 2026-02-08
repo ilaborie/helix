@@ -405,6 +405,14 @@ impl PickerOps for EditorContext {
                         );
                     }
                 }
+                PickerMode::Commands => {
+                    // Execute the selected command via deferred dispatch
+                    if let Ok(idx) = selected.id.parse::<usize>() {
+                        if let Some(cmd) = self.command_panel_commands.get(idx).cloned() {
+                            let _ = self.command_tx.send(cmd);
+                        }
+                    }
+                }
                 PickerMode::References | PickerMode::Definitions => {
                     // Extract location data before mutable borrow
                     if let Ok(idx) = selected.id.parse::<usize>() {
@@ -440,6 +448,7 @@ impl PickerOps for EditorContext {
         self.picker_diagnostics.clear();
         self.global_search_results.clear();
         self.locations.clear();
+        self.command_panel_commands.clear();
         self.cancel_global_search();
     }
 }
@@ -500,6 +509,33 @@ impl EditorContext {
         self.picker_selected = 0;
         self.picker_visible = true;
         self.picker_mode = PickerMode::Registers;
+        self.picker_current_path = None;
+    }
+
+    /// Show the command panel with all available editor commands.
+    pub(crate) fn show_command_panel(&mut self) {
+        self.command_mode = false;
+        self.command_input.clear();
+
+        let entries = command_panel_entries();
+        let items: Vec<PickerItem> = entries
+            .iter()
+            .enumerate()
+            .map(|(idx, (_, name, hint))| PickerItem {
+                id: format!("{idx}"),
+                display: (*name).to_string(),
+                icon: PickerIcon::Command,
+                match_indices: vec![],
+                secondary: hint.map(|h| h.to_string()),
+            })
+            .collect();
+
+        self.command_panel_commands = entries.iter().map(|(cmd, _, _)| cmd.clone()).collect();
+        self.picker_items = items;
+        self.picker_filter.clear();
+        self.picker_selected = 0;
+        self.picker_visible = true;
+        self.picker_mode = PickerMode::Commands;
         self.picker_current_path = None;
     }
 
@@ -807,6 +843,164 @@ fn execute_global_search_blocking(
 /// Fuzzy match with indices: returns (score, match_indices) or None if no match.
 /// Score is based on consecutive matches and start-of-word bonuses.
 /// Case-insensitive matching.
+/// Returns the static list of command panel entries: (command, display name, keybinding hint).
+fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static str>)> {
+    vec![
+        // File operations
+        (EditorCommand::ShowFilePicker, "Open File", Some("Space f")),
+        (
+            EditorCommand::ShowFilesRecursivePicker,
+            "Find Files",
+            Some("Ctrl+f"),
+        ),
+        (EditorCommand::ShowBufferPicker, "Switch Buffer", Some(":b")),
+        // Buffer management
+        (EditorCommand::NextBuffer, "Next Buffer", Some("Ctrl+l")),
+        (
+            EditorCommand::PreviousBuffer,
+            "Previous Buffer",
+            Some("Ctrl+h"),
+        ),
+        (
+            EditorCommand::ReloadDocument,
+            "Reload Document",
+            Some(":reload"),
+        ),
+        (EditorCommand::WriteAll, "Save All", Some(":wa")),
+        // Navigation
+        (EditorCommand::GotoFirstLine, "Go to First Line", Some("gg")),
+        (EditorCommand::GotoLastLine, "Go to Last Line", Some("G")),
+        (
+            EditorCommand::GotoFirstNonWhitespace,
+            "Go to First Non-Whitespace",
+            Some("gs"),
+        ),
+        (EditorCommand::PageUp, "Page Up", Some("C-b")),
+        (EditorCommand::PageDown, "Page Down", Some("C-f")),
+        (EditorCommand::HalfPageUp, "Half Page Up", Some("C-u")),
+        (EditorCommand::HalfPageDown, "Half Page Down", Some("C-d")),
+        // Search
+        (
+            EditorCommand::ShowGlobalSearch,
+            "Global Search",
+            Some("Space /"),
+        ),
+        (
+            EditorCommand::EnterSearchMode { backwards: false },
+            "Search Forward",
+            Some("/"),
+        ),
+        (
+            EditorCommand::EnterSearchMode { backwards: true },
+            "Search Backward",
+            Some("?"),
+        ),
+        // LSP
+        (EditorCommand::FormatDocument, "Format Document", None),
+        (
+            EditorCommand::RenameSymbol,
+            "Rename Symbol",
+            Some("Space r"),
+        ),
+        (
+            EditorCommand::GotoDefinition,
+            "Go to Definition",
+            Some("gd"),
+        ),
+        (
+            EditorCommand::GotoReferences,
+            "Go to References",
+            Some("gr"),
+        ),
+        (
+            EditorCommand::GotoTypeDefinition,
+            "Go to Type Definition",
+            Some("gy"),
+        ),
+        (
+            EditorCommand::GotoImplementation,
+            "Go to Implementation",
+            Some("gi"),
+        ),
+        (
+            EditorCommand::ShowCodeActions,
+            "Show Code Actions",
+            Some("Space a"),
+        ),
+        (
+            EditorCommand::ShowDocumentSymbols,
+            "Document Symbols",
+            Some("Space s"),
+        ),
+        (
+            EditorCommand::ShowWorkspaceSymbols,
+            "Workspace Symbols",
+            Some("Space S"),
+        ),
+        (
+            EditorCommand::ShowDocumentDiagnostics,
+            "Document Diagnostics",
+            Some("Space d"),
+        ),
+        (
+            EditorCommand::ShowWorkspaceDiagnostics,
+            "Workspace Diagnostics",
+            Some("Space D"),
+        ),
+        (EditorCommand::NextDiagnostic, "Next Diagnostic", Some("]d")),
+        (
+            EditorCommand::PrevDiagnostic,
+            "Previous Diagnostic",
+            Some("[d"),
+        ),
+        (
+            EditorCommand::ToggleInlayHints,
+            "Toggle Inlay Hints",
+            Some("Space i"),
+        ),
+        (EditorCommand::ToggleLspDialog, "LSP Server Status", None),
+        (
+            EditorCommand::TriggerHover,
+            "Trigger Hover",
+            Some("Space k"),
+        ),
+        (
+            EditorCommand::TriggerCompletion,
+            "Trigger Completion",
+            Some("Ctrl+Space"),
+        ),
+        // Editing
+        (
+            EditorCommand::ToggleLineComment,
+            "Toggle Line Comment",
+            Some("Space c"),
+        ),
+        (
+            EditorCommand::ToggleBlockComment,
+            "Toggle Block Comment",
+            Some("Space C"),
+        ),
+        (EditorCommand::Undo, "Undo", Some("u")),
+        (EditorCommand::Redo, "Redo", Some("U")),
+        (EditorCommand::IndentLine, "Indent", Some(">")),
+        (EditorCommand::UnindentLine, "Unindent", Some("<")),
+        (EditorCommand::SelectAll, "Select All", Some("%")),
+        (
+            EditorCommand::FlipSelections,
+            "Flip Selections",
+            Some("A-;"),
+        ),
+        (EditorCommand::JoinLines, "Join Lines", Some("J")),
+        (EditorCommand::ToggleCase, "Toggle Case", Some("~")),
+        // Application
+        (
+            EditorCommand::PrintWorkingDirectory,
+            "Print Working Directory",
+            Some(":pwd"),
+        ),
+    ]
+}
+
 fn fuzzy_match_with_indices(text: &str, pattern: &str) -> Option<(u16, Vec<usize>)> {
     if pattern.is_empty() {
         return Some((0, vec![]));

@@ -53,6 +53,8 @@ pub enum PickerIcon {
     Definition,
     // Register icon
     Register,
+    // Command panel icon
+    Command,
 }
 
 /// Generic picker item with match highlighting.
@@ -80,6 +82,7 @@ pub enum PickerMode {
     References,
     Definitions,
     Registers,
+    Commands,
 }
 
 /// Minimal diagnostic info for scrollbar markers.
@@ -279,6 +282,12 @@ pub enum EditorCommand {
     SearchWordUnderCursor,
     /// Jump to matching bracket.
     MatchBracket,
+    /// Scroll half page up and move cursor.
+    HalfPageUp,
+    /// Scroll half page down and move cursor.
+    HalfPageDown,
+    /// Move to first non-whitespace character on line (gs).
+    GotoFirstNonWhitespace,
 
     // Mode changes
     EnterInsertMode,
@@ -300,6 +309,10 @@ pub enum EditorCommand {
     DeleteWordBackward,
     /// Delete to line start (Ctrl+u in insert mode).
     DeleteToLineStart,
+    /// Delete word forward (Alt+d in insert mode).
+    DeleteWordForward,
+    /// Kill to line end (Ctrl+k in insert mode).
+    KillToLineEnd,
     OpenLineBelow,
     OpenLineAbove,
     /// Indent the current line or selection.
@@ -318,6 +331,10 @@ pub enum EditorCommand {
     ToLowercase,
     /// Convert selection to uppercase.
     ToUppercase,
+    /// Add a newline below current line without entering insert mode.
+    AddNewlineBelow,
+    /// Add a newline above current line without entering insert mode.
+    AddNewlineAbove,
     /// Add surround pair around selection.
     SurroundAdd(char),
     /// Delete surround pair.
@@ -360,6 +377,22 @@ pub enum EditorCommand {
     SelectInsidePair(char),
     /// Select around a bracket/quote pair.
     SelectAroundPair(char),
+    /// Select entire buffer (%).
+    SelectAll,
+    /// Flip selection (swap anchor and head) (Alt+;).
+    FlipSelections,
+    /// Extend selection to find char forward (select mode).
+    ExtendFindCharForward(char),
+    /// Extend selection to find char backward (select mode).
+    ExtendFindCharBackward(char),
+    /// Extend selection till char forward (select mode).
+    ExtendTillCharForward(char),
+    /// Extend selection till char backward (select mode).
+    ExtendTillCharBackward(char),
+    /// Extend selection to next search match (select mode).
+    ExtendSearchNext,
+    /// Extend selection to previous search match (select mode).
+    ExtendSearchPrev,
 
     // Clipboard operations
     Yank,
@@ -611,6 +644,10 @@ pub enum EditorCommand {
     SetSelectedRegister(char),
     /// Clear a register by name ('+' = clipboard, '/' = search).
     ClearRegister(char),
+
+    // Command panel
+    /// Show the command panel (fuzzy command palette).
+    ShowCommandPanel,
 }
 
 /// Direction for cursor movement.

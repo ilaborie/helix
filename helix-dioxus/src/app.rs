@@ -140,7 +140,11 @@ pub fn App() -> Element {
                     PendingKeySequence::FindForward => {
                         pending_key.set(PendingKeySequence::None);
                         if let KeyCode::Char(ch) = key_event.code {
-                            vec![EditorCommand::FindCharForward(ch)]
+                            if snapshot.mode == "SELECT" {
+                                vec![EditorCommand::ExtendFindCharForward(ch)]
+                            } else {
+                                vec![EditorCommand::FindCharForward(ch)]
+                            }
                         } else {
                             vec![]
                         }
@@ -148,7 +152,11 @@ pub fn App() -> Element {
                     PendingKeySequence::FindBackward => {
                         pending_key.set(PendingKeySequence::None);
                         if let KeyCode::Char(ch) = key_event.code {
-                            vec![EditorCommand::FindCharBackward(ch)]
+                            if snapshot.mode == "SELECT" {
+                                vec![EditorCommand::ExtendFindCharBackward(ch)]
+                            } else {
+                                vec![EditorCommand::FindCharBackward(ch)]
+                            }
                         } else {
                             vec![]
                         }
@@ -156,7 +164,11 @@ pub fn App() -> Element {
                     PendingKeySequence::TillForward => {
                         pending_key.set(PendingKeySequence::None);
                         if let KeyCode::Char(ch) = key_event.code {
-                            vec![EditorCommand::TillCharForward(ch)]
+                            if snapshot.mode == "SELECT" {
+                                vec![EditorCommand::ExtendTillCharForward(ch)]
+                            } else {
+                                vec![EditorCommand::TillCharForward(ch)]
+                            }
                         } else {
                             vec![]
                         }
@@ -164,7 +176,11 @@ pub fn App() -> Element {
                     PendingKeySequence::TillBackward => {
                         pending_key.set(PendingKeySequence::None);
                         if let KeyCode::Char(ch) = key_event.code {
-                            vec![EditorCommand::TillCharBackward(ch)]
+                            if snapshot.mode == "SELECT" {
+                                vec![EditorCommand::ExtendTillCharBackward(ch)]
+                            } else {
+                                vec![EditorCommand::TillCharBackward(ch)]
+                            }
                         } else {
                             vec![]
                         }
@@ -290,23 +306,23 @@ pub fn App() -> Element {
                                     pending_key.set(PendingKeySequence::SpaceLeader);
                                     vec![]
                                 }
-                                KeyCode::Char('f') if snapshot.mode == "NORMAL" => {
+                                KeyCode::Char('f') => {
                                     pending_key.set(PendingKeySequence::FindForward);
                                     vec![]
                                 }
-                                KeyCode::Char('F') if snapshot.mode == "NORMAL" => {
+                                KeyCode::Char('F') => {
                                     pending_key.set(PendingKeySequence::FindBackward);
                                     vec![]
                                 }
-                                KeyCode::Char('t') if snapshot.mode == "NORMAL" => {
+                                KeyCode::Char('t') => {
                                     pending_key.set(PendingKeySequence::TillForward);
                                     vec![]
                                 }
-                                KeyCode::Char('T') if snapshot.mode == "NORMAL" => {
+                                KeyCode::Char('T') => {
                                     pending_key.set(PendingKeySequence::TillBackward);
                                     vec![]
                                 }
-                                KeyCode::Char('r') if snapshot.mode == "NORMAL" => {
+                                KeyCode::Char('r') => {
                                     pending_key.set(PendingKeySequence::ReplacePrefix);
                                     vec![]
                                 }

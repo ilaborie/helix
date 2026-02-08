@@ -21,6 +21,8 @@ pub trait SelectionOps {
     fn keep_primary_selection(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn select_inside_pair(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char);
     fn select_around_pair(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char);
+    fn select_all(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn flip_selections(&mut self, doc_id: DocumentId, view_id: ViewId);
 }
 
 impl SelectionOps for EditorContext {
@@ -274,6 +276,23 @@ impl SelectionOps for EditorContext {
             // Around: include the delimiters
             doc.set_selection(view_id, helix_core::Selection::single(open, close + 1));
         }
+    }
+
+    /// Select entire buffer (`%` in Helix).
+    fn select_all(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let len = text.len_chars();
+        doc.set_selection(view_id, helix_core::Selection::single(0, len));
+    }
+
+    /// Flip selections: swap anchor and head (`Alt+;` in Helix).
+    fn flip_selections(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let selection = doc.selection(view_id).clone();
+        let new_selection =
+            selection.transform(|range| helix_core::Range::new(range.head, range.anchor));
+        doc.set_selection(view_id, new_selection);
     }
 }
 

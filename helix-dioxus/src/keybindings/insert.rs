@@ -11,11 +11,28 @@ pub fn handle_insert_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         return vec![EditorCommand::ExitInsertMode];
     }
 
+    // Handle Alt+key combinations
+    if key.modifiers.contains(KeyModifiers::ALT) {
+        return match key.code {
+            // Alt+d - delete word forward
+            KeyCode::Char('d') => vec![EditorCommand::DeleteWordForward],
+            _ => vec![],
+        };
+    }
+
     // Handle control key combinations
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         return match key.code {
             // Ctrl+c - toggle line comment
             KeyCode::Char('c') => vec![EditorCommand::ToggleLineComment],
+            // Ctrl+d - delete char forward (alt delete)
+            KeyCode::Char('d') => vec![EditorCommand::DeleteCharForward],
+            // Ctrl+h - delete char backward (alt backspace)
+            KeyCode::Char('h') => vec![EditorCommand::DeleteCharBackward],
+            // Ctrl+j - insert newline (alt enter)
+            KeyCode::Char('j') => vec![EditorCommand::InsertNewline],
+            // Ctrl+k - kill to line end
+            KeyCode::Char('k') => vec![EditorCommand::KillToLineEnd],
             // Ctrl+Space - trigger completion
             KeyCode::Char(' ') => vec![EditorCommand::TriggerCompletion],
             // Ctrl+. - show code actions (quick fix)
