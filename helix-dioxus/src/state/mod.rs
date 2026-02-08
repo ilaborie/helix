@@ -487,6 +487,7 @@ impl EditorContext {
             EditorCommand::ToUppercase => self.to_uppercase(doc_id, view_id),
             EditorCommand::AddNewlineBelow => self.add_newline_below(doc_id, view_id),
             EditorCommand::AddNewlineAbove => self.add_newline_above(doc_id, view_id),
+            EditorCommand::AlignSelections => self.align_selections(doc_id, view_id),
             EditorCommand::Increment => self.increment(doc_id, view_id, 1),
             EditorCommand::Decrement => self.increment(doc_id, view_id, -1),
             EditorCommand::SurroundAdd(ch) => self.surround_add(doc_id, view_id, ch),
@@ -826,10 +827,7 @@ impl EditorContext {
             }
 
             // LSP - Format
-            EditorCommand::FormatDocument => {
-                // TODO: Trigger LSP format document
-                log::info!("FormatDocument - not yet implemented");
-            }
+            EditorCommand::FormatDocument => self.format_document(doc_id, view_id),
             EditorCommand::FormatSelections => self.format_selections(doc_id, view_id),
 
             // LSP - Rename

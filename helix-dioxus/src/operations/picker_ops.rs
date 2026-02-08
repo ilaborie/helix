@@ -895,8 +895,19 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
             "Search Backward",
             Some("?"),
         ),
+        // Editing
+        (
+            EditorCommand::AlignSelections,
+            "Align Selections",
+            Some("&"),
+        ),
         // LSP
         (EditorCommand::FormatDocument, "Format Document", None),
+        (
+            EditorCommand::FormatSelections,
+            "Format Selections",
+            Some("="),
+        ),
         (
             EditorCommand::RenameSymbol,
             "Rename Symbol",

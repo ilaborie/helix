@@ -73,6 +73,7 @@ Reference: `helix-term/src/keymap/default.rs`
 | `C-x` | Decrement number | Matches |
 | `_` | Trim selections | Matches |
 | `=` | Format selections (LSP) | Matches |
+| `&` | Align selections | Matches |
 
 ### Editing — Deviations
 
@@ -92,7 +93,6 @@ Reference: `helix-term/src/keymap/default.rs`
 | `A-o` | `expand_selection` | Tree-sitter expand |
 | `A-i` | `shrink_selection` | Tree-sitter shrink |
 | `q/Q` | `replay_macro` / `record_macro` | Macro support |
-| `&` | `align_selections` | Align selections |
 | `(/)` | `rotate_selections_backward/forward` | Multi-selection rotation |
 | `\|` | `shell_pipe` | Pipe selection through shell |
 | `!` | `shell_insert_output` | Insert shell output |

@@ -67,7 +67,9 @@ pub trait EditingOps {
     fn add_newline_below(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn add_newline_above(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn increment(&mut self, doc_id: DocumentId, view_id: ViewId, amount: i64);
+    fn format_document(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn format_selections(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn align_selections(&mut self, doc_id: DocumentId, view_id: ViewId);
 }
 
 impl EditingOps for EditorContext {
@@ -792,6 +794,62 @@ impl EditingOps for EditorContext {
         }
     }
 
+    /// Format the entire document via LSP.
+    fn format_document(&mut self, doc_id: DocumentId, _view_id: ViewId) {
+        use helix_core::syntax::config::LanguageServerFeature;
+        use helix_lsp::lsp;
+
+        let doc = self.editor.document(doc_id).expect("doc exists");
+
+        let Some(language_server) = doc
+            .language_servers_with_feature(LanguageServerFeature::Format)
+            .next()
+        else {
+            log::info!("No configured language server supports formatting");
+            return;
+        };
+
+        let offset_encoding = language_server.offset_encoding();
+
+        let future = language_server.text_document_formatting(
+            doc.identifier(),
+            lsp::FormattingOptions {
+                tab_size: doc.tab_width() as u32,
+                insert_spaces: matches!(
+                    doc.indent_style,
+                    helix_core::indent::IndentStyle::Spaces(_)
+                ),
+                ..Default::default()
+            },
+            None,
+        );
+
+        let Some(future) = future else {
+            log::info!("Language server does not support formatting");
+            return;
+        };
+
+        let text = doc.text().clone();
+        let tx = self.command_tx.clone();
+
+        tokio::spawn(async move {
+            match future.await {
+                Ok(Some(edits)) => {
+                    let transaction = helix_lsp::util::generate_transaction_from_edits(
+                        &text,
+                        edits,
+                        offset_encoding,
+                    );
+                    let _ = tx.send(crate::state::EditorCommand::LspResponse(
+                        crate::lsp::LspResponse::FormatResult { transaction },
+                    ));
+                }
+                Ok(None) => log::info!("No formatting edits returned"),
+                Err(e) => log::error!("Format document failed: {e}"),
+            }
+        });
+    }
+
     /// Format selections via LSP range formatting.
     fn format_selections(&mut self, doc_id: DocumentId, view_id: ViewId) {
         use helix_core::syntax::config::LanguageServerFeature;
@@ -860,6 +918,69 @@ impl EditingOps for EditorContext {
                 Err(e) => log::error!("Format selections failed: {e}"),
             }
         });
+    }
+
+    /// Align selections by inserting spaces to align cursors in columns.
+    #[allow(deprecated)]
+    fn align_selections(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        use helix_core::visual_coords_at_pos;
+
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+        let tab_width = doc.tab_width();
+
+        let mut column_widths: Vec<Vec<(usize, usize)>> = Vec::new();
+        let mut last_line = text.len_lines() + 1;
+        let mut col = 0;
+
+        for range in selection.iter() {
+            let coords = visual_coords_at_pos(text, range.head, tab_width);
+            let anchor_coords = visual_coords_at_pos(text, range.anchor, tab_width);
+
+            if coords.row != anchor_coords.row {
+                log::info!("align cannot work with multi line selections");
+                return;
+            }
+
+            col = if coords.row == last_line { col + 1 } else { 0 };
+
+            if col >= column_widths.len() {
+                column_widths.push(Vec::new());
+            }
+            column_widths[col].push((range.from(), coords.col));
+
+            last_line = coords.row;
+        }
+
+        let mut changes = Vec::with_capacity(selection.len());
+        let len = column_widths.first().map(|cols| cols.len()).unwrap_or(0);
+        let mut offs = vec![0usize; len];
+
+        for col in column_widths {
+            let max_col = col
+                .iter()
+                .enumerate()
+                .map(|(row, (_, cursor))| *cursor + offs[row])
+                .max()
+                .unwrap_or(0);
+
+            for (row, (insert_pos, last_col)) in col.into_iter().enumerate() {
+                let ins_count = max_col - (last_col + offs[row]);
+                if ins_count == 0 {
+                    continue;
+                }
+                offs[row] += ins_count;
+                changes.push((insert_pos, insert_pos, Some(" ".repeat(ins_count).into())));
+            }
+        }
+
+        changes.sort_unstable_by_key(|(from, _, _)| *from);
+
+        if !changes.is_empty() {
+            let transaction = helix_core::Transaction::change(doc.text(), changes.into_iter());
+            doc.apply(&transaction, view_id);
+        }
     }
 }
 

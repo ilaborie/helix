@@ -410,6 +410,7 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - **Window/Splits**: Not supported — helix-dioxus uses a single-view design. `C-w` prefix and `Space w` sub-menu will not be implemented.
 
 ### Recently Completed
+- [x] Format document + align selections — `:format` / command panel now uses LSP `textDocument/formatting`, `&` aligns multi-cursor selections, `=` formats via LSP range formatting
 - [x] Quick wins batch (6 bindings) — `A-d`/`A-c` delete/change without yanking, `C-a`/`C-x` increment/decrement numbers and dates, `_` trim selections, `=` format selections via LSP range formatting
 - [x] Goto + bracket navigation batch (20 bindings) — `gt`/`gc`/`gb` window position, `ga`/`gm`/`g.` file/edit goto, `]f`/`[f` function, `]t`/`[t` class, `]a`/`[a` parameter, `]c`/`[c` comment, `]p`/`[p` paragraph, `]D`/`[D` first/last diagnostic, `X` extend to line bounds, `A-x` shrink to line bounds
 - [x] Keybinding gap reduction (3 batches, ~30 new bindings) — Batch 1: wire existing commands (`C-b`/`C-f` page, `ge`/`gh`/`gl`/`gn`/`gp` goto, `Space b` buffer picker, insert `C-h`/`C-d`/`C-j`). Batch 2: new operations (`C-u`/`C-d` half-page, `%` select all, `A-;` flip selections, `gs` first non-whitespace, `] Space`/`[ Space` add newline, `C-k` kill to line end, `A-d` delete word forward). Batch 3: select mode extend variants (`f`/`F`/`t`/`T`/`r` in select mode, `n`/`N` extend search next/prev, mode-aware dispatch in `app.rs`)

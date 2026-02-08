@@ -171,6 +171,9 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         // Join lines
         KeyCode::Char('J') => vec![EditorCommand::JoinLines],
 
+        // Align selections
+        KeyCode::Char('&') => vec![EditorCommand::AlignSelections],
+
         // Trim selections
         KeyCode::Char('_') => vec![EditorCommand::TrimSelections],
 

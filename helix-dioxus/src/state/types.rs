@@ -400,6 +400,8 @@ pub enum EditorCommand {
     Increment,
     /// Decrement number or date under cursor (C-x).
     Decrement,
+    /// Align selections by inserting spaces (&).
+    AlignSelections,
     /// Add surround pair around selection.
     SurroundAdd(char),
     /// Delete surround pair.
