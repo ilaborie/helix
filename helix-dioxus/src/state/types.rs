@@ -307,6 +307,46 @@ pub enum EditorCommand {
     AlignViewTop,
     /// Align view so cursor is at the bottom (zb).
     AlignViewBottom,
+    /// Move cursor to top of visible window (gt).
+    GotoWindowTop,
+    /// Move cursor to center of visible window (gc).
+    GotoWindowCenter,
+    /// Move cursor to bottom of visible window (gb).
+    GotoWindowBottom,
+    /// Jump to last accessed file (ga).
+    GotoLastAccessedFile,
+    /// Jump to last modified file (gm).
+    GotoLastModifiedFile,
+    /// Jump to last modification position in current document (g.).
+    GotoLastModification,
+    /// Jump to first diagnostic ([D).
+    GotoFirstDiagnostic,
+    /// Jump to last diagnostic (]D).
+    GotoLastDiagnostic,
+    /// Move to next paragraph (]p).
+    NextParagraph,
+    /// Move to previous paragraph ([p).
+    PrevParagraph,
+    /// Move to next function (]f).
+    NextFunction,
+    /// Move to previous function ([f).
+    PrevFunction,
+    /// Move to next class/type (]t).
+    NextClass,
+    /// Move to previous class/type ([t).
+    PrevClass,
+    /// Move to next parameter (]a).
+    NextParameter,
+    /// Move to previous parameter ([a).
+    PrevParameter,
+    /// Move to next comment (]c).
+    NextComment,
+    /// Move to previous comment ([c).
+    PrevComment,
+    /// Extend selection to full line bounds (X).
+    ExtendToLineBounds,
+    /// Shrink selection to line bounds (Alt-x).
+    ShrinkToLineBounds,
 
     // Mode changes
     EnterInsertMode,

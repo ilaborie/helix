@@ -58,6 +58,8 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
             KeyCode::Char(';') => vec![EditorCommand::FlipSelections],
             // Alt+` = convert to uppercase
             KeyCode::Char('`') => vec![EditorCommand::ToUppercase],
+            // Alt+x = shrink selection to line bounds
+            KeyCode::Char('x') => vec![EditorCommand::ShrinkToLineBounds],
             _ => vec![],
         };
     }
@@ -124,6 +126,7 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
 
         // Line selection (helix x/X)
         KeyCode::Char('x') => vec![EditorCommand::SelectLine],
+        KeyCode::Char('X') => vec![EditorCommand::ExtendToLineBounds],
 
         // Delete selection (works in normal mode due to selection-first model)
         KeyCode::Char('d') => vec![EditorCommand::DeleteSelection],
@@ -176,18 +179,28 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
 /// Handle two-key sequences starting with 'g' (goto).
 pub fn handle_g_prefix(key: &KeyEvent) -> Vec<EditorCommand> {
     match key.code {
-        // gg - go to first line
-        KeyCode::Char('g') => vec![EditorCommand::GotoFirstLine],
+        // g. - go to last modification in current document
+        KeyCode::Char('.') => vec![EditorCommand::GotoLastModification],
+        // ga - go to last accessed file (alternate file)
+        KeyCode::Char('a') => vec![EditorCommand::GotoLastAccessedFile],
+        // gb - go to window bottom
+        KeyCode::Char('b') => vec![EditorCommand::GotoWindowBottom],
+        // gc - go to window center
+        KeyCode::Char('c') => vec![EditorCommand::GotoWindowCenter],
         // gd - go to definition
         KeyCode::Char('d') => vec![EditorCommand::GotoDefinition],
         // ge - go to last line
         KeyCode::Char('e') => vec![EditorCommand::GotoLastLine],
+        // gg - go to first line
+        KeyCode::Char('g') => vec![EditorCommand::GotoFirstLine],
         // gh - go to line start
         KeyCode::Char('h') => vec![EditorCommand::MoveLineStart],
         // gi - go to implementation
         KeyCode::Char('i') => vec![EditorCommand::GotoImplementation],
         // gl - go to line end
         KeyCode::Char('l') => vec![EditorCommand::MoveLineEnd],
+        // gm - go to last modified file
+        KeyCode::Char('m') => vec![EditorCommand::GotoLastModifiedFile],
         // gn - next buffer
         KeyCode::Char('n') => vec![EditorCommand::NextBuffer],
         // gp - previous buffer
@@ -196,6 +209,8 @@ pub fn handle_g_prefix(key: &KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('r') => vec![EditorCommand::GotoReferences],
         // gs - go to first non-whitespace character on line
         KeyCode::Char('s') => vec![EditorCommand::GotoFirstNonWhitespace],
+        // gt - go to window top
+        KeyCode::Char('t') => vec![EditorCommand::GotoWindowTop],
         // gy - go to type definition
         KeyCode::Char('y') => vec![EditorCommand::GotoTypeDefinition],
         _ => vec![],
@@ -205,8 +220,20 @@ pub fn handle_g_prefix(key: &KeyEvent) -> Vec<EditorCommand> {
 /// Handle two-key sequences starting with ']' (next).
 pub fn handle_bracket_next(key: &KeyEvent) -> Vec<EditorCommand> {
     match key.code {
+        // ]a - next parameter
+        KeyCode::Char('a') => vec![EditorCommand::NextParameter],
+        // ]c - next comment
+        KeyCode::Char('c') => vec![EditorCommand::NextComment],
         // ]d - next diagnostic
         KeyCode::Char('d') => vec![EditorCommand::NextDiagnostic],
+        // ]f - next function
+        KeyCode::Char('f') => vec![EditorCommand::NextFunction],
+        // ]p - next paragraph
+        KeyCode::Char('p') => vec![EditorCommand::NextParagraph],
+        // ]t - next class/type
+        KeyCode::Char('t') => vec![EditorCommand::NextClass],
+        // ]D - last diagnostic
+        KeyCode::Char('D') => vec![EditorCommand::GotoLastDiagnostic],
         // ] Space - add newline below
         KeyCode::Char(' ') => vec![EditorCommand::AddNewlineBelow],
         _ => vec![],
@@ -216,8 +243,20 @@ pub fn handle_bracket_next(key: &KeyEvent) -> Vec<EditorCommand> {
 /// Handle two-key sequences starting with '[' (previous).
 pub fn handle_bracket_prev(key: &KeyEvent) -> Vec<EditorCommand> {
     match key.code {
+        // [a - previous parameter
+        KeyCode::Char('a') => vec![EditorCommand::PrevParameter],
+        // [c - previous comment
+        KeyCode::Char('c') => vec![EditorCommand::PrevComment],
         // [d - previous diagnostic
         KeyCode::Char('d') => vec![EditorCommand::PrevDiagnostic],
+        // [f - previous function
+        KeyCode::Char('f') => vec![EditorCommand::PrevFunction],
+        // [p - previous paragraph
+        KeyCode::Char('p') => vec![EditorCommand::PrevParagraph],
+        // [t - previous class/type
+        KeyCode::Char('t') => vec![EditorCommand::PrevClass],
+        // [D - first diagnostic
+        KeyCode::Char('D') => vec![EditorCommand::GotoFirstDiagnostic],
         // [ Space - add newline above
         KeyCode::Char(' ') => vec![EditorCommand::AddNewlineAbove],
         _ => vec![],

@@ -23,6 +23,8 @@ pub trait SelectionOps {
     fn select_around_pair(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char);
     fn select_all(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn flip_selections(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn extend_to_line_bounds(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn shrink_to_line_bounds(&mut self, doc_id: DocumentId, view_id: ViewId);
 }
 
 impl SelectionOps for EditorContext {
@@ -292,6 +294,53 @@ impl SelectionOps for EditorContext {
         let selection = doc.selection(view_id).clone();
         let new_selection =
             selection.transform(|range| helix_core::Range::new(range.head, range.anchor));
+        doc.set_selection(view_id, new_selection);
+    }
+
+    /// Extend selection to full line bounds (`X` in Helix).
+    fn extend_to_line_bounds(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().clone();
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection.transform(|range| {
+            let (start_line, end_line) = range.line_range(text.slice(..));
+            let start = text.line_to_char(start_line);
+            let end = text.line_to_char((end_line + 1).min(text.len_lines()));
+            helix_core::Range::new(start, end).with_direction(range.direction())
+        });
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    /// Shrink selection to line bounds (`Alt-x` in Helix).
+    fn shrink_to_line_bounds(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().clone();
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection.transform(|range| {
+            let (start_line, end_line) = range.line_range(text.slice(..));
+
+            // Do nothing if the selection is within one line
+            if start_line == end_line {
+                return range;
+            }
+
+            let mut start = text.line_to_char(start_line);
+            let mut end = text.line_to_char((end_line + 1).min(text.len_lines()));
+
+            if start != range.from() {
+                start = text.line_to_char((start_line + 1).min(text.len_lines()));
+            }
+
+            if end != range.to() {
+                end = text.line_to_char(end_line);
+            }
+
+            helix_core::Range::new(start, end).with_direction(range.direction())
+        });
+
         doc.set_selection(view_id, new_selection);
     }
 }

@@ -1,5 +1,6 @@
 //! Movement operations for the editor.
 
+use helix_core::movement::Movement;
 use helix_view::{Align, DocumentId, ViewId};
 
 use crate::state::{Direction, EditorContext};
@@ -35,6 +36,24 @@ pub trait MovementOps {
     fn align_view_center(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn align_view_top(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn align_view_bottom(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn goto_window_top(&mut self);
+    fn goto_window_center(&mut self);
+    fn goto_window_bottom(&mut self);
+    fn goto_last_accessed_file(&mut self);
+    fn goto_last_modified_file(&mut self);
+    fn goto_last_modification(&mut self);
+    fn goto_first_diagnostic(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn goto_last_diagnostic(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn next_paragraph(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn prev_paragraph(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn next_function(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn prev_function(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn next_class(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn prev_class(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn next_parameter(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn prev_parameter(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn next_comment(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn prev_comment(&mut self, doc_id: DocumentId, view_id: ViewId);
 }
 
 impl MovementOps for EditorContext {
@@ -282,6 +301,166 @@ impl MovementOps for EditorContext {
         let (view, doc) = helix_view::current!(self.editor);
         helix_view::align_view(doc, view, Align::Bottom);
     }
+
+    fn goto_window_top(&mut self) {
+        self.goto_window(Align::Top);
+    }
+
+    fn goto_window_center(&mut self) {
+        self.goto_window(Align::Center);
+    }
+
+    fn goto_window_bottom(&mut self) {
+        self.goto_window(Align::Bottom);
+    }
+
+    fn goto_last_accessed_file(&mut self) {
+        let view = helix_view::view_mut!(self.editor);
+        if let Some(alt) = view.docs_access_history.pop() {
+            self.editor.switch(alt, helix_view::editor::Action::Replace);
+        } else {
+            self.editor.set_error("no last accessed buffer");
+        }
+    }
+
+    fn goto_last_modified_file(&mut self) {
+        let view = helix_view::view!(self.editor);
+        let alternate_file = view
+            .last_modified_docs
+            .into_iter()
+            .flatten()
+            .find(|&id| id != view.doc);
+        if let Some(alt) = alternate_file {
+            self.editor.switch(alt, helix_view::editor::Action::Replace);
+        } else {
+            self.editor.set_error("no last modified buffer");
+        }
+    }
+
+    fn goto_last_modification(&mut self) {
+        let (view, doc) = helix_view::current!(self.editor);
+        let pos = doc.history.get_mut().last_edit_pos();
+        if let Some(pos) = pos {
+            let text = doc.text().slice(..);
+            let selection = doc
+                .selection(view.id)
+                .clone()
+                .transform(|range| range.put_cursor(text, pos, false));
+            doc.set_selection(view.id, selection);
+        }
+    }
+
+    fn goto_first_diagnostic(&mut self, _doc_id: DocumentId, _view_id: ViewId) {
+        let (view, doc) = helix_view::current!(self.editor);
+        if let Some(diag) = doc.diagnostics().first() {
+            let selection = helix_core::Selection::single(diag.range.start, diag.range.end);
+            doc.set_selection(view.id, selection);
+        }
+    }
+
+    fn goto_last_diagnostic(&mut self, _doc_id: DocumentId, _view_id: ViewId) {
+        let (view, doc) = helix_view::current!(self.editor);
+        if let Some(diag) = doc.diagnostics().last() {
+            let selection = helix_core::Selection::single(diag.range.start, diag.range.end);
+            doc.set_selection(view.id, selection);
+        }
+    }
+
+    fn next_paragraph(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection.transform(|range| {
+            helix_core::movement::move_next_paragraph(text, range, 1, Movement::Move)
+        });
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    fn prev_paragraph(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection.transform(|range| {
+            helix_core::movement::move_prev_paragraph(text, range, 1, Movement::Move)
+        });
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    fn next_function(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        self.goto_ts_object(
+            doc_id,
+            view_id,
+            "function",
+            helix_core::movement::Direction::Forward,
+        );
+    }
+
+    fn prev_function(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        self.goto_ts_object(
+            doc_id,
+            view_id,
+            "function",
+            helix_core::movement::Direction::Backward,
+        );
+    }
+
+    fn next_class(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        self.goto_ts_object(
+            doc_id,
+            view_id,
+            "class",
+            helix_core::movement::Direction::Forward,
+        );
+    }
+
+    fn prev_class(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        self.goto_ts_object(
+            doc_id,
+            view_id,
+            "class",
+            helix_core::movement::Direction::Backward,
+        );
+    }
+
+    fn next_parameter(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        self.goto_ts_object(
+            doc_id,
+            view_id,
+            "parameter",
+            helix_core::movement::Direction::Forward,
+        );
+    }
+
+    fn prev_parameter(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        self.goto_ts_object(
+            doc_id,
+            view_id,
+            "parameter",
+            helix_core::movement::Direction::Backward,
+        );
+    }
+
+    fn next_comment(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        self.goto_ts_object(
+            doc_id,
+            view_id,
+            "comment",
+            helix_core::movement::Direction::Forward,
+        );
+    }
+
+    fn prev_comment(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        self.goto_ts_object(
+            doc_id,
+            view_id,
+            "comment",
+            helix_core::movement::Direction::Backward,
+        );
+    }
 }
 
 impl EditorContext {
@@ -424,6 +603,65 @@ impl EditorContext {
 
         offset.anchor = text.line_to_char(new_line);
         doc.set_view_offset(view_id, offset);
+    }
+
+    /// Move cursor to a window position (top/center/bottom).
+    fn goto_window(&mut self, align: Align) {
+        let config = self.editor.config();
+        let (view, doc) = helix_view::current!(self.editor);
+        let view_offset = doc.view_offset(view.id);
+
+        let last_visual_line = view.last_visual_line(doc);
+        let scrolloff = config.scrolloff.min(last_visual_line.saturating_sub(1) / 2);
+
+        let visual_line = match align {
+            Align::Top => view_offset.vertical_offset + scrolloff,
+            Align::Center => view_offset.vertical_offset + (last_visual_line / 2),
+            Align::Bottom => {
+                view_offset.vertical_offset + last_visual_line.saturating_sub(scrolloff)
+            }
+        };
+        let visual_line = visual_line
+            .max(view_offset.vertical_offset + scrolloff)
+            .min(view_offset.vertical_offset + last_visual_line.saturating_sub(scrolloff));
+
+        if let Some(pos) = view.pos_at_visual_coords(doc, visual_line as u16, 0, false) {
+            let text = doc.text().slice(..);
+            let selection = doc
+                .selection(view.id)
+                .clone()
+                .transform(|range| range.put_cursor(text, pos, false));
+            doc.set_selection(view.id, selection);
+        }
+    }
+
+    /// Navigate to a tree-sitter object (function, class, parameter, comment).
+    fn goto_ts_object(
+        &mut self,
+        doc_id: DocumentId,
+        view_id: ViewId,
+        object: &str,
+        dir: helix_core::movement::Direction,
+    ) {
+        // Load syn_loader before borrowing doc to avoid borrow conflicts.
+        let loader = self.editor.syn_loader.load();
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        if let Some(syntax) = doc.syntax() {
+            let text = doc.text().slice(..);
+            let root = syntax.tree().root_node();
+
+            let selection = doc.selection(view_id).clone().transform(|range| {
+                let new_range = helix_core::movement::goto_treesitter_object(
+                    text, range, object, dir, &root, syntax, &loader, 1,
+                );
+                new_range.with_direction(dir)
+            });
+
+            doc.set_selection(view_id, selection);
+        } else {
+            self.editor
+                .set_status("Syntax-tree is not available in current buffer");
+        }
     }
 }
 

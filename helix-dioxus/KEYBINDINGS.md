@@ -33,6 +33,8 @@ Reference: `helix-term/src/keymap/default.rs`
 | `Alt+.` | Repeat last motion | Matches |
 | `%` | Select all | Matches |
 | `Alt+;` | Flip selections | Matches |
+| `X` | Extend to line bounds | Matches |
+| `Alt+x` | Shrink to line bounds | Matches |
 
 ### Movement — Deviations
 
@@ -86,8 +88,6 @@ Reference: `helix-term/src/keymap/default.rs`
 | `A-c` | `change_selection_noyank` | Change without yanking |
 | `A-o` | `expand_selection` | Tree-sitter expand |
 | `A-i` | `shrink_selection` | Tree-sitter shrink |
-| `X` | `extend_to_line_bounds` | Extend selection to line bounds |
-| `A-x` | `shrink_to_line_bounds` | Shrink selection to line bounds |
 | `q/Q` | `replay_macro` / `record_macro` | Macro support |
 | `&` | `align_selections` | Align selections |
 | `_` | `trim_selections` | Trim whitespace |
@@ -127,6 +127,12 @@ Reference: `helix-term/src/keymap/default.rs`
 | `gr` | Go to references |
 | `gs` | Go to first non-whitespace |
 | `gy` | Go to type definition |
+| `gt` | Go to window top |
+| `gc` | Go to window center |
+| `gb` | Go to window bottom |
+| `ga` | Go to last accessed file |
+| `gm` | Go to last modified file |
+| `g.` | Go to last modification |
 
 ### Missing
 
@@ -135,13 +141,7 @@ Reference: `helix-term/src/keymap/default.rs`
 | `gf` | `goto_file` | Open file under cursor |
 | `gD` | `goto_declaration` | Go to declaration |
 | `g\|` | `goto_column` | Go to column |
-| `gt` | `goto_window_top` | Top of window |
-| `gc` | `goto_window_center` | Center of window |
-| `gb` | `goto_window_bottom` | Bottom of window |
-| `ga` | `goto_last_accessed_file` | Last accessed file |
-| `gm` | `goto_last_modified_file` | Last modified file |
 | `gk/gj` | `move_line_up/down` | Move line up/down |
-| `g.` | `goto_last_modification` | Last modification |
 | `gw` | `goto_word` | Word jump |
 
 ---
@@ -204,18 +204,18 @@ Reference: `helix-term/src/keymap/default.rs`
 | `[d` | Previous diagnostic |
 | `] Space` | Add newline below |
 | `[ Space` | Add newline above |
+| `]D / [D` | Last/first diagnostic |
+| `]f / [f` | Next/prev function |
+| `]t / [t` | Next/prev class |
+| `]a / [a` | Next/prev parameter |
+| `]c / [c` | Next/prev comment |
+| `]p / [p` | Next/prev paragraph |
 
 ### Missing
 
 | Key | Helix Action | Notes |
 |-----|-------------|-------|
-| `]D / [D` | Last/first diagnostic | Jump to first/last |
 | `]g / [g` | Next/prev change | VCS change navigation |
-| `]f / [f` | Next/prev function | Tree-sitter function jump |
-| `]t / [t` | Next/prev class | Tree-sitter class jump |
-| `]a / [a` | Next/prev parameter | Tree-sitter parameter |
-| `]c / [c` | Next/prev comment | Tree-sitter comment |
-| `]p / [p` | Next/prev paragraph | Paragraph navigation |
 
 ---
 
@@ -307,21 +307,29 @@ Reference: `helix-term/src/keymap/default.rs`
 
 ---
 
-## View Mode (z/Z prefix) — Missing
+## View Mode (z/Z prefix)
 
-The entire `z` (view) and `Z` (sticky view) prefix is not implemented.
+### Matches Helix
+
+| Key | Action |
+|-----|--------|
+| `zz` / `zc` | Align view center |
+| `zt` | Align view top |
+| `zb` | Align view bottom |
+| `zk/zj` | Scroll up/down |
+| `z C-b / z PageUp` | Page up |
+| `z C-f / z PageDown` | Page down |
+| `z C-u` | Half page up |
+| `z C-d` | Half page down |
+| `z/`, `z?` | Search forward/backward |
+| `zn/zN` | Search next/prev |
+| `Z` prefix | Sticky view mode (same keys, stays until Esc) |
+
+### Missing
 
 | Key | Helix Action | Notes |
 |-----|-------------|-------|
-| `zz` / `zc` | Align view center | Center cursor in view |
-| `zt` | Align view top | Cursor at top of view |
-| `zb` | Align view bottom | Cursor at bottom of view |
 | `zm` | Align view middle | Cursor at middle column |
-| `zk/zj` | Scroll up/down | Scroll without moving cursor |
-| `z C-b / z PageUp` | Page up | |
-| `z C-f / z PageDown` | Page down | |
-| `z C-u` | Half page up | |
-| `z C-d` | Half page down | |
 
 ---
 
@@ -399,10 +407,9 @@ Window/split management is not supported. helix-dioxus uses a single-view design
 ### Feature Categories Not Yet Implemented
 
 1. **Multi-cursor** — `C`, `A-C`, selections rotation `(/)`, `s`/`S` regex selection
-2. **View mode** — `z/Z` prefix for scroll/alignment
-3. **Jump list** — `C-i`/`C-o`, `Space j`, `Space '`
-4. **Tree-sitter navigation** — `]f/[f`, `]t/[t`, `A-o/A-i` expand/shrink, `gw` word jump
-5. **Macros** — `q/Q` record/replay
-6. **Shell integration** — `|`, `!`, `$` pipe/insert/keep
-7. **VCS integration** — `]g/[g` change navigation, `Space g` changed files
-8. **DAP/Debug** — `Space G` sub-menu
+2. **Jump list** — `C-i`/`C-o`, `Space j`, `Space '`
+3. **Tree-sitter expand/shrink** — `A-o`/`A-i`, `gw` word jump
+4. **Macros** — `q/Q` record/replay
+5. **Shell integration** — `|`, `!`, `$` pipe/insert/keep
+6. **VCS integration** — `]g/[g` change navigation, `Space g` changed files
+7. **DAP/Debug** — `Space G` sub-menu
