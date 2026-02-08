@@ -477,6 +477,9 @@ impl EditorContext {
                 self.editor.mode = Mode::Insert;
             }
             EditorCommand::ChangeSelection => self.change_selection(doc_id, view_id),
+            EditorCommand::ChangeSelectionNoYank => {
+                self.change_selection_noyank(doc_id, view_id);
+            }
             EditorCommand::ReplaceChar(ch) => self.replace_char(doc_id, view_id, ch),
             EditorCommand::JoinLines => self.join_lines(doc_id, view_id),
             EditorCommand::ToggleCase => self.toggle_case(doc_id, view_id),
@@ -484,6 +487,8 @@ impl EditorContext {
             EditorCommand::ToUppercase => self.to_uppercase(doc_id, view_id),
             EditorCommand::AddNewlineBelow => self.add_newline_below(doc_id, view_id),
             EditorCommand::AddNewlineAbove => self.add_newline_above(doc_id, view_id),
+            EditorCommand::Increment => self.increment(doc_id, view_id, 1),
+            EditorCommand::Decrement => self.increment(doc_id, view_id, -1),
             EditorCommand::SurroundAdd(ch) => self.surround_add(doc_id, view_id, ch),
             EditorCommand::SurroundDelete(ch) => self.surround_delete(doc_id, view_id, ch),
             EditorCommand::SurroundReplace(old, new) => {
@@ -511,6 +516,7 @@ impl EditorContext {
             EditorCommand::KeepPrimarySelection => self.keep_primary_selection(doc_id, view_id),
             EditorCommand::SelectInsidePair(ch) => self.select_inside_pair(doc_id, view_id, ch),
             EditorCommand::SelectAroundPair(ch) => self.select_around_pair(doc_id, view_id, ch),
+            EditorCommand::TrimSelections => self.trim_selections(doc_id, view_id),
             EditorCommand::SelectAll => self.select_all(doc_id, view_id),
             EditorCommand::FlipSelections => self.flip_selections(doc_id, view_id),
             EditorCommand::ExtendFindCharForward(ch) => {
@@ -537,6 +543,9 @@ impl EditorContext {
             EditorCommand::Paste => self.paste(doc_id, view_id, false),
             EditorCommand::PasteBefore => self.paste(doc_id, view_id, true),
             EditorCommand::DeleteSelection => self.delete_selection(doc_id, view_id),
+            EditorCommand::DeleteSelectionNoYank => {
+                self.delete_selection_noyank(doc_id, view_id);
+            }
             EditorCommand::ReplaceWithYanked => self.replace_with_yanked(doc_id, view_id),
 
             // History operations
@@ -821,6 +830,7 @@ impl EditorContext {
                 // TODO: Trigger LSP format document
                 log::info!("FormatDocument - not yet implemented");
             }
+            EditorCommand::FormatSelections => self.format_selections(doc_id, view_id),
 
             // LSP - Rename
             EditorCommand::RenameSymbol => {
@@ -1091,6 +1101,10 @@ impl EditorContext {
             }
             LspResponse::FormatApplied | LspResponse::WorkspaceEditApplied => {
                 // Nothing to do - changes already applied
+            }
+            LspResponse::FormatResult { transaction } => {
+                let (view, doc) = helix_view::current!(self.editor);
+                doc.apply(&transaction, view.id);
             }
             LspResponse::RenameResult {
                 edit,

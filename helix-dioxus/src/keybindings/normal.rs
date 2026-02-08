@@ -58,6 +58,10 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
             KeyCode::Char(';') => vec![EditorCommand::FlipSelections],
             // Alt+` = convert to uppercase
             KeyCode::Char('`') => vec![EditorCommand::ToUppercase],
+            // Alt+c = change selection without yanking
+            KeyCode::Char('c') => vec![EditorCommand::ChangeSelectionNoYank],
+            // Alt+d = delete selection without yanking
+            KeyCode::Char('d') => vec![EditorCommand::DeleteSelectionNoYank],
             // Alt+x = shrink selection to line bounds
             KeyCode::Char('x') => vec![EditorCommand::ShrinkToLineBounds],
             _ => vec![],
@@ -73,8 +77,10 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
             KeyCode::Char('f') => vec![EditorCommand::PageDown],
             KeyCode::Char('h') => vec![EditorCommand::PreviousBuffer],
             KeyCode::Char('l') => vec![EditorCommand::NextBuffer],
+            KeyCode::Char('a') => vec![EditorCommand::Increment],
             KeyCode::Char('r') => vec![EditorCommand::Redo],
             KeyCode::Char('u') => vec![EditorCommand::HalfPageUp],
+            KeyCode::Char('x') => vec![EditorCommand::Decrement],
             // Ctrl+Space or Ctrl+. - show code actions (quick fix)
             KeyCode::Char(' ') | KeyCode::Char('.') => vec![EditorCommand::ShowCodeActions],
             _ => vec![],
@@ -164,6 +170,12 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
 
         // Join lines
         KeyCode::Char('J') => vec![EditorCommand::JoinLines],
+
+        // Trim selections
+        KeyCode::Char('_') => vec![EditorCommand::TrimSelections],
+
+        // Format selections via LSP
+        KeyCode::Char('=') => vec![EditorCommand::FormatSelections],
 
         // Case operations
         KeyCode::Char('~') => vec![EditorCommand::ToggleCase],

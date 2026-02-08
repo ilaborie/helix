@@ -67,6 +67,12 @@ Reference: `helix-term/src/keymap/default.rs`
 | `` ` `` | To lowercase | Matches |
 | `` Alt+` `` | To uppercase | Matches |
 | `r` + char | Replace character | Matches |
+| `A-d` | Delete without yanking | Matches |
+| `A-c` | Change without yanking | Matches |
+| `C-a` | Increment number | Matches |
+| `C-x` | Decrement number | Matches |
+| `_` | Trim selections | Matches |
+| `=` | Format selections (LSP) | Matches |
 
 ### Editing — Deviations
 
@@ -80,21 +86,16 @@ Reference: `helix-term/src/keymap/default.rs`
 
 | Key | Helix Action | Notes |
 |-----|-------------|-------|
-| `=` | `format_selections` | Format; helix-dioxus has `FormatDocument` in command panel |
 | `s` | `select_regex` | Select by regex pattern |
 | `S` | `split_selection` | Split selection on regex |
 | `C` | `copy_selection_on_next_line` | Multi-cursor |
-| `A-d` | `delete_selection_noyank` | Delete without yanking |
-| `A-c` | `change_selection_noyank` | Change without yanking |
 | `A-o` | `expand_selection` | Tree-sitter expand |
 | `A-i` | `shrink_selection` | Tree-sitter shrink |
 | `q/Q` | `replay_macro` / `record_macro` | Macro support |
 | `&` | `align_selections` | Align selections |
-| `_` | `trim_selections` | Trim whitespace |
 | `(/)` | `rotate_selections_backward/forward` | Multi-selection rotation |
 | `\|` | `shell_pipe` | Pipe selection through shell |
 | `!` | `shell_insert_output` | Insert shell output |
-| `C-a/C-x` | `increment/decrement` | Increment/decrement numbers |
 | `C-i/Tab` | `jump_forward` | Jump list forward |
 | `C-o` | `jump_backward` | Jump list backward |
 | `C-s` | `save_selection` | Save selection to jump list |

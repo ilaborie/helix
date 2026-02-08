@@ -53,6 +53,7 @@ pub trait EditingOps {
     fn earlier(&mut self, steps: usize);
     fn later(&mut self, steps: usize);
     fn change_selection(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn change_selection_noyank(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn replace_char(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char);
     fn join_lines(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn toggle_case(&mut self, doc_id: DocumentId, view_id: ViewId);
@@ -65,6 +66,8 @@ pub trait EditingOps {
     fn kill_to_line_end(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn add_newline_below(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn add_newline_above(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn increment(&mut self, doc_id: DocumentId, view_id: ViewId, amount: i64);
+    fn format_selections(&mut self, doc_id: DocumentId, view_id: ViewId);
 }
 
 impl EditingOps for EditorContext {
@@ -420,6 +423,24 @@ impl EditingOps for EditorContext {
         self.editor.mode = Mode::Insert;
     }
 
+    /// Change selection without yanking (Alt-c): delete selected text and enter insert mode.
+    fn change_selection_noyank(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let (from, to) = {
+            let doc = self.editor.document(doc_id).expect("doc exists");
+            let primary = doc.selection(view_id).primary();
+            (primary.from(), primary.to())
+        };
+
+        if from < to {
+            let doc = self.editor.document_mut(doc_id).expect("doc exists");
+            let ranges = std::iter::once((from, to));
+            let transaction = helix_core::Transaction::delete(doc.text(), ranges);
+            doc.apply(&transaction, view_id);
+        }
+
+        self.editor.mode = Mode::Insert;
+    }
+
     /// Replace each character in selection with the given character.
     fn replace_char(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char) {
         let doc = self.editor.document_mut(doc_id).expect("doc exists");
@@ -724,6 +745,121 @@ impl EditingOps for EditorContext {
         let transaction =
             helix_core::Transaction::insert(doc.text(), &insert_selection, "\n".into());
         doc.apply(&transaction, view_id);
+    }
+
+    /// Increment or decrement numbers/dates in selections.
+    fn increment(&mut self, doc_id: DocumentId, view_id: ViewId, amount: i64) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let mut changes = Vec::new();
+        let mut new_ranges = helix_core::SmallVec::<[helix_core::Range; 1]>::new();
+        let mut cumulative_diff: i128 = 0;
+
+        for range in selection.iter() {
+            let selected_text: std::borrow::Cow<str> = range.fragment(text);
+            let new_from = ((range.from() as i128) + cumulative_diff) as usize;
+            let incremented = [
+                helix_core::increment::integer,
+                helix_core::increment::date_time,
+            ]
+            .iter()
+            .find_map(|incrementor| incrementor(selected_text.as_ref(), amount));
+
+            match incremented {
+                None => {
+                    let new_range = helix_core::Range::new(
+                        new_from,
+                        ((range.to() as i128) + cumulative_diff) as usize,
+                    );
+                    new_ranges.push(new_range);
+                }
+                Some(new_text) => {
+                    let new_range = helix_core::Range::new(new_from, new_from + new_text.len());
+                    cumulative_diff += new_text.len() as i128 - selected_text.len() as i128;
+                    new_ranges.push(new_range);
+                    changes.push((range.from(), range.to(), Some(new_text.into())));
+                }
+            }
+        }
+
+        if !changes.is_empty() {
+            let new_selection = helix_core::Selection::new(new_ranges, selection.primary_index());
+            let transaction = helix_core::Transaction::change(doc.text(), changes.into_iter());
+            let transaction = transaction.with_selection(new_selection);
+            doc.apply(&transaction, view_id);
+        }
+    }
+
+    /// Format selections via LSP range formatting.
+    fn format_selections(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        use helix_core::syntax::config::LanguageServerFeature;
+        use helix_lsp::lsp;
+
+        let doc = self.editor.document(doc_id).expect("doc exists");
+
+        if doc.selection(view_id).len() != 1 {
+            log::info!("format_selections only supports a single selection");
+            return;
+        }
+
+        let Some(language_server) = doc
+            .language_servers_with_feature(LanguageServerFeature::Format)
+            .find(|ls| {
+                matches!(
+                    ls.capabilities().document_range_formatting_provider,
+                    Some(lsp::OneOf::Left(true) | lsp::OneOf::Right(_))
+                )
+            })
+        else {
+            log::info!("No configured language server supports range formatting");
+            return;
+        };
+
+        let offset_encoding = language_server.offset_encoding();
+        let selection = doc.selection(view_id).clone();
+        let range =
+            helix_lsp::util::range_to_lsp_range(doc.text(), selection.primary(), offset_encoding);
+
+        let future = language_server.text_document_range_formatting(
+            doc.identifier(),
+            range,
+            lsp::FormattingOptions {
+                tab_size: doc.tab_width() as u32,
+                insert_spaces: matches!(
+                    doc.indent_style,
+                    helix_core::indent::IndentStyle::Spaces(_)
+                ),
+                ..Default::default()
+            },
+            None,
+        );
+
+        let Some(future) = future else {
+            log::info!("Language server does not support range formatting");
+            return;
+        };
+
+        let text = doc.text().clone();
+        let tx = self.command_tx.clone();
+
+        tokio::spawn(async move {
+            match future.await {
+                Ok(Some(edits)) => {
+                    let transaction = helix_lsp::util::generate_transaction_from_edits(
+                        &text,
+                        edits,
+                        offset_encoding,
+                    );
+                    let _ = tx.send(crate::state::EditorCommand::LspResponse(
+                        crate::lsp::LspResponse::FormatResult { transaction },
+                    ));
+                }
+                Ok(None) => log::info!("No formatting edits returned"),
+                Err(e) => log::error!("Format selections failed: {e}"),
+            }
+        });
     }
 }
 

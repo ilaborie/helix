@@ -10,6 +10,7 @@ pub trait ClipboardOps {
     fn yank(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn paste(&mut self, doc_id: DocumentId, view_id: ViewId, before: bool);
     fn delete_selection(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn delete_selection_noyank(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn replace_with_yanked(&mut self, doc_id: DocumentId, view_id: ViewId);
 }
 
@@ -151,6 +152,24 @@ impl ClipboardOps for EditorContext {
             });
 
         doc.apply(&transaction, view_id);
+    }
+
+    /// Delete the current selection without yanking (Alt-d).
+    fn delete_selection_noyank(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let (from, to) = {
+            let doc = self.editor.document(doc_id).expect("doc exists");
+            let primary = doc.selection(view_id).primary();
+            (primary.from(), primary.to())
+        };
+
+        if from < to {
+            let doc = self.editor.document_mut(doc_id).expect("doc exists");
+            let ranges = std::iter::once((from, to));
+            let transaction = helix_core::Transaction::delete(doc.text(), ranges);
+            doc.apply(&transaction, view_id);
+        }
+
+        self.editor.mode = Mode::Normal;
     }
 
     /// Delete the current selection, yanking to the selected register.

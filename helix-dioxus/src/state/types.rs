@@ -380,6 +380,8 @@ pub enum EditorCommand {
     UnindentLine,
     /// Change selection: delete + enter insert mode.
     ChangeSelection,
+    /// Change selection without yanking (Alt-c): delete + enter insert mode, skip register.
+    ChangeSelectionNoYank,
     /// Replace each character in selection with the given character.
     ReplaceChar(char),
     /// Join lines in selection.
@@ -394,6 +396,10 @@ pub enum EditorCommand {
     AddNewlineBelow,
     /// Add a newline above current line without entering insert mode.
     AddNewlineAbove,
+    /// Increment number or date under cursor (C-a).
+    Increment,
+    /// Decrement number or date under cursor (C-x).
+    Decrement,
     /// Add surround pair around selection.
     SurroundAdd(char),
     /// Delete surround pair.
@@ -436,6 +442,8 @@ pub enum EditorCommand {
     SelectInsidePair(char),
     /// Select around a bracket/quote pair.
     SelectAroundPair(char),
+    /// Trim whitespace from selection edges (_).
+    TrimSelections,
     /// Select entire buffer (%).
     SelectAll,
     /// Flip selection (swap anchor and head) (Alt+;).
@@ -460,6 +468,8 @@ pub enum EditorCommand {
 
     // Delete
     DeleteSelection,
+    /// Delete selection without yanking (Alt-d).
+    DeleteSelectionNoYank,
     /// Replace selection with yanked text (R).
     ReplaceWithYanked,
 
@@ -580,6 +590,8 @@ pub enum EditorCommand {
     // LSP - Format
     /// Format the current document.
     FormatDocument,
+    /// Format selections via LSP range formatting (=).
+    FormatSelections,
 
     // LSP - Rename
     /// Rename symbol under cursor.

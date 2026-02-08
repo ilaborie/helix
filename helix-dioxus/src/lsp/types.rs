@@ -478,6 +478,10 @@ pub enum LspResponse {
     DiagnosticsUpdated,
     /// Format edits received (applied directly).
     FormatApplied,
+    /// Format selection result with transaction to apply.
+    FormatResult {
+        transaction: helix_core::Transaction,
+    },
     /// Workspace edit applied (from code action).
     WorkspaceEditApplied,
     /// Rename result received.

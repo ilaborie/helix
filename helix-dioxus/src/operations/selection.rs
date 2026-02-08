@@ -25,6 +25,7 @@ pub trait SelectionOps {
     fn flip_selections(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn extend_to_line_bounds(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn shrink_to_line_bounds(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn trim_selections(&mut self, doc_id: DocumentId, view_id: ViewId);
 }
 
 impl SelectionOps for EditorContext {
@@ -342,6 +343,37 @@ impl SelectionOps for EditorContext {
         });
 
         doc.set_selection(view_id, new_selection);
+    }
+    /// Trim whitespace from selection edges (`_` in Helix).
+    fn trim_selections(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let ranges: helix_core::SmallVec<[helix_core::Range; 1]> = selection
+            .iter()
+            .filter_map(|range| {
+                if range.is_empty() || range.slice(text).chars().all(|ch| ch.is_whitespace()) {
+                    return None;
+                }
+                let mut start = range.from();
+                let mut end = range.to();
+                start = helix_core::movement::skip_while(text, start, |x| x.is_whitespace())
+                    .unwrap_or(start);
+                end = helix_core::movement::backwards_skip_while(text, end, |x| x.is_whitespace())
+                    .unwrap_or(end);
+                Some(helix_core::Range::new(start, end).with_direction(range.direction()))
+            })
+            .collect();
+
+        if !ranges.is_empty() {
+            let primary = selection.primary();
+            let idx = ranges
+                .iter()
+                .position(|range| range.overlaps(&primary))
+                .unwrap_or(ranges.len() - 1);
+            doc.set_selection(view_id, helix_core::Selection::new(ranges, idx));
+        }
     }
 }
 
