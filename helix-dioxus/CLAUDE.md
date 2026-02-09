@@ -79,6 +79,7 @@ helix-dioxus/src/
     ├── select.rs               # handle_select_mode
     ├── command.rs              # handle_command_mode
     ├── picker.rs               # handle_picker_mode
+    ├── regex.rs                # handle_regex_mode (select/split regex prompt)
     ├── search.rs               # handle_search_mode
     ├── confirmation.rs         # handle_confirmation_mode
     └── input_dialog.rs         # handle_input_dialog_mode
@@ -238,7 +239,7 @@ Shared keybinding logic lives in `keybindings/mod.rs`:
 - `direction_from_key(code)` → maps hjkl/arrows to `Direction`
 - `handle_move_keys(code)` → direction → `MoveLeft/Right/Up/Down`
 - `handle_extend_keys(code)` → direction → `ExtendLeft/Right/Up/Down`
-- `handle_text_input_keys(code, esc, enter, backspace, char_fn)` → shared Esc/Enter/Backspace/Char pattern (used by search/command modes)
+- `handle_text_input_keys(code, esc, enter, backspace, char_fn)` → shared Esc/Enter/Backspace/Char pattern (used by search/command/regex modes)
 - `handle_list_navigation_keys(code, esc, up, down, enter, backspace?, char_fn?)` → shared list navigation (used by location picker, code actions)
 
 Multi-key sequences (f/F/t/T, g, Space, [, ], r, m, ") are handled via `PendingKeySequence` enum in `app.rs`.
@@ -410,6 +411,7 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - **Window/Splits**: Not supported — helix-dioxus uses a single-view design. `C-w` prefix and `Space w` sub-menu will not be implemented.
 
 ### Recently Completed
+- [x] Multi-selection, regex select/split, copy/rotate — multi-selection rendering (all ranges, not just primary), `s`/`S` regex select/split with prompt, `A-s` split on newline, `C`/`A-C` copy selection on next/prev line, `(`/`)` rotate selections
 - [x] Format document + align selections — `:format` / command panel now uses LSP `textDocument/formatting`, `&` aligns multi-cursor selections, `=` formats via LSP range formatting
 - [x] Quick wins batch (6 bindings) — `A-d`/`A-c` delete/change without yanking, `C-a`/`C-x` increment/decrement numbers and dates, `_` trim selections, `=` format selections via LSP range formatting
 - [x] Goto + bracket navigation batch (20 bindings) — `gt`/`gc`/`gb` window position, `ga`/`gm`/`g.` file/edit goto, `]f`/`[f` function, `]t`/`[t` class, `]a`/`[a` parameter, `]c`/`[c` comment, `]p`/`[p` paragraph, `]D`/`[D` first/last diagnostic, `X` extend to line bounds, `A-x` shrink to line bounds

@@ -26,6 +26,12 @@ pub trait SelectionOps {
     fn extend_to_line_bounds(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn shrink_to_line_bounds(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn trim_selections(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn rotate_selections_forward(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn rotate_selections_backward(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn copy_selection_on_line(&mut self, doc_id: DocumentId, view_id: ViewId, forward: bool);
+    fn split_selection_on_newline(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn select_regex(&mut self, doc_id: DocumentId, view_id: ViewId, pattern: &str);
+    fn split_selection(&mut self, doc_id: DocumentId, view_id: ViewId, pattern: &str);
 }
 
 impl SelectionOps for EditorContext {
@@ -344,6 +350,148 @@ impl SelectionOps for EditorContext {
 
         doc.set_selection(view_id, new_selection);
     }
+    /// Rotate selections forward (`)` in Helix): move primary index forward.
+    fn rotate_selections_forward(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let mut selection = doc.selection(view_id).clone();
+        let len = selection.len();
+        if len > 1 {
+            let idx = selection.primary_index();
+            selection.set_primary_index((idx + 1) % len);
+            doc.set_selection(view_id, selection);
+        }
+    }
+
+    /// Rotate selections backward (`(` in Helix): move primary index backward.
+    fn rotate_selections_backward(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let mut selection = doc.selection(view_id).clone();
+        let len = selection.len();
+        if len > 1 {
+            let idx = selection.primary_index();
+            selection.set_primary_index((idx + len - 1) % len);
+            doc.set_selection(view_id, selection);
+        }
+    }
+
+    /// Copy selection to next/previous line (`C`/`A-C` in Helix).
+    #[allow(deprecated)]
+    fn copy_selection_on_line(&mut self, doc_id: DocumentId, view_id: ViewId, forward: bool) {
+        use helix_core::{pos_at_visual_coords, visual_coords_at_pos, Position, Range, Selection};
+
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+        let tab_width = doc.tab_width();
+
+        let mut ranges = helix_core::SmallVec::with_capacity(selection.len() * 2);
+        ranges.extend_from_slice(selection.ranges());
+        let mut primary_index = 0;
+
+        for range in selection.iter() {
+            let is_primary = *range == selection.primary();
+
+            // The range is always head exclusive
+            let (head, anchor) = if range.anchor < range.head {
+                (range.head - 1, range.anchor)
+            } else {
+                (range.head, range.anchor.saturating_sub(1))
+            };
+
+            let head_pos = visual_coords_at_pos(text, head, tab_width);
+            let anchor_pos = visual_coords_at_pos(text, anchor, tab_width);
+
+            let height = std::cmp::max(head_pos.row, anchor_pos.row)
+                - std::cmp::min(head_pos.row, anchor_pos.row)
+                + 1;
+
+            if is_primary {
+                primary_index = ranges.len();
+            }
+            ranges.push(*range);
+
+            let offset = height;
+
+            let anchor_row = if forward {
+                anchor_pos.row + offset
+            } else {
+                anchor_pos.row.saturating_sub(offset)
+            };
+
+            let head_row = if forward {
+                head_pos.row + offset
+            } else {
+                head_pos.row.saturating_sub(offset)
+            };
+
+            if anchor_row >= text.len_lines() || head_row >= text.len_lines() {
+                continue;
+            }
+
+            let new_anchor =
+                pos_at_visual_coords(text, Position::new(anchor_row, anchor_pos.col), tab_width);
+            let new_head =
+                pos_at_visual_coords(text, Position::new(head_row, head_pos.col), tab_width);
+
+            // Skip lines that are too short
+            if visual_coords_at_pos(text, new_anchor, tab_width).col == anchor_pos.col
+                && visual_coords_at_pos(text, new_head, tab_width).col == head_pos.col
+            {
+                if is_primary {
+                    primary_index = ranges.len();
+                }
+                ranges.push(Range::point(new_anchor).put_cursor(text, new_head, true));
+            }
+        }
+
+        let new_selection = Selection::new(ranges, primary_index);
+        doc.set_selection(view_id, new_selection);
+    }
+
+    /// Split selection on newlines (`A-s` in Helix).
+    fn split_selection_on_newline(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+        let new_selection = helix_core::selection::split_on_newline(text, &selection);
+        doc.set_selection(view_id, new_selection);
+    }
+
+    /// Select regex matches within current selection (`s` in Helix).
+    fn select_regex(&mut self, doc_id: DocumentId, view_id: ViewId, pattern: &str) {
+        let regex = match helix_stdx::rope::Regex::new(pattern) {
+            Ok(r) => r,
+            Err(e) => {
+                log::warn!("Invalid regex pattern '{}': {}", pattern, e);
+                return;
+            }
+        };
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+        if let Some(new_selection) =
+            helix_core::selection::select_on_matches(text, &selection, &regex)
+        {
+            doc.set_selection(view_id, new_selection);
+        }
+    }
+
+    /// Split selection on regex matches (`S` in Helix).
+    fn split_selection(&mut self, doc_id: DocumentId, view_id: ViewId, pattern: &str) {
+        let regex = match helix_stdx::rope::Regex::new(pattern) {
+            Ok(r) => r,
+            Err(e) => {
+                log::warn!("Invalid regex pattern '{}': {}", pattern, e);
+                return;
+            }
+        };
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+        let new_selection = helix_core::selection::split_on_matches(text, &selection, &regex);
+        doc.set_selection(view_id, new_selection);
+    }
+
     /// Trim whitespace from selection edges (`_` in Helix).
     fn trim_selections(&mut self, doc_id: DocumentId, view_id: ViewId) {
         let doc = self.editor.document_mut(doc_id).expect("doc exists");

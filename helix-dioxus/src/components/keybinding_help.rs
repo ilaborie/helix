@@ -132,7 +132,9 @@ fn hints_for_context(mode: &str, pending: PendingKeySequence) -> Vec<(&'static s
                 ("d", "delete"),
                 ("y", "yank"),
                 ("p", "replace"),
-                ("x", "line"),
+                ("s", "select"),
+                ("S", "split"),
+                ("C", "copy line"),
                 ("\"", "register"),
             ],
             _ => vec![

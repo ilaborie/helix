@@ -58,6 +58,9 @@ pub struct EditorContext {
     pub(crate) search_backwards: bool,
     pub(crate) search_input: String,
     pub(crate) last_search: String,
+    pub(crate) regex_mode: bool,
+    pub(crate) regex_split: bool,
+    pub(crate) regex_input: String,
     /// Last find/till character motion: (char, forward, till).
     pub(crate) last_find_char: Option<(char, bool, bool)>,
 
@@ -254,6 +257,9 @@ impl EditorContext {
             search_input: String::new(),
             last_search: String::new(),
             last_find_char: None,
+            regex_mode: false,
+            regex_split: false,
+            regex_input: String::new(),
             picker_visible: false,
             picker_items: Vec::new(),
             picker_filter: String::new(),
@@ -581,6 +587,52 @@ impl EditorContext {
             }
             EditorCommand::SearchPrevious => {
                 self.search_next(doc_id, view_id, true);
+            }
+
+            // Regex select/split mode
+            EditorCommand::EnterRegexMode { split } => {
+                self.regex_mode = true;
+                self.regex_split = split;
+                self.regex_input.clear();
+            }
+            EditorCommand::ExitRegexMode => {
+                self.regex_mode = false;
+                self.regex_input.clear();
+            }
+            EditorCommand::RegexInput(ch) => {
+                self.regex_input.push(ch);
+            }
+            EditorCommand::RegexBackspace => {
+                self.regex_input.pop();
+            }
+            EditorCommand::RegexExecute => {
+                if !self.regex_input.is_empty() {
+                    let pattern = self.regex_input.clone();
+                    if self.regex_split {
+                        self.split_selection(doc_id, view_id, &pattern);
+                    } else {
+                        self.select_regex(doc_id, view_id, &pattern);
+                    }
+                }
+                self.regex_mode = false;
+                self.regex_input.clear();
+            }
+
+            // Multi-selection operations
+            EditorCommand::SplitSelectionOnNewline => {
+                self.split_selection_on_newline(doc_id, view_id);
+            }
+            EditorCommand::CopySelectionOnNextLine => {
+                self.copy_selection_on_line(doc_id, view_id, true);
+            }
+            EditorCommand::CopySelectionOnPrevLine => {
+                self.copy_selection_on_line(doc_id, view_id, false);
+            }
+            EditorCommand::RotateSelectionsForward => {
+                self.rotate_selections_forward(doc_id, view_id);
+            }
+            EditorCommand::RotateSelectionsBackward => {
+                self.rotate_selections_backward(doc_id, view_id);
             }
 
             // Command mode
@@ -1390,16 +1442,16 @@ impl EditorContext {
         // Compute syntax highlighting tokens for visible lines
         let line_tokens = self.compute_syntax_tokens(doc, visible_start, visible_end);
 
-        // Get selection range for highlighting
-        let primary_range = selection.primary();
-        let sel_start = primary_range.from();
-        let sel_end = primary_range.to();
-
-        // Show selection highlighting when there is a multi-char selection.
+        // Collect all multi-char selection ranges for highlighting.
         // In Normal mode, Helix always has a 1-char selection internally,
         // so we only highlight when the selection spans more than 1 character
         // (e.g., after `x` to select a line, or in Select mode).
-        let has_selection = sel_end > sel_start + 1;
+        let multi_char_ranges: Vec<(usize, usize)> = selection
+            .iter()
+            .filter(|range| range.to() > range.from() + 1)
+            .map(|range| (range.from(), range.to()))
+            .collect();
+        let has_selection = !multi_char_ranges.is_empty();
 
         let is_modified = doc.is_modified();
 
@@ -1414,24 +1466,25 @@ impl EditorContext {
                     None
                 };
 
-                let selection_range = if has_selection {
+                let selection_ranges: Vec<(usize, usize)> = if has_selection {
                     let line_start_char = text.line_to_char(line_idx);
                     let line_len = text.line(line_idx).len_chars().saturating_sub(1);
                     let line_end_char = line_start_char + line_len;
 
-                    if sel_end > line_start_char && sel_start <= line_end_char {
-                        let range_start = sel_start.saturating_sub(line_start_char);
-                        let range_end = (sel_end - line_start_char).min(line_len);
-                        if range_start <= range_end {
-                            Some((range_start, range_end))
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
+                    multi_char_ranges
+                        .iter()
+                        .filter_map(|&(sel_start, sel_end)| {
+                            if sel_end > line_start_char && sel_start <= line_end_char {
+                                let range_start = sel_start.saturating_sub(line_start_char);
+                                let range_end = (sel_end - line_start_char).min(line_len);
+                                (range_start <= range_end).then_some((range_start, range_end))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect()
                 } else {
-                    None
+                    Vec::new()
                 };
 
                 LineSnapshot {
@@ -1440,7 +1493,7 @@ impl EditorContext {
                     is_cursor_line,
                     cursor_col: cursor_col_opt,
                     tokens: line_tokens.get(idx).cloned().unwrap_or_default(),
-                    selection_range,
+                    selection_ranges,
                 }
             })
             .collect();
@@ -1503,6 +1556,9 @@ impl EditorContext {
             search_backwards: self.search_backwards,
             search_input: self.search_input.clone(),
             search_match_lines,
+            regex_mode: self.regex_mode,
+            regex_split: self.regex_split,
+            regex_input: self.regex_input.clone(),
             picker_visible: self.picker_visible,
             picker_items: self.filtered_picker_items(),
             picker_filter: self.picker_filter.clone(),

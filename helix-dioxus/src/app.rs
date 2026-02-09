@@ -8,14 +8,14 @@ use helix_view::input::{KeyCode, KeyModifiers};
 use crate::components::{
     BufferBar, CodeActionsMenu, CommandPrompt, CompletionPopup, ConfirmationDialog, EditorView,
     GenericPicker, HoverPopup, InputDialog, KeybindingHelpBar, LocationPicker, LspStatusDialog,
-    NotificationContainer, SearchPrompt, SignatureHelpPopup, StatusLine,
+    NotificationContainer, RegexPrompt, SearchPrompt, SignatureHelpPopup, StatusLine,
 };
 use crate::keybindings::{
     handle_bracket_next, handle_bracket_prev, handle_code_actions_mode, handle_command_mode,
     handle_completion_mode, handle_confirmation_mode, handle_g_prefix, handle_input_dialog_mode,
     handle_insert_mode, handle_location_picker_mode, handle_lsp_dialog_mode, handle_normal_mode,
-    handle_picker_mode, handle_search_mode, handle_select_mode, handle_space_leader,
-    handle_view_prefix, translate_key_event,
+    handle_picker_mode, handle_regex_mode, handle_search_mode, handle_select_mode,
+    handle_space_leader, handle_view_prefix, translate_key_event,
 };
 use crate::state::{EditorCommand, PendingKeySequence};
 use crate::AppState;
@@ -117,6 +117,8 @@ pub fn App() -> Element {
                 handle_command_mode(&key_event)
             } else if snapshot.search_mode {
                 handle_search_mode(&key_event)
+            } else if snapshot.regex_mode {
+                handle_regex_mode(&key_event)
             } else if snapshot.mode == "NORMAL" || snapshot.mode == "SELECT" {
                 // Handle multi-key sequences in normal/select mode
                 let current_pending = pending_key();
@@ -435,6 +437,14 @@ pub fn App() -> Element {
                 SearchPrompt {
                     input: snapshot.search_input.clone(),
                     backwards: snapshot.search_backwards,
+                }
+            }
+
+            // Regex prompt (shown when in regex select/split mode)
+            if snapshot.regex_mode {
+                RegexPrompt {
+                    input: snapshot.regex_input.clone(),
+                    split: snapshot.regex_split,
                 }
             }
 

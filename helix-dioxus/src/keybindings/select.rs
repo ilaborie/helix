@@ -7,7 +7,20 @@ use crate::state::EditorCommand;
 
 /// Handle keyboard input in Select mode.
 pub fn handle_select_mode(key: &KeyEvent) -> Vec<EditorCommand> {
-    // Handle Ctrl+key combinations first
+    // Handle Alt+key combinations
+    if key.modifiers.contains(KeyModifiers::ALT) {
+        return match key.code {
+            // Alt+; = flip selections
+            KeyCode::Char(';') => vec![EditorCommand::FlipSelections],
+            // Alt+C = copy selection to previous line
+            KeyCode::Char('C') => vec![EditorCommand::CopySelectionOnPrevLine],
+            // Alt+s = split selection on newlines
+            KeyCode::Char('s') => vec![EditorCommand::SplitSelectionOnNewline],
+            _ => vec![],
+        };
+    }
+
+    // Handle Ctrl+key combinations
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         return match key.code {
             KeyCode::Char('c') => vec![EditorCommand::ToggleLineComment],
@@ -70,6 +83,17 @@ pub fn handle_select_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         // Selection operations
         KeyCode::Char(';') => vec![EditorCommand::CollapseSelection],
         KeyCode::Char(',') => vec![EditorCommand::KeepPrimarySelection],
+
+        // Regex select/split
+        KeyCode::Char('s') => vec![EditorCommand::EnterRegexMode { split: false }],
+        KeyCode::Char('S') => vec![EditorCommand::EnterRegexMode { split: true }],
+
+        // Copy selection on next line
+        KeyCode::Char('C') => vec![EditorCommand::CopySelectionOnNextLine],
+
+        // Rotate selections
+        KeyCode::Char(')') => vec![EditorCommand::RotateSelectionsForward],
+        KeyCode::Char('(') => vec![EditorCommand::RotateSelectionsBackward],
 
         _ => vec![],
     }

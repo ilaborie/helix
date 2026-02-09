@@ -108,7 +108,7 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                 for (idx, line) in snapshot.lines.iter().enumerate() {
                     // Include version and selection state in key to force re-render
                     {
-                        let has_sel = line.selection_range.is_some();
+                        let has_sel = !line.selection_ranges.is_empty();
                         let line_num = line.line_number;
                         // Get all diagnostics for this line (for underlines)
                         // Sort by severity ascending so higher severity renders last (on top)
@@ -189,7 +189,7 @@ fn Line(
     // - Apply selection background at the LINE level to avoid gaps between lines
     // - Non-selected parts of the line will be masked with normal background in render_styled_content
     // - Cursor line gets highlight only if no selection
-    let has_selection = line.selection_range.is_some();
+    let has_selection = !line.selection_ranges.is_empty();
     let line_class = if has_selection {
         "line line-selected"
     } else if line.is_cursor_line {
@@ -197,6 +197,8 @@ fn Line(
     } else {
         "line"
     };
+
+    let selection_ranges = &line.selection_ranges;
 
     // Build sorted list of styling events (token starts/ends and cursor position)
     let cursor_pos = if line.is_cursor_line {
@@ -213,7 +215,7 @@ fn Line(
     rsx! {
         div {
             class: "{line_class}",
-            {render_styled_content(&chars, &line.tokens, cursor_pos, cursor_class, line.selection_range)}
+            {render_styled_content(&chars, &line.tokens, cursor_pos, cursor_class, selection_ranges)}
             // Diagnostic underlines (wavy lines under errors/warnings)
             for (idx, diag) in diagnostics.iter().enumerate() {
                 DiagnosticUnderline {
@@ -239,7 +241,7 @@ fn render_styled_content(
     tokens: &[TokenSpan],
     cursor_pos: Option<usize>,
     cursor_class: &str,
-    selection_range: Option<(usize, usize)>,
+    selection_ranges: &[(usize, usize)],
 ) -> Element {
     // Build a list of spans to render
     let mut spans: Vec<Element> = Vec::new();
@@ -277,7 +279,7 @@ fn render_styled_content(
         }
 
         // Check for selection boundaries
-        if let Some((sel_start, sel_end)) = selection_range {
+        for &(sel_start, sel_end) in selection_ranges {
             if sel_start > pos && sel_start < next_pos {
                 next_pos = sel_start;
             }
@@ -299,10 +301,10 @@ fn render_styled_content(
         // Determine if this is the cursor position
         let is_cursor = cursor_pos == Some(pos);
 
-        // Determine if this position is within the selection
-        let is_selected = selection_range
-            .map(|(sel_start, sel_end)| pos >= sel_start && pos < sel_end)
-            .unwrap_or(false);
+        // Determine if this position is within any selection range
+        let is_selected = selection_ranges
+            .iter()
+            .any(|&(sel_start, sel_end)| pos >= sel_start && pos < sel_end);
 
         // Build the text content for this span
         let text: String = chars[pos..next_pos.min(len)].iter().collect();
@@ -317,7 +319,7 @@ fn render_styled_content(
 
         // For lines with selection, non-selected parts need normal background to "mask" the line-level selection
         // This approach: line has selection bg, non-selected spans get normal bg to hide it
-        let line_has_selection = selection_range.is_some();
+        let line_has_selection = !selection_ranges.is_empty();
         if !is_selected && !is_cursor && line_has_selection {
             // Mask the line-level selection background with normal background
             style.push_str("background-color: #282c34;");

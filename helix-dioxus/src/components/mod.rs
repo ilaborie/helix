@@ -38,7 +38,7 @@ pub use location_picker::LocationPicker;
 pub use lsp_dialog::LspStatusDialog;
 pub use notification::NotificationContainer;
 pub use picker::GenericPicker;
-pub use prompt::{CommandPrompt, SearchPrompt};
+pub use prompt::{CommandPrompt, RegexPrompt, SearchPrompt};
 pub use scrollbar::Scrollbar;
 pub use signature_help::SignatureHelpPopup;
 pub use statusline::StatusLine;

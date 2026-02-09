@@ -131,6 +131,9 @@ pub struct EditorSnapshot {
     pub search_mode: bool,
     pub search_backwards: bool,
     pub search_input: String,
+    pub regex_mode: bool,
+    pub regex_split: bool,
+    pub regex_input: String,
     /// Line numbers with search matches (for scrollbar markers).
     pub search_match_lines: Vec<usize>,
 
@@ -235,9 +238,9 @@ pub struct LineSnapshot {
     pub is_cursor_line: bool,
     pub cursor_col: Option<usize>,
     pub tokens: Vec<TokenSpan>,
-    /// Selection range within this line (start_col, end_col) - for visual mode highlighting.
-    /// If Some, the range [start, end) should be highlighted as selected.
-    pub selection_range: Option<(usize, usize)>,
+    /// Selection ranges within this line (start_col, end_col) - for visual mode highlighting.
+    /// Each range [start, end) should be highlighted as selected.
+    pub selection_ranges: Vec<(usize, usize)>,
 }
 
 /// A span of text with a specific color for syntax highlighting.
@@ -463,6 +466,18 @@ pub enum EditorCommand {
     /// Extend selection to previous search match (select mode).
     ExtendSearchPrev,
 
+    // Multi-selection operations
+    /// Split selection on newlines (A-s).
+    SplitSelectionOnNewline,
+    /// Copy selection to next line (C).
+    CopySelectionOnNextLine,
+    /// Copy selection to previous line (A-C).
+    CopySelectionOnPrevLine,
+    /// Rotate selections forward ()).
+    RotateSelectionsForward,
+    /// Rotate selections backward (().
+    RotateSelectionsBackward,
+
     // Clipboard operations
     Yank,
     Paste,
@@ -485,6 +500,16 @@ pub enum EditorCommand {
     SearchExecute,
     SearchNext,
     SearchPrevious,
+
+    // Regex select/split mode
+    /// Enter regex prompt mode (s = select, S = split).
+    EnterRegexMode {
+        split: bool,
+    },
+    ExitRegexMode,
+    RegexInput(char),
+    RegexBackspace,
+    RegexExecute,
 
     // Command mode
     EnterCommandMode,

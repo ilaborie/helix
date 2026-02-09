@@ -74,6 +74,13 @@ Reference: `helix-term/src/keymap/default.rs`
 | `_` | Trim selections | Matches |
 | `=` | Format selections (LSP) | Matches |
 | `&` | Align selections | Matches |
+| `s` | Select regex (prompt) | Matches |
+| `S` | Split selection on regex | Matches |
+| `C` | Copy selection to next line | Matches |
+| `A-C` | Copy selection to prev line | Matches |
+| `A-s` | Split selection on newlines | Matches |
+| `)` | Rotate selections forward | Matches |
+| `(` | Rotate selections backward | Matches |
 
 ### Editing — Deviations
 
@@ -87,13 +94,9 @@ Reference: `helix-term/src/keymap/default.rs`
 
 | Key | Helix Action | Notes |
 |-----|-------------|-------|
-| `s` | `select_regex` | Select by regex pattern |
-| `S` | `split_selection` | Split selection on regex |
-| `C` | `copy_selection_on_next_line` | Multi-cursor |
 | `A-o` | `expand_selection` | Tree-sitter expand |
 | `A-i` | `shrink_selection` | Tree-sitter shrink |
 | `q/Q` | `replay_macro` / `record_macro` | Macro support |
-| `(/)` | `rotate_selections_backward/forward` | Multi-selection rotation |
 | `\|` | `shell_pipe` | Pipe selection through shell |
 | `!` | `shell_insert_output` | Insert shell output |
 | `C-i/Tab` | `jump_forward` | Jump list forward |

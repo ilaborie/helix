@@ -28,6 +28,32 @@ pub fn CommandPrompt(input: String) -> Element {
     }
 }
 
+/// Regex select/split prompt component.
+#[component]
+pub fn RegexPrompt(input: String, split: bool) -> Element {
+    let prefix = if split { "split:" } else { "select:" };
+
+    rsx! {
+        div {
+            class: "prompt",
+
+            // Regex prefix
+            span {
+                style: "color: var(--purple);",
+                "{prefix}"
+            }
+
+            // Input text
+            span { "{input}" }
+
+            // Cursor
+            span {
+                class: "prompt-cursor prompt-cursor-regex",
+            }
+        }
+    }
+}
+
 /// Search prompt component that displays the search input.
 #[component]
 pub fn SearchPrompt(input: String, backwards: bool) -> Element {

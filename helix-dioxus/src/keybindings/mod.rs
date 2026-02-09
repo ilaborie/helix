@@ -10,6 +10,7 @@ mod input_dialog;
 mod insert;
 mod normal;
 mod picker;
+mod regex;
 mod search;
 mod select;
 mod translate;
@@ -31,6 +32,7 @@ pub use normal::{
     handle_space_leader, handle_view_prefix,
 };
 pub use picker::handle_picker_mode;
+pub use regex::handle_regex_mode;
 pub use search::handle_search_mode;
 pub use select::handle_select_mode;
 pub use translate::translate_key_event;

@@ -60,8 +60,12 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
             KeyCode::Char('`') => vec![EditorCommand::ToUppercase],
             // Alt+c = change selection without yanking
             KeyCode::Char('c') => vec![EditorCommand::ChangeSelectionNoYank],
+            // Alt+C = copy selection to previous line
+            KeyCode::Char('C') => vec![EditorCommand::CopySelectionOnPrevLine],
             // Alt+d = delete selection without yanking
             KeyCode::Char('d') => vec![EditorCommand::DeleteSelectionNoYank],
+            // Alt+s = split selection on newlines
+            KeyCode::Char('s') => vec![EditorCommand::SplitSelectionOnNewline],
             // Alt+x = shrink selection to line bounds
             KeyCode::Char('x') => vec![EditorCommand::ShrinkToLineBounds],
             _ => vec![],
@@ -122,6 +126,17 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
 
         // Change selection (delete + enter insert)
         KeyCode::Char('c') => vec![EditorCommand::ChangeSelection],
+
+        // Regex select/split
+        KeyCode::Char('s') => vec![EditorCommand::EnterRegexMode { split: false }],
+        KeyCode::Char('S') => vec![EditorCommand::EnterRegexMode { split: true }],
+
+        // Copy selection on next line
+        KeyCode::Char('C') => vec![EditorCommand::CopySelectionOnNextLine],
+
+        // Rotate selections
+        KeyCode::Char(')') => vec![EditorCommand::RotateSelectionsForward],
+        KeyCode::Char('(') => vec![EditorCommand::RotateSelectionsBackward],
 
         // History
         KeyCode::Char('u') => vec![EditorCommand::Undo],
