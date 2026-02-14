@@ -323,3 +323,78 @@ fn config_reload_via_command_mode() {
     assert!(!ctx.command_mode);
     assert!(ctx.command_input.is_empty());
 }
+
+// --- :set command tests ---
+
+#[test]
+fn set_option_boolean() {
+    let _guard = crate::test_helpers::init();
+    let mut ctx = test_context("#[|h]#ello\n");
+    // cursorline defaults to false
+    assert!(!ctx.editor.config().cursorline);
+
+    ctx.set_option("cursorline", "true");
+
+    assert!(ctx.editor.config().cursorline);
+    assert_eq!(
+        ctx.notifications.last().expect("notification").message,
+        "Set cursorline = true"
+    );
+}
+
+#[test]
+fn set_option_number() {
+    let _guard = crate::test_helpers::init();
+    let mut ctx = test_context("#[|h]#ello\n");
+    assert_eq!(ctx.editor.config().scrolloff, 5);
+
+    ctx.set_option("scrolloff", "10");
+
+    assert_eq!(ctx.editor.config().scrolloff, 10);
+}
+
+#[test]
+fn set_option_unknown_key() {
+    let _guard = crate::test_helpers::init();
+    let mut ctx = test_context("#[|h]#ello\n");
+
+    ctx.set_option("nonexistent-key", "true");
+
+    let msg = &ctx.notifications.last().expect("notification").message;
+    assert!(msg.contains("Unknown config key"), "got: {msg}");
+}
+
+#[test]
+fn set_option_via_command_mode() {
+    let _guard = crate::test_helpers::init();
+    let mut ctx = test_context("#[|h]#ello\n");
+
+    ctx.command_input = "set cursorline true".to_string();
+    ctx.execute_command();
+
+    assert!(ctx.editor.config().cursorline);
+}
+
+#[test]
+fn toggle_option_boolean() {
+    let _guard = crate::test_helpers::init();
+    let mut ctx = test_context("#[|h]#ello\n");
+    assert!(!ctx.editor.config().cursorline);
+
+    ctx.toggle_option("cursorline");
+    assert!(ctx.editor.config().cursorline);
+
+    ctx.toggle_option("cursorline");
+    assert!(!ctx.editor.config().cursorline);
+}
+
+#[test]
+fn toggle_option_via_command_mode() {
+    let _guard = crate::test_helpers::init();
+    let mut ctx = test_context("#[|h]#ello\n");
+
+    ctx.command_input = "toggle cursorline".to_string();
+    ctx.execute_command();
+
+    assert!(ctx.editor.config().cursorline);
+}
