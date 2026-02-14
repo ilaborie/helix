@@ -248,6 +248,10 @@ pub struct EditorSnapshot {
     // UI state
     pub command_mode: bool,
     pub command_input: String,
+    /// Filtered command completions for the current command input.
+    pub command_completions: Vec<CommandCompletionItem>,
+    /// Selected index in the command completion list.
+    pub command_completion_selected: usize,
     pub search_mode: bool,
     pub search_backwards: bool,
     pub search_input: String,
@@ -693,6 +697,12 @@ pub enum EditorCommand {
     CommandInput(char),
     CommandBackspace,
     CommandExecute,
+    /// Navigate up in command completion list.
+    CommandCompletionUp,
+    /// Navigate down in command completion list.
+    CommandCompletionDown,
+    /// Accept selected command completion (Tab).
+    CommandCompletionAccept,
 
     // File picker
     ShowFilePicker,
@@ -1186,6 +1196,14 @@ pub struct RegisterSnapshot {
     pub name: char,
     /// Register content (empty if register has no value).
     pub content: String,
+}
+
+/// A single command completion item for the command mode popup.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandCompletionItem {
+    pub name: String,
+    pub description: String,
+    pub match_indices: Vec<usize>,
 }
 
 /// A single global search result for the picker.

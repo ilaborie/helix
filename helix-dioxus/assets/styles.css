@@ -551,6 +551,51 @@ kbd {
     font-size: 11px;
 }
 
+/* ───── Command completion popup ───── */
+.command-completion {
+    max-height: 300px;
+    overflow-y: auto;
+    background-color: var(--bg-secondary);
+    border-top: 1px solid var(--bg-deep);
+    font-size: 13px;
+    color: var(--text);
+}
+
+.command-completion-header {
+    padding: 2px 8px;
+    font-size: 11px;
+    color: var(--text-dimmer);
+    border-bottom: 1px solid var(--bg-deep);
+}
+
+.command-completion-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 2px 8px;
+    cursor: default;
+}
+
+.command-completion-item-selected {
+    background-color: var(--bg-highlight);
+}
+
+.command-completion-name {
+    color: var(--accent);
+    min-width: 160px;
+    font-family: var(--font-mono);
+}
+
+.command-completion-match {
+    color: var(--warning);
+    font-weight: bold;
+}
+
+.command-completion-desc {
+    color: var(--text-dim);
+    font-size: 12px;
+}
+
 /* ───── Prompt styles ───── */
 .prompt {
     height: 24px;

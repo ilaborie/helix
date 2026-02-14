@@ -14,11 +14,12 @@ mod lsp_events;
 mod types;
 
 pub use types::{
-    centered_window, BufferInfo, ConfirmationAction, ConfirmationDialogSnapshot, DiffLineType,
-    Direction, EditorCommand, EditorSnapshot, GlobalSearchResult, InputDialogKind,
-    InputDialogSnapshot, LineSnapshot, NotificationSeverity, NotificationSnapshot,
-    PendingKeySequence, PickerIcon, PickerItem, PickerMode, PickerPreview, PreviewLine,
-    RegisterSnapshot, ScrollbarDiagnostic, ShellBehavior, StartupAction, TokenSpan, WordJumpLabel,
+    centered_window, BufferInfo, CommandCompletionItem, ConfirmationAction,
+    ConfirmationDialogSnapshot, DiffLineType, Direction, EditorCommand, EditorSnapshot,
+    GlobalSearchResult, InputDialogKind, InputDialogSnapshot, LineSnapshot, NotificationSeverity,
+    NotificationSnapshot, PendingKeySequence, PickerIcon, PickerItem, PickerMode, PickerPreview,
+    PreviewLine, RegisterSnapshot, ScrollbarDiagnostic, ShellBehavior, StartupAction, TokenSpan,
+    WordJumpLabel,
 };
 
 use std::path::PathBuf;
@@ -56,6 +57,8 @@ pub struct EditorContext {
     // UI state - pub(crate) for operations access
     pub(crate) command_mode: bool,
     pub(crate) command_input: String,
+    /// Selected index in the command completion popup.
+    command_completion_selected: usize,
     pub(crate) search_mode: bool,
     pub(crate) search_backwards: bool,
     pub(crate) search_input: String,
@@ -287,6 +290,7 @@ impl EditorContext {
             command_tx,
             command_mode: false,
             command_input: String::new(),
+            command_completion_selected: 0,
             search_mode: false,
             search_backwards: false,
             search_input: String::new(),
@@ -731,12 +735,38 @@ impl EditorContext {
             }
             EditorCommand::CommandInput(c) => {
                 self.command_input.push(c);
+                self.command_completion_selected = 0;
             }
             EditorCommand::CommandBackspace => {
                 self.command_input.pop();
+                self.command_completion_selected = 0;
             }
             EditorCommand::CommandExecute => {
                 self.execute_command();
+            }
+            EditorCommand::CommandCompletionUp => {
+                if self.command_completion_selected > 0 {
+                    self.command_completion_selected -= 1;
+                }
+            }
+            EditorCommand::CommandCompletionDown => {
+                // Upper bound is checked in snapshot() where we know the count.
+                self.command_completion_selected += 1;
+            }
+            EditorCommand::CommandCompletionAccept => {
+                // Replace the command portion of input with the selected completion.
+                let completions = self.compute_command_completions();
+                if let Some(item) = completions.get(self.command_completion_selected) {
+                    let name = item.name.clone();
+                    // Preserve any arguments after the first word.
+                    let args_part = self
+                        .command_input
+                        .find(' ')
+                        .map(|idx| self.command_input[idx..].to_string())
+                        .unwrap_or_default();
+                    self.command_input = format!("{name}{args_part}");
+                    self.command_completion_selected = 0;
+                }
             }
 
             // Picker operations
@@ -1444,6 +1474,60 @@ impl EditorContext {
     }
 
     /// Collect register snapshots for display in the help bar.
+    /// Compute filtered command completions for the current command input.
+    fn compute_command_completions(&self) -> Vec<CommandCompletionItem> {
+        use crate::operations::{command_completions, fuzzy_match_with_indices};
+
+        let input = self.command_input.trim();
+        // Only match against the first word (command name, not args).
+        let pattern = input.split_whitespace().next().unwrap_or("");
+
+        let mut scored: Vec<(u16, CommandCompletionItem)> = Vec::new();
+
+        for cmd in command_completions() {
+            // Try matching against the command name.
+            if let Some((score, indices)) = fuzzy_match_with_indices(cmd.name, pattern) {
+                scored.push((
+                    score,
+                    CommandCompletionItem {
+                        name: cmd.name.to_string(),
+                        description: cmd.description.to_string(),
+                        match_indices: indices,
+                    },
+                ));
+                continue;
+            }
+            // Try matching against each alias.
+            for alias in cmd.aliases {
+                if let Some((score, _indices)) = fuzzy_match_with_indices(alias, pattern) {
+                    // Show the canonical name, but highlight is on the alias match.
+                    // Compute indices on the canonical name for display consistency.
+                    let display_indices = fuzzy_match_with_indices(cmd.name, pattern)
+                        .map(|(_, idx)| idx)
+                        .unwrap_or_default();
+                    scored.push((
+                        score,
+                        CommandCompletionItem {
+                            name: cmd.name.to_string(),
+                            description: cmd.description.to_string(),
+                            match_indices: display_indices,
+                        },
+                    ));
+                    break;
+                }
+            }
+        }
+
+        // Sort by score descending.
+        scored.sort_by(|a, b| b.0.cmp(&a.0));
+
+        // Deduplicate by name (alias match might add a duplicate).
+        let mut seen = std::collections::HashSet::new();
+        scored.retain(|(_, item)| seen.insert(item.name.clone()));
+
+        scored.into_iter().map(|(_, item)| item).collect()
+    }
+
     fn collect_register_snapshots(&self) -> Vec<RegisterSnapshot> {
         // On macOS there's no X11 primary selection, so * falls back to clipboard.
         // On Linux/X11, * shows the current primary selection text.
@@ -1821,6 +1905,18 @@ impl EditorContext {
             lines,
             command_mode: self.command_mode,
             command_input: self.command_input.clone(),
+            command_completions: if self.command_mode {
+                let completions = self.compute_command_completions();
+                // Clamp selected index to valid range.
+                let count = completions.len();
+                if count > 0 && self.command_completion_selected >= count {
+                    self.command_completion_selected = count - 1;
+                }
+                completions
+            } else {
+                Vec::new()
+            },
+            command_completion_selected: self.command_completion_selected,
             search_mode: self.search_mode,
             search_backwards: self.search_backwards,
             search_input: self.search_input.clone(),

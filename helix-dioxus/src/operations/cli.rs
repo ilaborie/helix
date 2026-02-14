@@ -8,6 +8,246 @@ use crate::operations::{
 };
 use crate::state::{EditorContext, NotificationSeverity, ShellBehavior};
 
+/// A command completion entry: name, aliases, and human-readable description.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandCompletion {
+    pub name: &'static str,
+    pub aliases: &'static [&'static str],
+    pub description: &'static str,
+}
+
+/// Return the static list of all known commands (single source of truth).
+pub fn command_completions() -> &'static [CommandCompletion] {
+    static COMMANDS: &[CommandCompletion] = &[
+        CommandCompletion {
+            name: "open",
+            aliases: &["o"],
+            description: "Open a file",
+        },
+        CommandCompletion {
+            name: "quit",
+            aliases: &["q"],
+            description: "Quit the editor",
+        },
+        CommandCompletion {
+            name: "quit!",
+            aliases: &["q!"],
+            description: "Force quit",
+        },
+        CommandCompletion {
+            name: "write",
+            aliases: &["w"],
+            description: "Save the current file",
+        },
+        CommandCompletion {
+            name: "write!",
+            aliases: &["w!"],
+            description: "Force save",
+        },
+        CommandCompletion {
+            name: "wq",
+            aliases: &["x"],
+            description: "Save and quit",
+        },
+        CommandCompletion {
+            name: "wq!",
+            aliases: &["x!"],
+            description: "Force save and quit",
+        },
+        CommandCompletion {
+            name: "new",
+            aliases: &["n"],
+            description: "Create a new buffer",
+        },
+        CommandCompletion {
+            name: "buffer",
+            aliases: &["b"],
+            description: "Switch buffer",
+        },
+        CommandCompletion {
+            name: "bnext",
+            aliases: &["bn"],
+            description: "Next buffer",
+        },
+        CommandCompletion {
+            name: "bprev",
+            aliases: &["bp", "bprevious"],
+            description: "Previous buffer",
+        },
+        CommandCompletion {
+            name: "bdelete",
+            aliases: &["bd"],
+            description: "Close current buffer",
+        },
+        CommandCompletion {
+            name: "bdelete!",
+            aliases: &["bd!"],
+            description: "Force close buffer",
+        },
+        CommandCompletion {
+            name: "reload",
+            aliases: &["rl"],
+            description: "Reload document from disk",
+        },
+        CommandCompletion {
+            name: "write-all",
+            aliases: &["wa"],
+            description: "Save all buffers",
+        },
+        CommandCompletion {
+            name: "quit-all",
+            aliases: &["qa"],
+            description: "Quit all buffers",
+        },
+        CommandCompletion {
+            name: "quit-all!",
+            aliases: &["qa!"],
+            description: "Force quit all",
+        },
+        CommandCompletion {
+            name: "buffer-close-all",
+            aliases: &["bca"],
+            description: "Close all buffers",
+        },
+        CommandCompletion {
+            name: "buffer-close-all!",
+            aliases: &["bca!"],
+            description: "Force close all",
+        },
+        CommandCompletion {
+            name: "buffer-close-others",
+            aliases: &["bco"],
+            description: "Close other buffers",
+        },
+        CommandCompletion {
+            name: "cd",
+            aliases: &["change-current-directory"],
+            description: "Change directory",
+        },
+        CommandCompletion {
+            name: "pwd",
+            aliases: &[],
+            description: "Print working directory",
+        },
+        CommandCompletion {
+            name: "registers",
+            aliases: &["reg"],
+            description: "Show registers",
+        },
+        CommandCompletion {
+            name: "commands",
+            aliases: &["cmd"],
+            description: "Open command panel",
+        },
+        CommandCompletion {
+            name: "theme",
+            aliases: &[],
+            description: "Set or pick theme",
+        },
+        CommandCompletion {
+            name: "earlier",
+            aliases: &[],
+            description: "Undo N steps",
+        },
+        CommandCompletion {
+            name: "later",
+            aliases: &[],
+            description: "Redo N steps",
+        },
+        CommandCompletion {
+            name: "pipe",
+            aliases: &["sh"],
+            description: "Pipe selection through shell",
+        },
+        CommandCompletion {
+            name: "insert-output",
+            aliases: &[],
+            description: "Insert shell output",
+        },
+        CommandCompletion {
+            name: "append-output",
+            aliases: &[],
+            description: "Append shell output",
+        },
+        CommandCompletion {
+            name: "pipe-to",
+            aliases: &[],
+            description: "Pipe selection, discard output",
+        },
+        CommandCompletion {
+            name: "run-shell-command",
+            aliases: &["run"],
+            description: "Run shell command",
+        },
+        CommandCompletion {
+            name: "sort",
+            aliases: &[],
+            description: "Sort selections",
+        },
+        CommandCompletion {
+            name: "reflow",
+            aliases: &[],
+            description: "Reflow text to width",
+        },
+        CommandCompletion {
+            name: "config-open",
+            aliases: &[],
+            description: "Open config file",
+        },
+        CommandCompletion {
+            name: "log-open",
+            aliases: &[],
+            description: "Open log file",
+        },
+        CommandCompletion {
+            name: "encoding",
+            aliases: &[],
+            description: "Show/set encoding",
+        },
+        CommandCompletion {
+            name: "set-line-ending",
+            aliases: &["line-ending"],
+            description: "Show/set line ending",
+        },
+        CommandCompletion {
+            name: "jumplist-clear",
+            aliases: &[],
+            description: "Clear jump list",
+        },
+        CommandCompletion {
+            name: "config-reload",
+            aliases: &[],
+            description: "Reload config",
+        },
+        CommandCompletion {
+            name: "set",
+            aliases: &[],
+            description: "Set config option",
+        },
+        CommandCompletion {
+            name: "toggle",
+            aliases: &[],
+            description: "Toggle config option",
+        },
+        CommandCompletion {
+            name: "format",
+            aliases: &["fmt"],
+            description: "Format document",
+        },
+        CommandCompletion {
+            name: "lsp-restart",
+            aliases: &[],
+            description: "Restart LSP server",
+        },
+        CommandCompletion {
+            name: "tree-sitter-scopes",
+            aliases: &[],
+            description: "Show TS scopes at cursor",
+        },
+    ];
+    COMMANDS
+}
+
 /// Extension trait for CLI command operations.
 pub trait CliOps {
     fn execute_command(&mut self);
@@ -657,5 +897,57 @@ impl CliOps for EditorContext {
             format!("Toggled {key} = {display_val}"),
             NotificationSeverity::Info,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn command_completions_is_non_empty() {
+        let cmds = command_completions();
+        assert!(!cmds.is_empty());
+    }
+
+    #[test]
+    fn command_completions_has_unique_names() {
+        let cmds = command_completions();
+        let mut names: Vec<&str> = cmds.iter().map(|c| c.name).collect();
+        let count_before = names.len();
+        names.sort();
+        names.dedup();
+        assert_eq!(names.len(), count_before, "Duplicate command names found");
+    }
+
+    #[test]
+    fn command_completions_contains_common_commands() {
+        let cmds = command_completions();
+        let names: Vec<&str> = cmds.iter().map(|c| c.name).collect();
+        assert!(names.contains(&"write"), "missing 'write'");
+        assert!(names.contains(&"quit"), "missing 'quit'");
+        assert!(names.contains(&"open"), "missing 'open'");
+        assert!(names.contains(&"theme"), "missing 'theme'");
+        assert!(names.contains(&"format"), "missing 'format'");
+    }
+
+    #[test]
+    fn command_completions_have_descriptions() {
+        for cmd in command_completions() {
+            assert!(
+                !cmd.description.is_empty(),
+                "Command '{}' has no description",
+                cmd.name
+            );
+        }
+    }
+
+    #[test]
+    fn write_has_alias_w() {
+        let write = command_completions()
+            .iter()
+            .find(|c| c.name == "write")
+            .expect("write command should exist");
+        assert!(write.aliases.contains(&"w"), "write should have alias 'w'");
     }
 }

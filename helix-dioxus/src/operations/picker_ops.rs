@@ -1373,7 +1373,7 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
     ]
 }
 
-fn fuzzy_match_with_indices(text: &str, pattern: &str) -> Option<(u16, Vec<usize>)> {
+pub(crate) fn fuzzy_match_with_indices(text: &str, pattern: &str) -> Option<(u16, Vec<usize>)> {
     if pattern.is_empty() {
         return Some((0, vec![]));
     }

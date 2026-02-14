@@ -6,9 +6,10 @@ use dioxus::prelude::*;
 use helix_view::input::{KeyCode, KeyModifiers};
 
 use crate::components::{
-    BufferBar, CodeActionsMenu, CommandPrompt, CompletionPopup, ConfirmationDialog, EditorView,
-    GenericPicker, HoverPopup, InputDialog, KeybindingHelpBar, LocationPicker, LspStatusDialog,
-    NotificationContainer, RegexPrompt, SearchPrompt, ShellPrompt, SignatureHelpPopup, StatusLine,
+    BufferBar, CodeActionsMenu, CommandCompletionPopup, CommandPrompt, CompletionPopup,
+    ConfirmationDialog, EditorView, GenericPicker, HoverPopup, InputDialog, KeybindingHelpBar,
+    LocationPicker, LspStatusDialog, NotificationContainer, RegexPrompt, SearchPrompt, ShellPrompt,
+    SignatureHelpPopup, StatusLine,
 };
 use crate::keybindings::{
     handle_bracket_next, handle_bracket_prev, handle_code_actions_mode, handle_command_mode,
@@ -498,6 +499,14 @@ pub fn App() -> Element {
             div {
                 style: "flex: 1; overflow: hidden;",
                 EditorView { version: version }
+            }
+
+            // Command completion popup (shown above command prompt)
+            if snapshot.command_mode && !snapshot.command_completions.is_empty() {
+                CommandCompletionPopup {
+                    items: snapshot.command_completions.clone(),
+                    selected: snapshot.command_completion_selected,
+                }
             }
 
             // Command prompt (shown when in command mode)
