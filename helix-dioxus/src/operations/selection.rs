@@ -36,6 +36,8 @@ pub trait SelectionOps {
     fn extend_to_last_line(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn extend_goto_first_nonwhitespace(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn extend_goto_column(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn expand_selection(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn shrink_selection(&mut self, doc_id: DocumentId, view_id: ViewId);
 }
 
 impl SelectionOps for EditorContext {
@@ -586,6 +588,40 @@ impl SelectionOps for EditorContext {
             doc.set_selection(view_id, helix_core::Selection::new(ranges, idx));
         }
     }
+
+    /// Expand selection to parent syntax node (`Alt-o` in Helix).
+    fn expand_selection(&mut self, _doc_id: DocumentId, _view_id: ViewId) {
+        let (view, doc) = helix_view::current!(self.editor);
+        if let Some(syntax) = doc.syntax() {
+            let text = doc.text().slice(..);
+            let current_selection = doc.selection(view.id);
+            let selection =
+                helix_core::object::expand_selection(syntax, text, current_selection.clone());
+            if *current_selection != selection {
+                view.object_selections.push(current_selection.clone());
+                doc.set_selection(view.id, selection);
+            }
+        }
+    }
+
+    /// Shrink selection to child syntax node (`Alt-i` in Helix).
+    fn shrink_selection(&mut self, _doc_id: DocumentId, _view_id: ViewId) {
+        let (view, doc) = helix_view::current!(self.editor);
+        let current_selection = doc.selection(view.id);
+        if let Some(prev_selection) = view.object_selections.pop() {
+            if current_selection.contains(&prev_selection) {
+                doc.set_selection(view.id, prev_selection);
+                return;
+            }
+            view.object_selections.clear();
+        }
+        if let Some(syntax) = doc.syntax() {
+            let text = doc.text().slice(..);
+            let selection =
+                helix_core::object::shrink_selection(syntax, text, current_selection.clone());
+            doc.set_selection(view.id, selection);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1064,5 +1100,63 @@ mod tests {
         let (_view, doc) = helix_view::current_ref!(ctx.editor);
         let sel = doc.selection(view_id);
         assert!(sel.len() >= 3, "should split on newlines into at least 3 parts");
+    }
+
+    // --- expand_selection / shrink_selection ---
+
+    #[test]
+    fn expand_selection_without_syntax_noop() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.expand_selection(doc_id, view_id);
+        // No syntax tree → selection unchanged
+        assert_state(&ctx, "#[h|]#ello\n");
+    }
+
+    #[test]
+    fn shrink_selection_without_syntax_noop() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.shrink_selection(doc_id, view_id);
+        // No syntax tree, no history → selection unchanged
+        assert_state(&ctx, "#[h|]#ello\n");
+    }
+
+    #[test]
+    fn shrink_selection_pops_from_history() {
+        let mut ctx = test_context("#[hello|]#\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+
+        // Manually push a previous selection into the object_selections history
+        let prev_sel = helix_core::Selection::single(1, 4);
+        let (view, _doc) = helix_view::current!(ctx.editor);
+        view.object_selections.push(prev_sel.clone());
+
+        ctx.shrink_selection(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        // Should have restored the pushed selection
+        assert_eq!(sel.anchor, 1, "anchor should be from history");
+        assert_eq!(sel.head, 4, "head should be from history");
+    }
+
+    #[test]
+    fn shrink_selection_clears_stale_history() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+
+        // Push a selection that does NOT contain the current one (stale)
+        let stale_sel = helix_core::Selection::single(3, 5);
+        let (view, _doc) = helix_view::current!(ctx.editor);
+        view.object_selections.push(stale_sel);
+
+        ctx.shrink_selection(doc_id, view_id);
+
+        // History should be cleared after encountering stale entry
+        let (view, _doc) = helix_view::current_ref!(ctx.editor);
+        assert!(
+            view.object_selections.is_empty(),
+            "stale history should be cleared"
+        );
     }
 }

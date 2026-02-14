@@ -81,6 +81,8 @@ Reference: `helix-term/src/keymap/default.rs`
 | `A-s` | Split selection on newlines | Matches |
 | `)` | Rotate selections forward | Matches |
 | `(` | Rotate selections backward | Matches |
+| `A-o` | Expand selection (tree-sitter) | Matches |
+| `A-i` | Shrink selection (tree-sitter) | Matches |
 
 ### Editing — Deviations
 
@@ -94,8 +96,6 @@ Reference: `helix-term/src/keymap/default.rs`
 
 | Key | Helix Action | Notes |
 |-----|-------------|-------|
-| `A-o` | `expand_selection` | Tree-sitter expand |
-| `A-i` | `shrink_selection` | Tree-sitter shrink |
 | `q/Q` | `replay_macro` / `record_macro` | Macro support |
 | `\|` | `shell_pipe` | Pipe selection through shell |
 | `!` | `shell_insert_output` | Insert shell output |

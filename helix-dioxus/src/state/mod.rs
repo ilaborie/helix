@@ -434,6 +434,8 @@ impl EditorContext {
             EditorCommand::PrevComment => self.prev_comment(doc_id, view_id),
             EditorCommand::ExtendToLineBounds => self.extend_to_line_bounds(doc_id, view_id),
             EditorCommand::ShrinkToLineBounds => self.shrink_to_line_bounds(doc_id, view_id),
+            EditorCommand::ExpandSelection => self.expand_selection(doc_id, view_id),
+            EditorCommand::ShrinkSelection => self.shrink_selection(doc_id, view_id),
 
             // Mode changes
             EditorCommand::EnterInsertMode => self.editor.mode = Mode::Insert,

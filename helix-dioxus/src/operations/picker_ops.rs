@@ -1038,6 +1038,16 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
             "Flip Selections",
             Some("A-;"),
         ),
+        (
+            EditorCommand::ExpandSelection,
+            "Expand Selection (tree-sitter)",
+            Some("A-o"),
+        ),
+        (
+            EditorCommand::ShrinkSelection,
+            "Shrink Selection (tree-sitter)",
+            Some("A-i"),
+        ),
         (EditorCommand::JoinLines, "Join Lines", Some("J")),
         (EditorCommand::ToggleCase, "Toggle Case", Some("~")),
         // Application

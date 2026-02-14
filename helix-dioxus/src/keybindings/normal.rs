@@ -70,6 +70,10 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
             KeyCode::Char('s') => vec![EditorCommand::SplitSelectionOnNewline],
             // Alt+x = shrink selection to line bounds
             KeyCode::Char('x') => vec![EditorCommand::ShrinkToLineBounds],
+            // Alt+o = expand selection to parent syntax node
+            KeyCode::Char('o') => vec![EditorCommand::ExpandSelection],
+            // Alt+i = shrink selection to child syntax node
+            KeyCode::Char('i') => vec![EditorCommand::ShrinkSelection],
             _ => vec![],
         };
     }
@@ -375,5 +379,33 @@ pub fn handle_space_leader(key: &KeyEvent) -> Vec<EditorCommand> {
         // Space ' - resume last picker
         KeyCode::Char('\'') => vec![EditorCommand::ShowLastPicker],
         _ => vec![],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use helix_view::input::KeyEvent;
+
+    use super::*;
+
+    fn alt_key(ch: char) -> KeyEvent {
+        KeyEvent {
+            code: KeyCode::Char(ch),
+            modifiers: KeyModifiers::ALT,
+        }
+    }
+
+    #[test]
+    fn alt_o_expands_selection() {
+        let cmds = handle_normal_mode(&alt_key('o'));
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(cmds[0], EditorCommand::ExpandSelection));
+    }
+
+    #[test]
+    fn alt_i_shrinks_selection() {
+        let cmds = handle_normal_mode(&alt_key('i'));
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(cmds[0], EditorCommand::ShrinkSelection));
     }
 }

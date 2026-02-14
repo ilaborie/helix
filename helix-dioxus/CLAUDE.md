@@ -416,6 +416,7 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - **Window/Splits**: Not supported — helix-dioxus uses a single-view design. `C-w` prefix and `Space w` sub-menu will not be implemented.
 
 ### Recently Completed
+- [x] Tree-sitter expand/shrink selection — `A-o` expands to parent syntax node (pushes history), `A-i` shrinks back (pops history or uses tree-sitter), both in normal and select modes, command panel entries
 - [x] Multi-selection, regex select/split, copy/rotate — multi-selection rendering (all ranges, not just primary), `s`/`S` regex select/split with prompt, `A-s` split on newline, `C`/`A-C` copy selection on next/prev line, `(`/`)` rotate selections
 - [x] Format document + align selections — `:format` / command panel now uses LSP `textDocument/formatting`, `&` aligns multi-cursor selections, `=` formats via LSP range formatting
 - [x] Quick wins batch (6 bindings) — `A-d`/`A-c` delete/change without yanking, `C-a`/`C-x` increment/decrement numbers and dates, `_` trim selections, `=` format selections via LSP range formatting

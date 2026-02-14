@@ -352,6 +352,10 @@ pub enum EditorCommand {
     ExtendToLineBounds,
     /// Shrink selection to line bounds (Alt-x).
     ShrinkToLineBounds,
+    /// Expand selection to parent syntax node (Alt-o).
+    ExpandSelection,
+    /// Shrink selection to child syntax node (Alt-i).
+    ShrinkSelection,
 
     // Mode changes
     EnterInsertMode,

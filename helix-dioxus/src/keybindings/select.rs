@@ -52,6 +52,10 @@ pub fn handle_select_mode(key: &KeyEvent) -> Vec<EditorCommand> {
             KeyCode::Char('C') => vec![EditorCommand::CopySelectionOnPrevLine],
             // Alt+s = split selection on newlines
             KeyCode::Char('s') => vec![EditorCommand::SplitSelectionOnNewline],
+            // Alt+o = expand selection to parent syntax node
+            KeyCode::Char('o') => vec![EditorCommand::ExpandSelection],
+            // Alt+i = shrink selection to child syntax node
+            KeyCode::Char('i') => vec![EditorCommand::ShrinkSelection],
             _ => vec![],
         };
     }
@@ -203,5 +207,26 @@ mod tests {
     fn select_g_prefix_unrecognized_returns_empty() {
         let cmds = handle_select_g_prefix(&key('z'));
         assert!(cmds.is_empty());
+    }
+
+    fn alt_key(ch: char) -> KeyEvent {
+        KeyEvent {
+            code: KeyCode::Char(ch),
+            modifiers: KeyModifiers::ALT,
+        }
+    }
+
+    #[test]
+    fn select_alt_o_expands_selection() {
+        let cmds = handle_select_mode(&alt_key('o'));
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(cmds[0], EditorCommand::ExpandSelection));
+    }
+
+    #[test]
+    fn select_alt_i_shrinks_selection() {
+        let cmds = handle_select_mode(&alt_key('i'));
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(cmds[0], EditorCommand::ShrinkSelection));
     }
 }
