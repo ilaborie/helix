@@ -9,8 +9,8 @@
     --bg-selection: #3e4451;
     --bg-deep: #181a1f;
     --text: #abb2bf;
-    --text-dim: #5c6370;
-    --text-dimmer: #6c7380;
+    --text-dim: #737a87;
+    --text-dimmer: #848b98;
     --accent: #61afef;
     --error: #e06c75;
     --warning: #e5c07b;
@@ -140,12 +140,12 @@ body {
     min-width: 40px;
     overflow: hidden;
 }
-.gutter-line {
+.gutter-line, .gutter-line-active {
+    position: relative;
     background-color: var(--bg-secondary);
 }
 .gutter-line-active {
     color: var(--text);
-    background-color: var(--bg-secondary);
 }
 
 /* Editor content */
@@ -655,6 +655,30 @@ kbd {
     font-size: 9px;
     color: var(--text-dim);
     z-index: 1;
+}
+
+/* VCS diff bar on right edge of line number gutter */
+.gutter-diff-bar {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 3px;
+    height: 100%;
+    pointer-events: none;
+}
+
+/* VCS diff deleted triangle on right edge of line number gutter */
+.gutter-diff-deleted {
+    position: absolute;
+    bottom: -4px;
+    right: 0;
+    width: 0;
+    height: 0;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    border-right: 6px solid var(--error);
+    z-index: 2;
+    pointer-events: none;
 }
 
 .diagnostic-marker {

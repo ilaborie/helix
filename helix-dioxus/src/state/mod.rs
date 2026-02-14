@@ -14,11 +14,11 @@ mod lsp_events;
 mod types;
 
 pub use types::{
-    centered_window, BufferInfo, ConfirmationAction, ConfirmationDialogSnapshot, Direction,
-    EditorCommand, EditorSnapshot, GlobalSearchResult, InputDialogKind, InputDialogSnapshot,
-    LineSnapshot, NotificationSeverity, NotificationSnapshot, PendingKeySequence, PickerIcon,
-    PickerItem, PickerMode, PickerPreview, PreviewLine, RegisterSnapshot, ScrollbarDiagnostic,
-    ShellBehavior, StartupAction, TokenSpan, WordJumpLabel,
+    centered_window, BufferInfo, ConfirmationAction, ConfirmationDialogSnapshot, DiffLineType,
+    Direction, EditorCommand, EditorSnapshot, GlobalSearchResult, InputDialogKind,
+    InputDialogSnapshot, LineSnapshot, NotificationSeverity, NotificationSnapshot,
+    PendingKeySequence, PickerIcon, PickerItem, PickerMode, PickerPreview, PreviewLine,
+    RegisterSnapshot, ScrollbarDiagnostic, ShellBehavior, StartupAction, TokenSpan, WordJumpLabel,
 };
 
 use std::path::PathBuf;
@@ -40,7 +40,8 @@ use crate::lsp::{
 };
 use crate::operations::{
     collect_search_match_lines, BufferOps, CliOps, ClipboardOps, EditingOps, JumpOps, LspOps,
-    MacroOps, MovementOps, PickerOps, SearchOps, SelectionOps, ShellOps, ThemeOps, WordJumpOps,
+    MacroOps, MovementOps, PickerOps, SearchOps, SelectionOps, ShellOps, ThemeOps, VcsOps,
+    WordJumpOps,
 };
 
 use lsp_events::LspEventOps;
@@ -1004,6 +1005,13 @@ impl EditorContext {
                 self.code_action_selected = 0; // Reset selection when filter changes
             }
 
+            // VCS - Hunk navigation
+            EditorCommand::NextChange => self.goto_next_change(doc_id, view_id),
+            EditorCommand::PrevChange => self.goto_prev_change(doc_id, view_id),
+            EditorCommand::GotoFirstChange => self.goto_first_change(doc_id, view_id),
+            EditorCommand::GotoLastChange => self.goto_last_change(doc_id, view_id),
+            EditorCommand::ShowChangedFilesPicker => self.show_changed_files_picker(),
+
             // LSP - Diagnostics
             EditorCommand::NextDiagnostic => {
                 self.next_diagnostic(doc_id, view_id);
@@ -1773,6 +1781,29 @@ impl EditorContext {
             })
             .collect();
 
+        // Collect VCS diff lines for gutter markers
+        let diff_lines = doc.diff_handle().map_or_else(Vec::new, |handle| {
+            let diff = handle.load();
+            let mut lines = Vec::new();
+            for i in 0..diff.len() {
+                let hunk = diff.nth_hunk(i);
+                if hunk.after.is_empty() {
+                    // Deletion: mark the line where content was removed
+                    lines.push((hunk.after.start as usize + 1, types::DiffLineType::Deleted));
+                } else {
+                    let dtype = if hunk.before.is_empty() {
+                        types::DiffLineType::Added
+                    } else {
+                        types::DiffLineType::Modified
+                    };
+                    for line in hunk.after.start..hunk.after.end {
+                        lines.push((line as usize + 1, dtype));
+                    }
+                }
+            }
+            lines
+        });
+
         let (open_buffers, buffer_scroll_offset) = self.buffer_bar_snapshot();
 
         // Increment snapshot version for change detection
@@ -1795,6 +1826,7 @@ impl EditorContext {
             search_input: self.search_input.clone(),
             search_match_lines,
             jump_lines,
+            diff_lines,
             regex_mode: self.regex_mode,
             regex_split: self.regex_split,
             regex_input: self.regex_input.clone(),
@@ -1983,6 +2015,22 @@ impl EditorContext {
             PickerMode::DirectoryBrowser
             | PickerMode::FileExplorer
             | PickerMode::FilesRecursive => Some((PathBuf::from(&selected_item.id), None)),
+            PickerMode::ChangedFiles => {
+                let path = PathBuf::from(&selected_item.id);
+                // Try to find the first diff hunk line for preview focus
+                let focus_line = self
+                    .editor
+                    .document_by_path(&path)
+                    .and_then(|doc| doc.diff_handle())
+                    .and_then(|handle| {
+                        let diff = handle.load();
+                        (diff.len() > 0).then(|| {
+                            let hunk = diff.nth_hunk(0);
+                            hunk.after.start as usize + 1 // 1-indexed
+                        })
+                    });
+                Some((path, focus_line))
+            }
             PickerMode::Buffers => {
                 let doc_id = self.parse_document_id(&selected_item.id)?;
                 let doc = self.editor.document(doc_id)?;
@@ -3693,6 +3741,7 @@ impl EditorContext {
             Some(PickerMode::Definitions) => self.show_definitions_picker(),
             Some(PickerMode::JumpList) => self.show_jumplist_picker(),
             Some(PickerMode::Themes) => self.show_theme_picker(),
+            Some(PickerMode::ChangedFiles) => self.show_changed_files_picker(),
             None => {}
         }
     }

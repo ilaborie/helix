@@ -463,6 +463,11 @@ impl PickerOps for EditorContext {
                     // Theme is already applied by live preview — just clear the rollback
                     self.theme_before_preview = None;
                 }
+                PickerMode::ChangedFiles => {
+                    // Open the selected changed file
+                    let path = PathBuf::from(&selected.id);
+                    self.open_file(&path);
+                }
                 PickerMode::References | PickerMode::Definitions => {
                     // Extract location data before mutable borrow
                     if let Ok(idx) = selected.id.parse::<usize>() {
@@ -1317,6 +1322,20 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
             "Switch Theme",
             Some(":theme"),
         ),
+        // VCS
+        (
+            EditorCommand::ShowChangedFilesPicker,
+            "Changed Files",
+            Some("Space g"),
+        ),
+        (EditorCommand::NextChange, "Next Change", Some("]g")),
+        (EditorCommand::PrevChange, "Previous Change", Some("[g")),
+        (
+            EditorCommand::GotoFirstChange,
+            "First Change",
+            Some("[G"),
+        ),
+        (EditorCommand::GotoLastChange, "Last Change", Some("]G")),
         // Text manipulation
         (
             EditorCommand::CliCommand("sort".to_string()),

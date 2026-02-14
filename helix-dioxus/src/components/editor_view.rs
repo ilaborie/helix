@@ -11,7 +11,7 @@ use crate::components::{
 };
 use crate::hooks::use_editor_snapshot;
 use crate::lsp::DiagnosticSnapshot;
-use crate::state::{LineSnapshot, TokenSpan, WordJumpLabel};
+use crate::state::{DiffLineType, LineSnapshot, TokenSpan, WordJumpLabel};
 
 /// Editor view component that renders the document content.
 #[component]
@@ -94,16 +94,30 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
             div {
                 class: "gutter",
                 for line in &snapshot.lines {
-                    // Include version and cursor state in key to force re-render
+                    // Include version, cursor state, and diff type in key to force re-render
                     {
                         let is_cursor = line.is_cursor_line;
-                        let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
+                        let diff_type = snapshot.diff_lines.iter().find(|(l, _)| *l == line.line_number).map(|(_, dt)| *dt);
+                        let gutter_key = format!("{}-{}-{}-{:?}", line.line_number, version, is_cursor, diff_type);
                         let gutter_class = if is_cursor { "gutter-line-active" } else { "gutter-line" };
                         rsx! {
                             div {
                                 key: "{gutter_key}",
                                 class: "{gutter_class}",
                                 "{line.line_number}"
+                                // VCS diff marker on right edge of line number
+                                if let Some(dt) = diff_type {
+                                    if dt == DiffLineType::Deleted {
+                                        span {
+                                            class: "gutter-diff-deleted",
+                                        }
+                                    } else {
+                                        span {
+                                            class: "gutter-diff-bar",
+                                            style: "background-color: {dt.css_color()};",
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

@@ -19,7 +19,8 @@ name = "dhx"
 path = "src/bin/dhx/main.rs"
 
 [features]
-default = []
+default = ["git"]
+git = ["helix-vcs/git"]
 
 [dependencies]
 helix-stdx = { path = "../helix-stdx" }
@@ -28,6 +29,10 @@ helix-event = { path = "../helix-event" }
 helix-view = { path = "../helix-view" }
 helix-lsp = { path = "../helix-lsp" }
 helix-loader = { path = "../helix-loader" }
+helix-vcs = { path = "../helix-vcs" }
+
+# VCS diff types (re-exported by helix-vcs)
+imara-diff = "0.2.0"
 
 # Dioxus for GUI
 dioxus = { version = "0.7", features = ["desktop"] }

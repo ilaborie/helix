@@ -2,9 +2,10 @@
 
 use dioxus::prelude::*;
 use lucide_dioxus::{
-    Blocks, Bookmark, Braces, ChevronRight, CircleX, Code, Component, File, FileCode, FileText,
-    Folder, FolderOpen, Hash, Info, Layers, Lightbulb, Link2, Package, Palette, SquareFunction,
-    Terminal, TextSearch, TriangleAlert, Variable,
+    Blocks, Bookmark, Braces, ChevronRight, CircleX, Code, Component, File, FileCode, FileDiff,
+    FileMinus, FilePen, FilePlus, FileText, FileX, Folder, FolderOpen, Hash, Info, Layers,
+    Lightbulb, Link2, Package, Palette, SquareFunction, Terminal, TextSearch, TriangleAlert,
+    Variable,
 };
 
 use crate::state::{PickerIcon, PickerItem};
@@ -54,6 +55,12 @@ pub fn PickerItemRow(
         PickerIcon::JumpEntry => "var(--orange)",
         // Theme
         PickerIcon::Theme => "var(--purple)",
+        // VCS icons
+        PickerIcon::VcsAdded => "var(--success)",
+        PickerIcon::VcsModified => "var(--warning)",
+        PickerIcon::VcsConflict => "var(--error)",
+        PickerIcon::VcsDeleted => "var(--error)",
+        PickerIcon::VcsRenamed => "var(--accent)",
         // Default colors
         PickerIcon::File | PickerIcon::Buffer => "var(--text)",
     };
@@ -126,6 +133,12 @@ pub fn PickerItemRow(
                     PickerIcon::Command => rsx! { Terminal { size: 16, color: "currentColor" } },
                     PickerIcon::JumpEntry => rsx! { Bookmark { size: 16, color: "currentColor" } },
                     PickerIcon::Theme => rsx! { Palette { size: 16, color: "currentColor" } },
+                    // VCS icons
+                    PickerIcon::VcsAdded => rsx! { FilePlus { size: 16, color: "currentColor" } },
+                    PickerIcon::VcsModified => rsx! { FilePen { size: 16, color: "currentColor" } },
+                    PickerIcon::VcsConflict => rsx! { FileX { size: 16, color: "currentColor" } },
+                    PickerIcon::VcsDeleted => rsx! { FileMinus { size: 16, color: "currentColor" } },
+                    PickerIcon::VcsRenamed => rsx! { FileDiff { size: 16, color: "currentColor" } },
                 }}
             }
 

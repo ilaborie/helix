@@ -50,6 +50,28 @@ pub struct BufferInfo {
     pub is_current: bool,
 }
 
+/// Type of diff change for a line in the gutter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiffLineType {
+    /// Line was added (new content).
+    Added,
+    /// Line was modified (changed content).
+    Modified,
+    /// Line marks a deletion point (content was removed here).
+    Deleted,
+}
+
+impl DiffLineType {
+    /// CSS color variable for this diff type.
+    pub fn css_color(&self) -> &'static str {
+        match self {
+            Self::Added => "var(--success)",
+            Self::Modified => "var(--accent)",
+            Self::Deleted => "var(--error)",
+        }
+    }
+}
+
 /// Icon type for picker items.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PickerIcon {
@@ -89,6 +111,12 @@ pub enum PickerIcon {
     JumpEntry,
     // Theme icon
     Theme,
+    // VCS icons
+    VcsAdded,
+    VcsModified,
+    VcsConflict,
+    VcsDeleted,
+    VcsRenamed,
 }
 
 /// Generic picker item with match highlighting.
@@ -122,6 +150,7 @@ pub enum PickerMode {
     Commands,
     JumpList,
     Themes,
+    ChangedFiles,
 }
 
 impl PickerMode {
@@ -143,6 +172,7 @@ impl PickerMode {
             Self::Commands => "Commands",
             Self::JumpList => "Jump List",
             Self::Themes => "Themes",
+            Self::ChangedFiles => "Changed Files",
         }
     }
 
@@ -158,7 +188,10 @@ impl PickerMode {
 
     /// Whether this picker mode supports file preview.
     pub fn supports_preview(&self) -> bool {
-        !matches!(self, Self::Registers | Self::Commands | Self::Themes)
+        !matches!(
+            self,
+            Self::Registers | Self::Commands | Self::Themes
+        )
     }
 }
 
@@ -228,6 +261,8 @@ pub struct EditorSnapshot {
     pub search_match_lines: Vec<usize>,
     /// Lines with jump list entries (1-indexed, for gutter markers).
     pub jump_lines: Vec<usize>,
+    /// Lines with VCS diff changes (1-indexed line number, diff type).
+    pub diff_lines: Vec<(usize, DiffLineType)>,
 
     // Picker state
     pub picker_visible: bool,
@@ -766,6 +801,18 @@ pub enum EditorCommand {
     /// Remove a character from the code action filter.
     CodeActionFilterBackspace,
 
+    // VCS - Hunk navigation
+    /// Jump to next change hunk (]g).
+    NextChange,
+    /// Jump to previous change hunk ([g).
+    PrevChange,
+    /// Jump to first change hunk ([G).
+    GotoFirstChange,
+    /// Jump to last change hunk (]G).
+    GotoLastChange,
+    /// Show changed files picker (Space g).
+    ShowChangedFilesPicker,
+
     // LSP - Diagnostics
     /// Jump to next diagnostic.
     NextDiagnostic,
@@ -1191,6 +1238,27 @@ mod tests {
         assert_eq!(centered_window(0, 0, 15), (0, 0));
     }
 
+    // --- DiffLineType ---
+
+    #[test]
+    fn diff_line_type_colors() {
+        assert_eq!(DiffLineType::Added.css_color(), "var(--success)");
+        assert_eq!(DiffLineType::Modified.css_color(), "var(--accent)");
+        assert_eq!(DiffLineType::Deleted.css_color(), "var(--error)");
+    }
+
+    // --- PickerMode ---
+
+    #[test]
+    fn changed_files_title() {
+        assert_eq!(PickerMode::ChangedFiles.title(), "Changed Files");
+    }
+
+    #[test]
+    fn changed_files_supports_preview() {
+        assert!(PickerMode::ChangedFiles.supports_preview());
+    }
+
     // --- PickerMode::title ---
 
     #[test]
@@ -1211,6 +1279,7 @@ mod tests {
             PickerMode::Commands,
             PickerMode::JumpList,
             PickerMode::Themes,
+            PickerMode::ChangedFiles,
         ];
         for mode in modes {
             let title = mode.title();
@@ -1257,6 +1326,7 @@ mod tests {
             PickerMode::References,
             PickerMode::Definitions,
             PickerMode::JumpList,
+            PickerMode::ChangedFiles,
         ];
         for mode in file_modes {
             assert!(mode.supports_preview(), "{mode:?} should support preview");

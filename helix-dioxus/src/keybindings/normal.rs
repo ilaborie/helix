@@ -299,8 +299,12 @@ pub fn handle_bracket_next(key: &KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('p') => vec![EditorCommand::NextParagraph],
         // ]t - next class/type
         KeyCode::Char('t') => vec![EditorCommand::NextClass],
+        // ]g - next change
+        KeyCode::Char('g') => vec![EditorCommand::NextChange],
         // ]D - last diagnostic
         KeyCode::Char('D') => vec![EditorCommand::GotoLastDiagnostic],
+        // ]G - last change
+        KeyCode::Char('G') => vec![EditorCommand::GotoLastChange],
         // ] Space - add newline below
         KeyCode::Char(' ') => vec![EditorCommand::AddNewlineBelow],
         _ => vec![],
@@ -318,12 +322,16 @@ pub fn handle_bracket_prev(key: &KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('d') => vec![EditorCommand::PrevDiagnostic],
         // [f - previous function
         KeyCode::Char('f') => vec![EditorCommand::PrevFunction],
+        // [g - previous change
+        KeyCode::Char('g') => vec![EditorCommand::PrevChange],
         // [p - previous paragraph
         KeyCode::Char('p') => vec![EditorCommand::PrevParagraph],
         // [t - previous class/type
         KeyCode::Char('t') => vec![EditorCommand::PrevClass],
         // [D - first diagnostic
         KeyCode::Char('D') => vec![EditorCommand::GotoFirstDiagnostic],
+        // [G - first change
+        KeyCode::Char('G') => vec![EditorCommand::GotoFirstChange],
         // [ Space - add newline above
         KeyCode::Char(' ') => vec![EditorCommand::AddNewlineAbove],
         _ => vec![],
@@ -355,6 +363,8 @@ pub fn handle_space_leader(key: &KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('D') => vec![EditorCommand::ShowWorkspaceDiagnostics],
         // Space f - file picker
         KeyCode::Char('f') => vec![EditorCommand::ShowFilePicker],
+        // Space g - changed files picker
+        KeyCode::Char('g') => vec![EditorCommand::ShowChangedFilesPicker],
         // Space F - file picker in buffer's directory
         KeyCode::Char('F') => vec![EditorCommand::ShowFilePickerInBufferDir],
         // Space h - select references to symbol (document highlights)

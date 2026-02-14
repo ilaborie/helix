@@ -17,6 +17,7 @@ mod selection;
 mod shell;
 mod text_manipulation;
 mod theme;
+mod vcs;
 mod word_jump;
 
 pub use buffer::BufferOps;
@@ -33,4 +34,5 @@ pub use selection::SelectionOps;
 pub use shell::ShellOps;
 pub use text_manipulation::TextManipulationOps;
 pub use theme::ThemeOps;
+pub use vcs::VcsOps;
 pub use word_jump::WordJumpOps;
