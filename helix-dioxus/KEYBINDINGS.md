@@ -88,6 +88,8 @@ Reference: `helix-term/src/keymap/default.rs`
 | `!` | Insert shell output | Matches |
 | `A-\|` | Pipe to shell (discard output) | Matches |
 | `A-!` | Append shell output | Matches |
+| `q` | Replay macro | Matches |
+| `Q` | Record/stop macro | Matches |
 
 ### Editing — Deviations
 
@@ -96,12 +98,6 @@ Reference: `helix-term/src/keymap/default.rs`
 | `K` | `keep_selections` | `TriggerHover` | Helix hover is `Space k`; `K` filters selections by regex |
 | `C-c` | `toggle_comments` | `ToggleLineComment` | Same intent but also available via `Space c` |
 | `C-r` | (not bound) | `Redo` | Vim-style convenience; Helix uses `U` |
-
-### Editing — Missing
-
-| Key | Helix Action | Notes |
-|-----|-------------|-------|
-| `q/Q` | `replay_macro` / `record_macro` | Macro support |
 
 ### Custom Bindings (not in Helix)
 
@@ -161,8 +157,11 @@ Reference: `helix-term/src/keymap/default.rs`
 | `Space C` | Toggle block comments |
 | `Space d` | Document diagnostics |
 | `Space D` | Workspace diagnostics |
+| `Space e` | File explorer |
+| `Space E` | File explorer in buffer's directory |
 | `Space f` | File picker |
 | `Space F` | File picker in buffer's directory |
+| `Space g` | Changed file picker (VCS) |
 | `Space h` | Select references to symbol |
 | `Space j` | Jump list picker |
 | `Space k` | Hover |
@@ -185,9 +184,6 @@ Reference: `helix-term/src/keymap/default.rs`
 
 | Key | Helix Action | Notes |
 |-----|-------------|-------|
-| `Space e` | `file_explorer` | File explorer (requires tree UI) |
-| `Space E` | `file_explorer_in_current_buffer_directory` | File explorer in buffer dir |
-| `Space g` | `changed_file_picker` | Changed files (VCS) |
 | `Space w` | Window sub-menu | Not supported (single-view design) |
 | `Space G` | Debug sub-menu | DAP integration |
 
@@ -209,12 +205,7 @@ Reference: `helix-term/src/keymap/default.rs`
 | `]a / [a` | Next/prev parameter |
 | `]c / [c` | Next/prev comment |
 | `]p / [p` | Next/prev paragraph |
-
-### Missing
-
-| Key | Helix Action | Notes |
-|-----|-------------|-------|
-| `]g / [g` | Next/prev change | VCS change navigation |
+| `]g / [g` | Next/prev VCS change |
 
 ---
 
@@ -391,22 +382,24 @@ Window/split management is not supported. helix-dioxus uses a single-view design
 | `:append-output` | | Append shell command output |
 | `:pipe-to` | | Pipe to shell (discard output) |
 | `:run-shell-command` | `:run` | Run shell command |
+| `:theme` | | Change theme (no args = picker with live preview) |
+| `:sort` | | Sort multi-cursor selections |
+| `:reflow` | | Reflow text (`:reflow [width]`) |
+| `:config-open` | | Open config file |
+| `:log-open` | | Open log file |
+| `:encoding` | | Show/set file encoding |
+| `:set-line-ending` | `:line-ending` | Show/set line ending (lf/crlf) |
+| `:tree-sitter-scopes` | | Show tree-sitter scopes at cursor |
+| `:jumplist-clear` | | Clear jump list |
 
 ### Missing Notable Commands
 
 | Command | Helix Action | Notes |
 |---------|-------------|-------|
-| `:theme` | Change color theme | |
-| `:config-reload` | Reload configuration | |
-| `:config-open` | Open config file | |
-| `:set` | Change editor settings | |
-| `:sort` | Sort selection | |
-| `:reflow` | Reflow text | |
-| `:encoding` | Set file encoding | |
-| `:line-ending` | Set line ending | |
+| `:config-reload` | Reload configuration | Requires config event channel |
+| `:set` | Change editor settings | e.g. `:set line-number relative` |
+| `:format` | Format document | Available via command panel and `=` binding |
 | `:lsp-restart` | Restart LSP | Available via LSP status dialog |
-| `:log-open` | Open log file | |
-| `:tree-sitter-scopes` | Show syntax scopes | |
 
 ---
 
@@ -423,22 +416,35 @@ Window/split management is not supported. helix-dioxus uses a single-view design
 
 ---
 
+## Macro Support
+
+| Feature | Status |
+|---------|--------|
+| `Q` | Record/stop macro (default register `@`) |
+| `q` | Replay macro from register |
+| `"aQ` | Record to named register `a` |
+| `"aq` | Replay from named register `a` |
+| Statusline `REC [@]` indicator | Matches |
+
+---
+
 ## Summary
 
 ### Coverage Statistics
 
 | Category | Implemented | Missing | Coverage |
 |----------|-------------|---------|----------|
-| Normal Mode | 60+ bindings | 1 (`q/Q`) | ~98% |
+| Normal Mode | 65+ bindings | 0 | 100% |
 | Goto (g-prefix) | 23 bindings | 0 | 100% |
-| Space Leader | 23 bindings | 4 (`e/E`, `g`, `G`) | 85% |
-| Bracket Sequences | 16 bindings | 2 (`]g/[g`) | 89% |
+| Space Leader | 26 bindings | 1 (`G`) | 96% |
+| Bracket Sequences | 18 bindings | 0 | 100% |
 | View Mode (z/Z) | 13 bindings | 0 | 100% |
 | Match (m-prefix) | 6 bindings | 0 | 100% |
 | Select Mode | 35+ bindings | 0 | 100% |
 | Insert Mode | 18 bindings | 0 | 100% |
-| Commands | 32 commands | 11 | 74% |
-| **Overall** | **~93%** | | |
+| Macros | 4 bindings | 0 | 100% |
+| Commands | 40 commands | 4 | 91% |
+| **Overall** | **~97%** | | |
 
 ### Design Decisions
 
@@ -446,7 +452,6 @@ Window/split management is not supported. helix-dioxus uses a single-view design
 
 ### Remaining Feature Categories
 
-1. **Macros** — `q/Q` record/replay
-2. **VCS integration** — `]g/[g` change navigation, `Space g` changed files
-3. **DAP/Debug** — `Space G` sub-menu
-4. **File explorer** — `Space e/E`
+1. **DAP/Debug** — `Space G` sub-menu
+2. **`:config-reload`** — reload configuration at runtime
+3. **`:set`** — change editor settings at runtime
