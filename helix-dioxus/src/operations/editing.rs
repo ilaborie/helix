@@ -1316,7 +1316,10 @@ mod tests {
         let (_view, doc) = helix_view::current_ref!(ctx.editor);
         let text: String = doc.text().slice(..).into();
         // Default indent style inserts tab or spaces
-        assert!(text.starts_with('\t') || text.starts_with(' '), "should insert indent");
+        assert!(
+            text.starts_with('\t') || text.starts_with(' '),
+            "should insert indent"
+        );
     }
 
     // --- delete_char_backward ---

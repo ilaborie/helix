@@ -189,7 +189,10 @@ mod tests {
     fn select_g_prefix_gs_extends_first_nonwhitespace() {
         let cmds = handle_select_g_prefix(&key('s'));
         assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::ExtendGotoFirstNonWhitespace));
+        assert!(matches!(
+            cmds[0],
+            EditorCommand::ExtendGotoFirstNonWhitespace
+        ));
     }
 
     #[test]

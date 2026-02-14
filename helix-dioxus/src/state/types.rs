@@ -12,6 +12,21 @@ use crate::lsp::{
     HoverSnapshot, InlayHintSnapshot, LocationSnapshot, LspServerSnapshot, SignatureHelpSnapshot,
 };
 
+/// Compute a visible window of `window_size` items centered on `selected`,
+/// clamped to `[0, total)`. Returns `(start, end)`.
+pub fn centered_window(selected: usize, total: usize, window_size: usize) -> (usize, usize) {
+    let half = window_size / 2;
+    let start = if selected <= half {
+        0
+    } else if selected + half >= total {
+        total.saturating_sub(window_size)
+    } else {
+        selected - half
+    };
+    let end = (start + window_size).min(total);
+    (start, end)
+}
+
 /// Determines what action to take on startup.
 #[derive(Debug, Clone)]
 pub enum StartupAction {
@@ -101,6 +116,67 @@ pub enum PickerMode {
     JumpList,
 }
 
+impl PickerMode {
+    /// Human-readable title for the picker header.
+    pub fn title(&self) -> &'static str {
+        match self {
+            Self::DirectoryBrowser => "Open File",
+            Self::FilesRecursive => "Find Files",
+            Self::Buffers => "Switch Buffer",
+            Self::DocumentSymbols => "Document Symbols",
+            Self::WorkspaceSymbols => "Workspace Symbols",
+            Self::DocumentDiagnostics => "Document Diagnostics",
+            Self::WorkspaceDiagnostics => "Workspace Diagnostics",
+            Self::GlobalSearch => "Global Search",
+            Self::References => "References",
+            Self::Definitions => "Definitions",
+            Self::Registers => "Registers",
+            Self::Commands => "Commands",
+            Self::JumpList => "Jump List",
+        }
+    }
+
+    /// Hint text for the Enter key action in the help row.
+    pub fn enter_hint(&self) -> &'static str {
+        match self {
+            Self::DirectoryBrowser => " open/enter \u{2022} ",
+            Self::GlobalSearch => " search/open \u{2022} ",
+            _ => " select \u{2022} ",
+        }
+    }
+
+    /// Whether this picker mode supports file preview.
+    pub fn supports_preview(&self) -> bool {
+        !matches!(self, Self::Registers | Self::Commands)
+    }
+}
+
+/// A single line in the picker preview panel.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PreviewLine {
+    /// Line number (1-indexed).
+    pub line_number: usize,
+    /// Line text content (no trailing newline).
+    pub content: String,
+    /// Syntax highlight spans for this line.
+    pub tokens: Vec<TokenSpan>,
+    /// Whether this is the target/focus line.
+    pub is_focus_line: bool,
+}
+
+/// File preview data for the picker panel.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct PickerPreview {
+    /// Display path (relative if possible).
+    pub file_path: String,
+    /// Visible preview lines (~20 lines).
+    pub lines: Vec<PreviewLine>,
+    /// 1-indexed focus line number.
+    pub focus_line: Option<usize>,
+    /// Search pattern for highlighting matches (GlobalSearch mode).
+    pub search_pattern: Option<String>,
+}
+
 /// Minimal diagnostic info for scrollbar markers.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScrollbarDiagnostic {
@@ -150,6 +226,8 @@ pub struct EditorSnapshot {
     pub picker_total: usize,
     pub picker_mode: PickerMode,
     pub picker_current_path: Option<String>,
+    /// File preview for the selected picker item.
+    pub picker_preview: Option<PickerPreview>,
 
     // Buffer bar state
     pub open_buffers: Vec<BufferInfo>,

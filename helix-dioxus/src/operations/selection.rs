@@ -516,8 +516,8 @@ impl SelectionOps for EditorContext {
         let last_line = text.len_lines().saturating_sub(1);
         let last_line_start = text.line_to_char(last_line);
 
-        let new_selection = selection
-            .transform(|range| helix_core::Range::new(range.anchor, last_line_start));
+        let new_selection =
+            selection.transform(|range| helix_core::Range::new(range.anchor, last_line_start));
 
         doc.set_selection(view_id, new_selection);
     }
@@ -1057,7 +1057,10 @@ mod tests {
         let text = doc.text().slice(..);
         let last_line = text.len_lines().saturating_sub(1);
         let last_line_start = text.line_to_char(last_line);
-        assert_eq!(sel.head, last_line_start, "head should move to last line start");
+        assert_eq!(
+            sel.head, last_line_start,
+            "head should move to last line start"
+        );
     }
 
     // --- extend_goto_first_nonwhitespace ---
@@ -1099,7 +1102,10 @@ mod tests {
         ctx.split_selection_on_newline(doc_id, view_id);
         let (_view, doc) = helix_view::current_ref!(ctx.editor);
         let sel = doc.selection(view_id);
-        assert!(sel.len() >= 3, "should split on newlines into at least 3 parts");
+        assert!(
+            sel.len() >= 3,
+            "should split on newlines into at least 3 parts"
+        );
     }
 
     // --- expand_selection / shrink_selection ---

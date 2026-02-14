@@ -775,7 +775,6 @@ impl EditorContext {
         self.last_picker_mode = Some(PickerMode::Definitions);
         self.picker_current_path = None;
     }
-
 }
 
 /// Execute global search on a blocking thread.
@@ -1069,16 +1068,8 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
         (EditorCommand::JoinLines, "Join Lines", Some("J")),
         (EditorCommand::ToggleCase, "Toggle Case", Some("~")),
         // Jump list
-        (
-            EditorCommand::JumpBackward,
-            "Jump Backward",
-            Some("C-o"),
-        ),
-        (
-            EditorCommand::JumpForward,
-            "Jump Forward",
-            Some("C-i"),
-        ),
+        (EditorCommand::JumpBackward, "Jump Backward", Some("C-o")),
+        (EditorCommand::JumpForward, "Jump Forward", Some("C-i")),
         (
             EditorCommand::SaveSelection,
             "Save Position to Jump List",

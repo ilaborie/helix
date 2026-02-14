@@ -995,7 +995,10 @@ mod tests {
         let text = doc.text().slice(..);
         let cursor_line = text.char_to_line(sel.cursor(text));
         // Should jump to or past the blank line (line 2)
-        assert!(cursor_line >= 2, "should be at or past blank line: {cursor_line}");
+        assert!(
+            cursor_line >= 2,
+            "should be at or past blank line: {cursor_line}"
+        );
     }
 
     #[test]
@@ -1008,7 +1011,10 @@ mod tests {
         let text = doc.text().slice(..);
         let cursor_line = text.char_to_line(sel.cursor(text));
         // Should jump back to or before the blank line
-        assert!(cursor_line <= 2, "should be at or before blank line: {cursor_line}");
+        assert!(
+            cursor_line <= 2,
+            "should be at or before blank line: {cursor_line}"
+        );
     }
 
     // --- extend_find_char ---

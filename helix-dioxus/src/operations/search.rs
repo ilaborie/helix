@@ -359,7 +359,10 @@ mod tests {
         ctx.execute_search(doc_id, view_id);
         assert_state(&ctx, "hello #[world|]#\n");
         assert!(!ctx.search_mode, "search mode should be exited");
-        assert!(ctx.search_input.is_empty(), "search input should be cleared");
+        assert!(
+            ctx.search_input.is_empty(),
+            "search input should be cleared"
+        );
         assert_eq!(ctx.last_search, "world", "last_search should be saved");
     }
 
@@ -438,7 +441,11 @@ mod tests {
         use helix_core::ropey::Rope;
         let text = Rope::from("aaa aaa aaa\n");
         let lines = super::collect_search_match_lines(&text, "aaa");
-        assert_eq!(lines, vec![0], "multiple matches on same line should deduplicate");
+        assert_eq!(
+            lines,
+            vec![0],
+            "multiple matches on same line should deduplicate"
+        );
     }
 
     // --- extend_search_next / extend_search_prev ---

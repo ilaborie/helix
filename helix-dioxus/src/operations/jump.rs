@@ -4,9 +4,7 @@ use std::path::PathBuf;
 
 use helix_view::editor::Action;
 
-use crate::state::{
-    EditorContext, NotificationSeverity, PickerIcon, PickerItem, PickerMode,
-};
+use crate::state::{EditorContext, NotificationSeverity, PickerIcon, PickerItem, PickerMode};
 
 /// Extension trait for jump list operations.
 pub trait JumpOps {
@@ -108,20 +106,29 @@ impl JumpOps for EditorContext {
                     .take(80)
                     .collect::<String>();
 
-                Some((*doc_id, selection.clone(), path_display, line + 1, col + 1, line_content))
+                Some((
+                    *doc_id,
+                    selection.clone(),
+                    path_display,
+                    line + 1,
+                    col + 1,
+                    line_content,
+                ))
             })
             .collect();
 
         let items: Vec<PickerItem> = entries
             .iter()
             .enumerate()
-            .map(|(idx, (_doc_id, _sel, path, line, col, content))| PickerItem {
-                id: idx.to_string(),
-                display: format!("{path}:{line}:{col}"),
-                icon: PickerIcon::JumpEntry,
-                match_indices: vec![],
-                secondary: Some(content.clone()),
-            })
+            .map(
+                |(idx, (_doc_id, _sel, path, line, col, content))| PickerItem {
+                    id: idx.to_string(),
+                    display: format!("{path}:{line}:{col}"),
+                    icon: PickerIcon::JumpEntry,
+                    match_indices: vec![],
+                    secondary: Some(content.clone()),
+                },
+            )
             .collect();
 
         // Store entries for confirm handler

@@ -476,6 +476,7 @@ pub fn App() -> Element {
                     total: snapshot.picker_total,
                     mode: snapshot.picker_mode,
                     current_path: snapshot.picker_current_path.clone(),
+                    preview: snapshot.picker_preview.clone(),
                 }
             }
 

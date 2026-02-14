@@ -51,9 +51,10 @@ helix-dioxus/src/
 │   │   └── prompt.rs           # Command/search prompts
 │   ├── picker/                 # Picker components (overlay dialogs)
 │   │   ├── mod.rs              # Re-exports GenericPicker
-│   │   ├── generic.rs          # Main picker container
+│   │   ├── generic.rs          # Main picker container (two-column with preview)
 │   │   ├── item.rs             # PickerItemRow component
-│   │   └── highlight.rs        # HighlightedText for fuzzy matches
+│   │   ├── highlight.rs        # HighlightedText for fuzzy matches
+│   │   └── preview.rs          # PickerPreviewPanel: syntax-highlighted file preview
 │   └── inline_dialog/          # Inline dialog primitives (cursor-positioned)
 │       ├── mod.rs              # Re-exports InlineDialogContainer, InlineListDialog
 │       ├── container.rs        # Base container with positioning logic
@@ -409,6 +410,7 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - [x] Code actions search box - filter input with count display, typing filters actions
 - [x] Diagnostic scrollbar markers - show diagnostic and search positions on right scrollbar edge
 - [x] Jump list gutter markers - Bookmark icon on lines with jump list entries, matching picker icon
+- [x] Picker file preview panel - side-by-side syntax-highlighted file preview in picker (40%/60% split), with search match highlighting for global search
 - [ ] Code actions preview panel - show fix preview before applying (needs LSP resolve)
 - [ ] Dialog search mode setting - user setting to toggle between: (1) current behavior where typing filters directly (arrows for navigation), or (2) vim-style where j/k and arrows navigate, '/' toggles search input focus. Applies to pickers and inline dialogs (code actions, completion, etc.)
 - [ ] Cursor block visibility — cursor is hard to spot against selection/line-highlight backgrounds, especially after `w`/`b` motions that create multi-char selections. Needs more prominent styling or animation
@@ -423,6 +425,7 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - **Window/Splits**: Not supported — helix-dioxus uses a single-view design. `C-w` prefix and `Space w` sub-menu will not be implemented.
 
 ### Recently Completed
+- [x] Picker file preview panel — side-by-side two-column layout (40% list / 60% preview) with syntax-highlighted file content, focus line indicator, search match highlighting for GlobalSearch; supports all file-based picker modes (DirectoryBrowser, FilesRecursive, Buffers, Symbols, Diagnostics, GlobalSearch, References, Definitions, JumpList); single-column preserved for Registers/Commands; `compute_tokens_for_rope` extracted as reusable helper for both editor view and preview
 - [x] Jump list gutter markers — orange Bookmark icon in indicator gutter for lines with jump list entries, `jump_lines` in `EditorSnapshot`, cache key updated for re-renders
 - [x] Fix Alt+key bindings on macOS — Option key composed special characters (ø, ˆ, ç) instead of intended keys; now uses physical key code (`evt.code()`) for Alt normalization in `translate.rs`
 - [x] Tree-sitter expand/shrink selection — `A-o` expands to parent syntax node (pushes history), `A-i` shrinks back (pops history or uses tree-sitter), both in normal and select modes, command panel entries

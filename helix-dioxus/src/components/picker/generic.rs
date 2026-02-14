@@ -1,14 +1,17 @@
 //! Generic picker component.
 //!
 //! Supports files, directories, and buffers with fuzzy match highlighting.
+//! When a preview is available, displays a two-column layout with the item
+//! list on the left and a syntax-highlighted file preview on the right.
 
 use dioxus::prelude::*;
 use lucide_dioxus::Search;
 
-use crate::state::{EditorCommand, PickerItem, PickerMode};
+use crate::state::{centered_window, EditorCommand, PickerItem, PickerMode, PickerPreview};
 use crate::AppState;
 
 use super::item::PickerItemRow;
+use super::preview::PickerPreviewPanel;
 
 /// Generic picker component that displays items with filtering and highlighting.
 #[component]
@@ -19,22 +22,12 @@ pub fn GenericPicker(
     total: usize,
     mode: PickerMode,
     current_path: Option<String>,
+    preview: Option<PickerPreview>,
 ) -> Element {
     let app_state = use_context::<AppState>();
 
     // Calculate visible window (show 15 items max, centered on selection)
-    let window_size = 15usize;
-    let half_window = window_size / 2;
-
-    let start = if selected <= half_window {
-        0
-    } else if selected + half_window >= items.len() {
-        items.len().saturating_sub(window_size)
-    } else {
-        selected - half_window
-    };
-
-    let end = (start + window_size).min(items.len());
+    let (start, end) = centered_window(selected, items.len(), 15);
     let visible_items: Vec<(usize, &PickerItem)> = items
         .get(start..end)
         .unwrap_or(&[])
@@ -45,21 +38,15 @@ pub fn GenericPicker(
 
     let filtered_count = items.len();
 
-    // Determine title based on mode
-    let title = match mode {
-        PickerMode::DirectoryBrowser => "Open File",
-        PickerMode::FilesRecursive => "Find Files",
-        PickerMode::Buffers => "Switch Buffer",
-        PickerMode::DocumentSymbols => "Document Symbols",
-        PickerMode::WorkspaceSymbols => "Workspace Symbols",
-        PickerMode::DocumentDiagnostics => "Document Diagnostics",
-        PickerMode::WorkspaceDiagnostics => "Workspace Diagnostics",
-        PickerMode::GlobalSearch => "Global Search",
-        PickerMode::References => "References",
-        PickerMode::Definitions => "Definitions",
-        PickerMode::Registers => "Registers",
-        PickerMode::Commands => "Commands",
-        PickerMode::JumpList => "Jump List",
+    let title = mode.title();
+
+    // Use wide layout whenever the mode supports preview (even if current item has none),
+    // so the container doesn't resize when navigating between folders and files.
+    let wide_layout = mode.supports_preview();
+    let container_class = if wide_layout {
+        "picker-container picker-container-with-preview"
+    } else {
+        "picker-container"
     };
 
     rsx! {
@@ -69,9 +56,9 @@ pub fn GenericPicker(
 
             // Picker container
             div {
-                class: "picker-container",
+                class: "{container_class}",
 
-                // Header with title
+                // Header with title (spans full width, above body)
                 div {
                     class: "picker-header",
 
@@ -122,13 +109,7 @@ pub fn GenericPicker(
                             kbd { "\u{2191}\u{2193}" }
                             " navigate \u{2022} "
                             kbd { "Enter" }
-                            if mode == PickerMode::DirectoryBrowser {
-                                " open/enter \u{2022} "
-                            } else if mode == PickerMode::GlobalSearch {
-                                " search/open \u{2022} "
-                            } else {
-                                " select \u{2022} "
-                            }
+                            {mode.enter_hint()}
                             kbd { "Esc" }
                             " cancel"
                         }
@@ -141,42 +122,64 @@ pub fn GenericPicker(
                     }
                 }
 
-                // Item list
+                // Body: two-column when preview, single-column otherwise
                 div {
-                    class: "picker-list",
+                    class: "picker-body",
 
-                    if items.is_empty() {
+                    // Left column: item list
+                    div {
+                        class: if wide_layout { "picker-left" } else { "picker-left picker-left-full" },
+
+                        // Item list
                         div {
-                            class: "picker-empty",
-                            if mode == PickerMode::GlobalSearch {
-                                if filter.is_empty() {
-                                    "Type a pattern and press Enter to search"
-                                } else {
-                                    "Press Enter to search"
-                                }
-                            } else if filter.is_empty() {
-                                "No items"
-                            } else {
-                                "No matches found"
-                            }
-                        }
-                    } else {
-                        for (idx, item) in visible_items {
-                            {
-                                let item_app_state = app_state.clone();
-                                let handle_click = move |evt: MouseEvent| {
-                                    evt.stop_propagation();
-                                    item_app_state.send_command(EditorCommand::PickerConfirmItem(idx));
-                                    item_app_state.process_commands_sync();
-                                };
-                                rsx! {
-                                    PickerItemRow {
-                                        key: "{idx}",
-                                        item: item.clone(),
-                                        is_selected: idx == selected,
-                                        on_click: handle_click,
+                            class: "picker-list",
+
+                            if items.is_empty() {
+                                div {
+                                    class: "picker-empty",
+                                    if mode == PickerMode::GlobalSearch {
+                                        if filter.is_empty() {
+                                            "Type a pattern and press Enter to search"
+                                        } else {
+                                            "Press Enter to search"
+                                        }
+                                    } else if filter.is_empty() {
+                                        "No items"
+                                    } else {
+                                        "No matches found"
                                     }
                                 }
+                            } else {
+                                for (idx, item) in visible_items {
+                                    {
+                                        let item_app_state = app_state.clone();
+                                        let handle_click = move |evt: MouseEvent| {
+                                            evt.stop_propagation();
+                                            item_app_state.send_command(EditorCommand::PickerConfirmItem(idx));
+                                            item_app_state.process_commands_sync();
+                                        };
+                                        rsx! {
+                                            PickerItemRow {
+                                                key: "{idx}",
+                                                item: item.clone(),
+                                                is_selected: idx == selected,
+                                                on_click: handle_click,
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Right column: preview panel or placeholder
+                    if wide_layout {
+                        if let Some(preview_data) = preview {
+                            PickerPreviewPanel { preview: preview_data }
+                        } else {
+                            div {
+                                class: "picker-preview-placeholder",
+                                "No preview available"
                             }
                         }
                     }

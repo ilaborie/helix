@@ -140,18 +140,42 @@ mod tests {
 
     #[test]
     fn direction_from_key_hjkl() {
-        assert!(matches!(direction_from_key(KeyCode::Char('h')), Some(Direction::Left)));
-        assert!(matches!(direction_from_key(KeyCode::Char('j')), Some(Direction::Down)));
-        assert!(matches!(direction_from_key(KeyCode::Char('k')), Some(Direction::Up)));
-        assert!(matches!(direction_from_key(KeyCode::Char('l')), Some(Direction::Right)));
+        assert!(matches!(
+            direction_from_key(KeyCode::Char('h')),
+            Some(Direction::Left)
+        ));
+        assert!(matches!(
+            direction_from_key(KeyCode::Char('j')),
+            Some(Direction::Down)
+        ));
+        assert!(matches!(
+            direction_from_key(KeyCode::Char('k')),
+            Some(Direction::Up)
+        ));
+        assert!(matches!(
+            direction_from_key(KeyCode::Char('l')),
+            Some(Direction::Right)
+        ));
     }
 
     #[test]
     fn direction_from_key_arrows() {
-        assert!(matches!(direction_from_key(KeyCode::Left), Some(Direction::Left)));
-        assert!(matches!(direction_from_key(KeyCode::Right), Some(Direction::Right)));
-        assert!(matches!(direction_from_key(KeyCode::Up), Some(Direction::Up)));
-        assert!(matches!(direction_from_key(KeyCode::Down), Some(Direction::Down)));
+        assert!(matches!(
+            direction_from_key(KeyCode::Left),
+            Some(Direction::Left)
+        ));
+        assert!(matches!(
+            direction_from_key(KeyCode::Right),
+            Some(Direction::Right)
+        ));
+        assert!(matches!(
+            direction_from_key(KeyCode::Up),
+            Some(Direction::Up)
+        ));
+        assert!(matches!(
+            direction_from_key(KeyCode::Down),
+            Some(Direction::Down)
+        ));
     }
 
     #[test]
@@ -165,20 +189,41 @@ mod tests {
 
     #[test]
     fn move_command_maps_directions() {
-        assert!(matches!(move_command(Direction::Left), EditorCommand::MoveLeft));
-        assert!(matches!(move_command(Direction::Right), EditorCommand::MoveRight));
+        assert!(matches!(
+            move_command(Direction::Left),
+            EditorCommand::MoveLeft
+        ));
+        assert!(matches!(
+            move_command(Direction::Right),
+            EditorCommand::MoveRight
+        ));
         assert!(matches!(move_command(Direction::Up), EditorCommand::MoveUp));
-        assert!(matches!(move_command(Direction::Down), EditorCommand::MoveDown));
+        assert!(matches!(
+            move_command(Direction::Down),
+            EditorCommand::MoveDown
+        ));
     }
 
     // --- extend_command ---
 
     #[test]
     fn extend_command_maps_directions() {
-        assert!(matches!(extend_command(Direction::Left), EditorCommand::ExtendLeft));
-        assert!(matches!(extend_command(Direction::Right), EditorCommand::ExtendRight));
-        assert!(matches!(extend_command(Direction::Up), EditorCommand::ExtendUp));
-        assert!(matches!(extend_command(Direction::Down), EditorCommand::ExtendDown));
+        assert!(matches!(
+            extend_command(Direction::Left),
+            EditorCommand::ExtendLeft
+        ));
+        assert!(matches!(
+            extend_command(Direction::Right),
+            EditorCommand::ExtendRight
+        ));
+        assert!(matches!(
+            extend_command(Direction::Up),
+            EditorCommand::ExtendUp
+        ));
+        assert!(matches!(
+            extend_command(Direction::Down),
+            EditorCommand::ExtendDown
+        ));
     }
 
     // --- handle_move_keys ---

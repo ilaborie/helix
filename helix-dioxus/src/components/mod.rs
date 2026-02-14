@@ -37,7 +37,5 @@ pub use dialog::{
     CommandPrompt, ConfirmationDialog, InputDialog, LspStatusDialog, NotificationContainer,
     RegexPrompt, SearchPrompt,
 };
-pub use lsp::{
-    CodeActionsMenu, CompletionPopup, HoverPopup, LocationPicker, SignatureHelpPopup,
-};
+pub use lsp::{CodeActionsMenu, CompletionPopup, HoverPopup, LocationPicker, SignatureHelpPopup};
 pub use picker::GenericPicker;

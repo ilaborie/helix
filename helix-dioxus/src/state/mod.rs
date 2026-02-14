@@ -14,10 +14,11 @@ mod lsp_events;
 mod types;
 
 pub use types::{
-    BufferInfo, ConfirmationAction, ConfirmationDialogSnapshot, Direction, EditorCommand,
-    EditorSnapshot, GlobalSearchResult, InputDialogKind, InputDialogSnapshot, LineSnapshot,
-    NotificationSeverity, NotificationSnapshot, PendingKeySequence, PickerIcon, PickerItem,
-    PickerMode, RegisterSnapshot, ScrollbarDiagnostic, StartupAction, TokenSpan,
+    centered_window, BufferInfo, ConfirmationAction, ConfirmationDialogSnapshot, Direction,
+    EditorCommand, EditorSnapshot, GlobalSearchResult, InputDialogKind, InputDialogSnapshot,
+    LineSnapshot, NotificationSeverity, NotificationSnapshot, PendingKeySequence, PickerIcon,
+    PickerItem, PickerMode, PickerPreview, PreviewLine, RegisterSnapshot, ScrollbarDiagnostic,
+    StartupAction, TokenSpan,
 };
 
 use std::path::PathBuf;
@@ -1628,6 +1629,7 @@ impl EditorContext {
                 .picker_current_path
                 .as_ref()
                 .map(|p| p.to_string_lossy().to_string()),
+            picker_preview: self.compute_picker_preview(),
             open_buffers,
             buffer_scroll_offset,
             // LSP state
@@ -1745,11 +1747,6 @@ impl EditorContext {
         visible_start: usize,
         visible_end: usize,
     ) -> Vec<Vec<TokenSpan>> {
-        use helix_core::syntax::HighlightEvent;
-
-        let text = doc.text();
-        let text_slice = text.slice(..);
-
         let syntax = match doc.syntax() {
             Some(s) => s,
             None => {
@@ -1758,85 +1755,209 @@ impl EditorContext {
         };
 
         let loader = self.editor.syn_loader.load();
-        let theme = &self.editor.theme;
+        compute_tokens_for_rope(
+            doc.text(),
+            syntax,
+            &self.editor.theme,
+            &loader,
+            visible_start,
+            visible_end,
+        )
+    }
 
-        let start_char = text.line_to_char(visible_start);
-        let end_char = if visible_end >= text.len_lines() {
-            text.len_chars()
-        } else {
-            text.line_to_char(visible_end)
+    /// Compute the picker preview for the currently selected picker item.
+    /// Resolve file path and target line for the currently selected picker item.
+    /// Returns `None` for non-previewable items (folders, registers, commands).
+    fn resolve_preview_target(
+        &self,
+        selected_item: &PickerItem,
+    ) -> Option<(PathBuf, Option<usize>)> {
+        use crate::operations::BufferOps;
+
+        let scratch_path = || PathBuf::from("[scratch]");
+        let current_doc_path = |editor: &helix_view::Editor| -> Option<PathBuf> {
+            let view = editor.tree.get(editor.tree.focus);
+            let doc = editor.document(view.doc)?;
+            Some(doc.path().cloned().unwrap_or_else(scratch_path))
         };
-        let start_byte = text.char_to_byte(start_char) as u32;
-        let end_byte = text.char_to_byte(end_char) as u32;
+        let clamped_idx = |len: usize| -> usize { self.picker_selected.min(len.saturating_sub(1)) };
 
-        let mut highlighter = syntax.highlighter(text_slice, &loader, start_byte..end_byte);
-        let mut line_tokens: Vec<Vec<TokenSpan>> = vec![Vec::new(); visible_end - visible_start];
-        let text_style = helix_view::theme::Style::default();
-        let mut current_style = text_style;
-        let mut pos = start_byte;
-
-        loop {
-            let next_event_pos = highlighter.next_event_offset();
-            let span_end = if next_event_pos == u32::MAX {
-                end_byte
-            } else {
-                next_event_pos
-            };
-
-            if span_end > pos {
-                if let Some(fg) = current_style.fg {
-                    if let Some(css_color) = color_to_css(&fg) {
-                        let span_start_char = text.byte_to_char(pos as usize);
-                        let span_end_char = text.byte_to_char(span_end as usize);
-                        let span_start_line = text.char_to_line(span_start_char);
-                        let span_end_line =
-                            text.char_to_line(span_end_char.saturating_sub(1).max(span_start_char));
-
-                        for line_idx in span_start_line..=span_end_line {
-                            if line_idx < visible_start || line_idx >= visible_end {
-                                continue;
-                            }
-                            let line_start_char = text.line_to_char(line_idx);
-                            let line_end_char = if line_idx + 1 < text.len_lines() {
-                                text.line_to_char(line_idx + 1)
-                            } else {
-                                text.len_chars()
-                            };
-
-                            let token_start =
-                                span_start_char.max(line_start_char) - line_start_char;
-                            let token_end = span_end_char.min(line_end_char) - line_start_char;
-
-                            if token_start < token_end {
-                                let line_slot = line_idx - visible_start;
-                                line_tokens[line_slot].push(TokenSpan {
-                                    start: token_start,
-                                    end: token_end,
-                                    color: css_color.clone(),
-                                });
-                            }
-                        }
-                    }
-                }
+        match self.picker_mode {
+            PickerMode::DirectoryBrowser | PickerMode::FilesRecursive => {
+                Some((PathBuf::from(&selected_item.id), None))
             }
-
-            if next_event_pos == u32::MAX || next_event_pos >= end_byte {
-                break;
+            PickerMode::Buffers => {
+                let doc_id = self.parse_document_id(&selected_item.id)?;
+                let doc = self.editor.document(doc_id)?;
+                let path = doc.path().cloned().unwrap_or_else(scratch_path);
+                let view_id = self.editor.tree.focus;
+                let cursor = doc
+                    .selection(view_id)
+                    .primary()
+                    .cursor(doc.text().slice(..));
+                let line = doc.text().char_to_line(cursor) + 1;
+                Some((path, Some(line)))
             }
+            PickerMode::DocumentSymbols => {
+                let symbol = self.symbols.get(clamped_idx(self.symbols.len()))?;
+                let path = current_doc_path(&self.editor)?;
+                Some((path, Some(symbol.line)))
+            }
+            PickerMode::WorkspaceSymbols => {
+                let symbol = self.symbols.get(clamped_idx(self.symbols.len()))?;
+                Some((symbol.path.clone()?, Some(symbol.line)))
+            }
+            PickerMode::DocumentDiagnostics => {
+                let entry = self
+                    .picker_diagnostics
+                    .get(clamped_idx(self.picker_diagnostics.len()))?;
+                let path = current_doc_path(&self.editor)?;
+                Some((path, Some(entry.diagnostic.line)))
+            }
+            PickerMode::WorkspaceDiagnostics => {
+                let entry = self
+                    .picker_diagnostics
+                    .get(clamped_idx(self.picker_diagnostics.len()))?;
+                Some((entry.path.clone()?, Some(entry.diagnostic.line)))
+            }
+            PickerMode::GlobalSearch => {
+                let result = self
+                    .global_search_results
+                    .get(clamped_idx(self.global_search_results.len()))?;
+                Some((result.path.clone(), Some(result.line_num)))
+            }
+            PickerMode::References | PickerMode::Definitions => {
+                let loc = self.locations.get(clamped_idx(self.locations.len()))?;
+                Some((PathBuf::from(&loc.path), Some(loc.line)))
+            }
+            PickerMode::JumpList => {
+                let (doc_id, sel) = self
+                    .jumplist_entries
+                    .get(clamped_idx(self.jumplist_entries.len()))?;
+                let doc = self.editor.document(*doc_id)?;
+                let path = doc.path().cloned().unwrap_or_else(scratch_path);
+                let cursor = sel.primary().cursor(doc.text().slice(..));
+                let line = doc.text().char_to_line(cursor) + 1;
+                Some((path, Some(line)))
+            }
+            PickerMode::Registers | PickerMode::Commands => None,
+        }
+    }
 
-            pos = next_event_pos;
-            let (event, highlights) = highlighter.advance();
+    fn compute_picker_preview(&self) -> Option<types::PickerPreview> {
+        use crate::operations::PickerOps;
 
-            let base = match event {
-                HighlightEvent::Refresh => text_style,
-                HighlightEvent::Push => current_style,
-            };
-
-            current_style =
-                highlights.fold(base, |acc, highlight| acc.patch(theme.highlight(highlight)));
+        if !self.picker_visible || !self.picker_mode.supports_preview() {
+            return None;
         }
 
-        line_tokens
+        let filtered = self.filtered_picker_items();
+        let selected_item = filtered.get(self.picker_selected)?;
+
+        // Skip folders in directory browser
+        if selected_item.icon == PickerIcon::Folder {
+            return None;
+        }
+
+        let preview_lines = 20usize;
+
+        let (file_path, target_line) = self.resolve_preview_target(selected_item)?;
+
+        // Try to load content: first from open documents, then from disk
+        let cwd = std::env::current_dir().unwrap_or_default();
+        let display_path = file_path
+            .strip_prefix(&cwd)
+            .unwrap_or(&file_path)
+            .to_string_lossy()
+            .to_string();
+
+        // Try open document first (match by path)
+        let open_doc = self
+            .editor
+            .documents()
+            .find(|d| d.path().is_some_and(|p| p == &file_path));
+
+        // We need the rope and optionally syntax to compute tokens.
+        // For open documents we can borrow directly; for disk files we create them.
+        let disk_rope;
+        let disk_syntax;
+        let (rope_ref, syntax_ref): (&helix_core::Rope, Option<&helix_core::Syntax>) =
+            if let Some(doc) = open_doc {
+                (doc.text(), doc.syntax())
+            } else {
+                // Read from disk
+                let metadata = std::fs::metadata(&file_path).ok()?;
+                if metadata.len() > 1_048_576 {
+                    // Skip files > 1MB
+                    return None;
+                }
+                let content = std::fs::read_to_string(&file_path).ok()?;
+                disk_rope = helix_core::Rope::from_str(&content);
+
+                // Try to create syntax for highlighting
+                let loader = self.editor.syn_loader.load();
+                disk_syntax = loader.language_for_filename(&file_path).and_then(|lang| {
+                    helix_core::Syntax::new(disk_rope.slice(..), lang, &loader).ok()
+                });
+
+                (&disk_rope, disk_syntax.as_ref())
+            };
+
+        let total_lines = rope_ref.len_lines();
+        if total_lines == 0 {
+            return None;
+        }
+
+        // Compute visible window centered on target line
+        let focus_line_0 = target_line.map(|l| l.saturating_sub(1)); // Convert to 0-indexed
+        let (window_start, window_end) = match focus_line_0 {
+            Some(focus) => centered_window(focus, total_lines, preview_lines),
+            None => (0, preview_lines.min(total_lines)),
+        };
+
+        // Compute syntax tokens for the window
+        let line_tokens = if let Some(syntax) = syntax_ref {
+            let loader = self.editor.syn_loader.load();
+            compute_tokens_for_rope(
+                rope_ref,
+                syntax,
+                &self.editor.theme,
+                &loader,
+                window_start,
+                window_end,
+            )
+        } else {
+            vec![Vec::new(); window_end - window_start]
+        };
+
+        // Build preview lines
+        let lines: Vec<types::PreviewLine> = (window_start..window_end)
+            .enumerate()
+            .map(|(idx, line_idx)| {
+                let line_content = rope_ref.line(line_idx).to_string();
+                // Strip trailing newline
+                let content = line_content.trim_end_matches('\n').to_string();
+                types::PreviewLine {
+                    line_number: line_idx + 1,
+                    content,
+                    tokens: line_tokens.get(idx).cloned().unwrap_or_default(),
+                    is_focus_line: target_line.is_some_and(|tl| tl == line_idx + 1),
+                }
+            })
+            .collect();
+
+        let search_pattern = if self.picker_mode == PickerMode::GlobalSearch {
+            Some(self.picker_filter.clone()).filter(|s| !s.is_empty())
+        } else {
+            None
+        };
+
+        Some(types::PickerPreview {
+            file_path: display_path,
+            lines,
+            focus_line: target_line,
+            search_pattern,
+        })
     }
 }
 
@@ -2228,11 +2349,8 @@ impl EditorContext {
         let ranges: Vec<helix_core::Range> = highlights
             .iter()
             .filter_map(|hl| {
-                let start = helix_lsp::util::lsp_pos_to_pos(
-                    doc.text(),
-                    hl.range.start,
-                    offset_encoding,
-                )?;
+                let start =
+                    helix_lsp::util::lsp_pos_to_pos(doc.text(), hl.range.start, offset_encoding)?;
                 let end =
                     helix_lsp::util::lsp_pos_to_pos(doc.text(), hl.range.end, offset_encoding)?;
                 Some(helix_core::Range::new(start, end))
@@ -2289,9 +2407,9 @@ impl EditorContext {
             match future.await {
                 Ok(Some(highlights)) => {
                     log::info!("Received {} document highlights", highlights.len());
-                    let _ = tx.send(EditorCommand::LspResponse(
-                        LspResponse::DocumentHighlights(highlights),
-                    ));
+                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::DocumentHighlights(
+                        highlights,
+                    )));
                 }
                 Ok(None) => {
                     log::info!("No document highlights found");
@@ -3512,6 +3630,98 @@ fn convert_diagnostic_code(
         helix_core::diagnostic::NumberOrString::Number(n) => n.to_string(),
         helix_core::diagnostic::NumberOrString::String(s) => s.clone(),
     })
+}
+
+/// Compute syntax highlighting tokens for a rope+syntax pair over a line range.
+/// Reusable by both the main editor view and picker preview.
+fn compute_tokens_for_rope(
+    text: &helix_core::Rope,
+    syntax: &helix_core::Syntax,
+    theme: &helix_view::Theme,
+    loader: &helix_core::syntax::Loader,
+    visible_start: usize,
+    visible_end: usize,
+) -> Vec<Vec<TokenSpan>> {
+    use helix_core::syntax::HighlightEvent;
+
+    let text_slice = text.slice(..);
+
+    let start_char = text.line_to_char(visible_start);
+    let end_char = if visible_end >= text.len_lines() {
+        text.len_chars()
+    } else {
+        text.line_to_char(visible_end)
+    };
+    let start_byte = text.char_to_byte(start_char) as u32;
+    let end_byte = text.char_to_byte(end_char) as u32;
+
+    let mut highlighter = syntax.highlighter(text_slice, loader, start_byte..end_byte);
+    let mut line_tokens: Vec<Vec<TokenSpan>> = vec![Vec::new(); visible_end - visible_start];
+    let text_style = helix_view::theme::Style::default();
+    let mut current_style = text_style;
+    let mut pos = start_byte;
+
+    loop {
+        let next_event_pos = highlighter.next_event_offset();
+        let span_end = if next_event_pos == u32::MAX {
+            end_byte
+        } else {
+            next_event_pos
+        };
+
+        if span_end > pos {
+            if let Some(fg) = current_style.fg {
+                if let Some(css_color) = color_to_css(&fg) {
+                    let span_start_char = text.byte_to_char(pos as usize);
+                    let span_end_char = text.byte_to_char(span_end as usize);
+                    let span_start_line = text.char_to_line(span_start_char);
+                    let span_end_line =
+                        text.char_to_line(span_end_char.saturating_sub(1).max(span_start_char));
+
+                    for line_idx in span_start_line..=span_end_line {
+                        if line_idx < visible_start || line_idx >= visible_end {
+                            continue;
+                        }
+                        let line_start_char = text.line_to_char(line_idx);
+                        let line_end_char = if line_idx + 1 < text.len_lines() {
+                            text.line_to_char(line_idx + 1)
+                        } else {
+                            text.len_chars()
+                        };
+
+                        let token_start = span_start_char.max(line_start_char) - line_start_char;
+                        let token_end = span_end_char.min(line_end_char) - line_start_char;
+
+                        if token_start < token_end {
+                            let line_slot = line_idx - visible_start;
+                            line_tokens[line_slot].push(TokenSpan {
+                                start: token_start,
+                                end: token_end,
+                                color: css_color.clone(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        if next_event_pos == u32::MAX || next_event_pos >= end_byte {
+            break;
+        }
+
+        pos = next_event_pos;
+        let (event, highlights) = highlighter.advance();
+
+        let base = match event {
+            HighlightEvent::Refresh => text_style,
+            HighlightEvent::Push => current_style,
+        };
+
+        current_style =
+            highlights.fold(base, |acc, highlight| acc.patch(theme.highlight(highlight)));
+    }
+
+    line_tokens
 }
 
 /// Convert a helix Color to a CSS color string.

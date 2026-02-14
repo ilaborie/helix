@@ -5,5 +5,6 @@
 mod generic;
 mod highlight;
 mod item;
+mod preview;
 
 pub use generic::GenericPicker;
