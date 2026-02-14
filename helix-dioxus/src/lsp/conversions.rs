@@ -194,7 +194,7 @@ fn convert_parameter(param: lsp::ParameterInformation) -> ParameterSnapshot {
     let label = match param.label {
         lsp::ParameterLabel::Simple(s) => s,
         lsp::ParameterLabel::LabelOffsets([start, end]) => {
-            format!("[{}:{}]", start, end)
+            format!("[{start}:{end}]")
         }
     };
 

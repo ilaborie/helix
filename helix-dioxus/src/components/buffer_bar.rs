@@ -167,7 +167,7 @@ fn BufferTab(buffer: BufferInfo, on_action: EventHandler<()>) -> Element {
             title: "{buffer.name}",
             onmousedown: move |evt| {
                 evt.stop_propagation();
-                log::info!("Buffer tab clicked: {:?}", doc_id);
+                log::info!("Buffer tab clicked: {doc_id:?}");
                 app_state_switch.send_command(EditorCommand::SwitchToBuffer(doc_id));
                 app_state_switch.process_commands_sync();
                 on_action_switch.call(());
@@ -200,7 +200,7 @@ fn BufferTab(buffer: BufferInfo, on_action: EventHandler<()>) -> Element {
                 style: "width: 16px; height: 16px; margin-left: 4px; border-radius: 3px; opacity: 0.6; cursor: pointer; display: flex; align-items: center; justify-content: center;",
                 onmousedown: move |evt| {
                     evt.stop_propagation();
-                    log::info!("Close button clicked: {:?}", doc_id_close);
+                    log::info!("Close button clicked: {doc_id_close:?}");
                     app_state_close.send_command(EditorCommand::CloseBuffer(doc_id_close));
                     app_state_close.process_commands_sync();
                     on_action_close.call(());
@@ -224,7 +224,7 @@ fn ScrollButton(direction: &'static str, onclick: EventHandler<MouseEvent>) -> E
             class: "scroll-button",
             onmousedown: move |evt| {
                 evt.stop_propagation();
-                log::info!("Scroll button clicked: {}", direction);
+                log::info!("Scroll button clicked: {direction}");
                 onclick.call(evt);
             },
             span {

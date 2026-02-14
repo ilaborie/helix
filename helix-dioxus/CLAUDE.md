@@ -438,6 +438,7 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 
 ### Design Decisions
 - **Window/Splits**: Not supported — helix-dioxus uses a single-view design. `C-w` prefix and `Space w` sub-menu will not be implemented.
+- **DAP/Debug**: Not supported — `Space G` sub-menu will not be implemented. Debug adapter protocol is not integrated.
 
 ### Recently Completed
 - [x] Command mode autocompletion — fuzzy-matching popup above `:` prompt showing all ~45 commands with aliases and descriptions, Tab to accept, Up/Down to navigate, `CommandCompletion` struct as single source of truth, `CommandCompletionPopup` component, `compute_command_completions()` reuses `fuzzy_match_with_indices`, CSS `.command-completion-*` classes

@@ -468,7 +468,7 @@ impl SelectionOps for EditorContext {
         let regex = match helix_stdx::rope::Regex::new(pattern) {
             Ok(r) => r,
             Err(e) => {
-                log::warn!("Invalid regex pattern '{}': {}", pattern, e);
+                log::warn!("Invalid regex pattern '{pattern}': {e}");
                 return;
             }
         };
@@ -487,7 +487,7 @@ impl SelectionOps for EditorContext {
         let regex = match helix_stdx::rope::Regex::new(pattern) {
             Ok(r) => r,
             Err(e) => {
-                log::warn!("Invalid regex pattern '{}': {}", pattern, e);
+                log::warn!("Invalid regex pattern '{pattern}': {e}");
                 return;
             }
         };
@@ -566,14 +566,14 @@ impl SelectionOps for EditorContext {
         let ranges: helix_core::SmallVec<[helix_core::Range; 1]> = selection
             .iter()
             .filter_map(|range| {
-                if range.is_empty() || range.slice(text).chars().all(|ch| ch.is_whitespace()) {
+                if range.is_empty() || range.slice(text).chars().all(char::is_whitespace) {
                     return None;
                 }
                 let mut start = range.from();
                 let mut end = range.to();
-                start = helix_core::movement::skip_while(text, start, |x| x.is_whitespace())
+                start = helix_core::movement::skip_while(text, start, char::is_whitespace)
                     .unwrap_or(start);
-                end = helix_core::movement::backwards_skip_while(text, end, |x| x.is_whitespace())
+                end = helix_core::movement::backwards_skip_while(text, end, char::is_whitespace)
                     .unwrap_or(end);
                 Some(helix_core::Range::new(start, end).with_direction(range.direction()))
             })

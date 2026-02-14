@@ -196,7 +196,7 @@ impl LspEventOps for EditorContext {
                 self.lsp_progress.update(server_id, token, report);
             }
             lsp::WorkDoneProgress::End(end) => {
-                log::info!("LSP progress end (server {:?})", server_id);
+                log::info!("LSP progress end (server {server_id:?})");
                 self.lsp_progress.end_progress(server_id, &token);
                 // Log the message if present
                 if let Some(msg) = end.message {

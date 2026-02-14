@@ -444,7 +444,7 @@ pub fn App() -> Element {
             };
 
             // Send commands to editor
-            log::trace!("Commands: {:?}", commands);
+            log::trace!("Commands: {commands:?}");
             for cmd in commands {
                 app_state_for_handler.send_command(cmd);
             }

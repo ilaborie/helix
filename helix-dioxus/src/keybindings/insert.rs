@@ -14,6 +14,8 @@ pub fn handle_insert_mode(key: &KeyEvent) -> Vec<EditorCommand> {
     // Handle Alt+key combinations
     if key.modifiers.contains(KeyModifiers::ALT) {
         return match key.code {
+            // Alt+Backspace - delete word backward
+            KeyCode::Backspace => vec![EditorCommand::DeleteWordBackward],
             // Alt+d - delete word forward
             KeyCode::Char('d') => vec![EditorCommand::DeleteWordForward],
             _ => vec![],
@@ -41,6 +43,8 @@ pub fn handle_insert_mode(key: &KeyEvent) -> Vec<EditorCommand> {
             KeyCode::Char('s') => vec![EditorCommand::CommitUndoCheckpoint],
             // Ctrl+w - delete word backward
             KeyCode::Char('w') => vec![EditorCommand::DeleteWordBackward],
+            // Ctrl+x - trigger completion
+            KeyCode::Char('x') => vec![EditorCommand::TriggerCompletion],
             // Ctrl+u - delete to line start
             KeyCode::Char('u') => vec![EditorCommand::DeleteToLineStart],
             _ => vec![],

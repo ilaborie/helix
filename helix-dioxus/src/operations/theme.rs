@@ -165,12 +165,10 @@ impl ThemeOps for EditorContext {
 
         // Detect light vs dark from background color
         let bg_color = theme.try_get("ui.background").and_then(|s| s.bg.clone());
-        let is_light = bg_color.as_ref().is_some_and(|c| is_light_background(c));
+        let is_light = bg_color.as_ref().is_some_and(is_light_background);
         log::debug!(
-            "theme_to_css_vars: theme='{}', bg_color={:?}, is_light={}",
+            "theme_to_css_vars: theme='{}', bg_color={bg_color:?}, is_light={is_light}",
             theme.name(),
-            bg_color,
-            is_light,
         );
         let defaults = if is_light {
             LIGHT_DEFAULTS

@@ -1,6 +1,6 @@
 //! Picker operations for the editor.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use grep_matcher::Matcher;
@@ -91,7 +91,7 @@ impl PickerOps for EditorContext {
 
                 let is_dir = path.is_dir();
                 let display_name = if is_dir {
-                    format!("{}/", name)
+                    format!("{name}/")
                 } else {
                     name.clone()
                 };
@@ -208,7 +208,7 @@ impl PickerOps for EditorContext {
                 let is_current = id == current_doc_id;
 
                 PickerItem {
-                    id: format!("{}", id),
+                    id: format!("{id}"),
                     display: name,
                     icon: if is_modified {
                         PickerIcon::BufferModified
@@ -305,7 +305,7 @@ impl PickerOps for EditorContext {
                         if let Some(parent) = self
                             .picker_current_path
                             .as_ref()
-                            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+                            .and_then(|p| p.parent().map(Path::to_path_buf))
                         {
                             if std::env::set_current_dir(&parent).is_ok() {
                                 self.show_file_picker();
@@ -413,7 +413,7 @@ impl PickerOps for EditorContext {
                     if let Some(ch) = selected.id.chars().next() {
                         self.editor.selected_register = Some(ch);
                         self.show_notification(
-                            format!("Register '{}' selected", ch),
+                            format!("Register '{ch}' selected"),
                             crate::state::NotificationSeverity::Info,
                         );
                     }
@@ -524,7 +524,7 @@ impl EditorContext {
             .editor
             .document(doc_id)
             .and_then(|doc| doc.path())
-            .and_then(|p| p.parent().map(|p| p.to_path_buf()));
+            .and_then(|p| p.parent().map(Path::to_path_buf));
 
         if let Some(dir) = buffer_dir {
             if std::env::set_current_dir(&dir).is_ok() {
@@ -573,7 +573,7 @@ impl EditorContext {
             .editor
             .document(doc_id)
             .and_then(|doc| doc.path())
-            .and_then(|p| p.parent().map(|p| p.to_path_buf()));
+            .and_then(|p| p.parent().map(Path::to_path_buf));
 
         let root = buffer_dir
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
@@ -716,7 +716,7 @@ impl EditorContext {
                 display: (*name).to_string(),
                 icon: PickerIcon::Command,
                 match_indices: vec![],
-                secondary: hint.map(|h| h.to_string()),
+                secondary: hint.map(ToString::to_string),
                 depth: 0,
             })
             .collect();
@@ -839,7 +839,7 @@ impl EditorContext {
             );
 
             if let Err(e) = result {
-                log::error!("Global search error: {:?}", e);
+                log::error!("Global search error: {e:?}");
             }
 
             // Signal completion
@@ -871,7 +871,7 @@ impl EditorContext {
                     .unwrap_or(&result.path)
                     .to_string_lossy();
 
-                let display = format!("{}:{}", relative_path, result.line_num);
+                let display = format!("{relative_path}:{}", result.line_num);
 
                 PickerItem {
                     id: idx.to_string(),
@@ -900,7 +900,7 @@ impl EditorContext {
                     .unwrap_or(&loc.path)
                     .to_string_lossy();
 
-                let display = format!("{}:{}:{}", relative_path, loc.line, loc.column);
+                let display = format!("{relative_path}:{}:{}", loc.line, loc.column);
                 let secondary = loc.preview.clone();
 
                 PickerItem {
@@ -941,7 +941,7 @@ impl EditorContext {
                     .unwrap_or(&loc.path)
                     .to_string_lossy();
 
-                let display = format!("{}:{}:{}", relative_path, loc.line, loc.column);
+                let display = format!("{relative_path}:{}:{}", loc.line, loc.column);
                 let secondary = loc.preview.clone();
 
                 PickerItem {
@@ -977,7 +977,7 @@ fn execute_global_search_blocking(
     cancel_rx: tokio::sync::watch::Receiver<bool>,
 ) -> anyhow::Result<()> {
     // Determine if pattern is case-sensitive (smart case: uppercase = case-sensitive)
-    let has_uppercase = pattern.chars().any(|c| c.is_uppercase());
+    let has_uppercase = pattern.chars().any(char::is_uppercase);
 
     // Build regex matcher
     let matcher = RegexMatcherBuilder::new()
@@ -1057,7 +1057,7 @@ fn execute_global_search_blocking(
 
             if let Err(e) = search_result {
                 // Skip files that can't be read (binary, permission denied, etc.)
-                log::debug!("Skipping file {:?}: {:?}", path, e);
+                log::debug!("Skipping file {path:?}: {e:?}");
             }
         }
 

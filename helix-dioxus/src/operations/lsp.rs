@@ -63,7 +63,7 @@ impl EditorContext {
         // Second pass: move cursor (mutable borrow)
         if let Some((target_pos, line, message)) = target_info {
             self.goto_char(doc_id, view_id, target_pos);
-            log::info!("Jumped to diagnostic at line {}: {}", line, message);
+            log::info!("Jumped to diagnostic at line {line}: {message}");
         } else {
             log::info!("No diagnostics in document");
         }

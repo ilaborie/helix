@@ -165,7 +165,7 @@ impl EditingOps for EditorContext {
         let insert_selection = helix_core::Selection::point(insert_pos);
 
         // Insert newline + indentation
-        let insert_text = format!("\n{}", indent);
+        let insert_text = format!("\n{indent}");
         let transaction =
             helix_core::Transaction::insert(doc.text(), &insert_selection, insert_text.into());
         doc.apply(&transaction, view_id);
@@ -188,7 +188,7 @@ impl EditingOps for EditorContext {
 
         // Insert indentation + newline at start of current line
         let insert_selection = helix_core::Selection::point(line_start);
-        let insert_text = format!("{}\n", indent);
+        let insert_text = format!("{indent}\n");
         let transaction =
             helix_core::Transaction::insert(doc.text(), &insert_selection, insert_text.into());
         doc.apply(&transaction, view_id);
@@ -410,7 +410,7 @@ impl EditingOps for EditorContext {
                 .registers
                 .write(register, vec![selected_text.clone()])
             {
-                log::warn!("Failed to write to register '{}': {e}", register);
+                log::warn!("Failed to write to register '{register}': {e}");
             }
             if register == '+' {
                 self.clipboard.clone_from(&selected_text);
@@ -810,7 +810,7 @@ impl EditingOps for EditorContext {
             .editor
             .registers
             .read(register, &self.editor)
-            .and_then(|mut values| values.next().map(|v| v.into_owned()))
+            .and_then(|mut values| values.next().map(std::borrow::Cow::into_owned))
             .or_else(|| {
                 if register == '+' {
                     Some(self.clipboard.clone())
@@ -992,7 +992,7 @@ impl EditingOps for EditorContext {
         }
 
         let mut changes = Vec::with_capacity(selection.len());
-        let len = column_widths.first().map(|cols| cols.len()).unwrap_or(0);
+        let len = column_widths.first().map(Vec::len).unwrap_or(0);
         let mut offs = vec![0usize; len];
 
         for col in column_widths {

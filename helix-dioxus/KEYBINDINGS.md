@@ -180,12 +180,12 @@ Reference: `helix-term/src/keymap/default.rs`
 |-----|-------------------|-------|
 | `Space i` | Toggle inlay hints | Desktop UI extension |
 
-### Missing
+### Not Supported
 
 | Key | Helix Action | Notes |
 |-----|-------------|-------|
 | `Space w` | Window sub-menu | Not supported (single-view design) |
-| `Space G` | Debug sub-menu | DAP integration |
+| `Space G` | Debug sub-menu | Not supported (DAP not integrated) |
 
 ---
 
@@ -294,7 +294,9 @@ Reference: `helix-term/src/keymap/default.rs`
 | `C-d` | Delete char forward |
 | `C-j` | Insert newline |
 | `A-d` | Delete word forward |
+| `A-Backspace` | Delete word backward |
 | `C-r` | Insert from register |
+| `C-x` | Trigger completion |
 | `C-s` | Commit undo checkpoint |
 | `S-Tab` | Unindent |
 | arrows, Home, End | Cursor movement |
@@ -307,13 +309,6 @@ Reference: `helix-term/src/keymap/default.rs`
 | `C-c` | `ToggleLineComment` | Comment toggle in insert mode |
 | `C-Space` | `TriggerCompletion` | Explicit completion trigger |
 | `C-.` | `ShowCodeActions` | Quick fix in insert mode |
-
-### Missing
-
-| Key | Helix Action | Notes |
-|-----|-------------|-------|
-| `C-x` | `completion` | Helix completion trigger (use `C-Space` instead) |
-| `A-Backspace` | `delete_word_backward` | Alt backspace (use `C-w` instead) |
 
 ---
 
@@ -437,20 +432,21 @@ When typing `:` commands, a completion popup appears above the prompt showing fi
 |----------|-------------|---------|----------|
 | Normal Mode | 65+ bindings | 0 | 100% |
 | Goto (g-prefix) | 23 bindings | 0 | 100% |
-| Space Leader | 26 bindings | 1 (`G`) | 96% |
+| Space Leader | 26 bindings | 0 | 100% |
 | Bracket Sequences | 18 bindings | 0 | 100% |
 | View Mode (z/Z) | 13 bindings | 0 | 100% |
 | Match (m-prefix) | 6 bindings | 0 | 100% |
 | Select Mode | 35+ bindings | 0 | 100% |
-| Insert Mode | 18 bindings | 0 | 100% |
+| Insert Mode | 20 bindings | 0 | 100% |
 | Macros | 4 bindings | 0 | 100% |
 | Commands | 45 commands | 0 | 100% |
-| **Overall** | **~98%** | | |
+| **Overall** | **100%** | | |
 
 ### Design Decisions
 
 - **Window/Splits**: Not supported — helix-dioxus uses a single-view design. `C-w` prefix and `Space w` sub-menu will not be implemented.
 
-### Remaining Feature Categories
+### Not Supported Feature Categories
 
-1. **DAP/Debug** — `Space G` sub-menu
+- **DAP/Debug** — `Space G` sub-menu (debug adapter protocol not integrated)
+- **Window/Splits** — `C-w` prefix, `Space w` sub-menu (single-view design)

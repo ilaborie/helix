@@ -632,7 +632,7 @@ impl CliOps for EditorContext {
                 }
             },
             "toggle" => {
-                let toggle_args = args.map(|a| a.to_string());
+                let toggle_args = args.map(ToString::to_string);
                 match toggle_args {
                     Some(toggle_args) => {
                         self.toggle_option(&toggle_args);
@@ -691,9 +691,9 @@ impl CliOps for EditorContext {
             }
 
             _ => {
-                log::warn!("Unknown command: {}", cmd);
+                log::warn!("Unknown command: {cmd}");
                 self.show_notification(
-                    format!("Unknown command: {}", cmd),
+                    format!("Unknown command: {cmd}"),
                     NotificationSeverity::Error,
                 );
             }

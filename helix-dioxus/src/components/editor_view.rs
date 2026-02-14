@@ -47,7 +47,7 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                         let show_lightbulb = has_code_actions && line_num == cursor_line;
                         let severity = highest_severity_for_line(diagnostics, line_num);
                         let has_jump = snapshot.jump_lines.contains(&line_num);
-                        let key = format!("ind-{}-{}-{}-{}-{}", line_num, version, show_lightbulb, severity.is_some(), has_jump);
+                        let key = format!("ind-{line_num}-{version}-{show_lightbulb}-{}-{has_jump}", severity.is_some());
                         // Use diagnostic severity color if available, otherwise warning
                         let lightbulb_color = severity
                             .map(|s| s.css_color())
@@ -98,7 +98,7 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                     {
                         let is_cursor = line.is_cursor_line;
                         let diff_type = snapshot.diff_lines.iter().find(|(l, _)| *l == line.line_number).map(|(_, dt)| *dt);
-                        let gutter_key = format!("{}-{}-{}-{:?}", line.line_number, version, is_cursor, diff_type);
+                        let gutter_key = format!("{}-{version}-{is_cursor}-{diff_type:?}", line.line_number);
                         let gutter_class = if is_cursor { "gutter-line-active" } else { "gutter-line" };
                         rsx! {
                             div {
@@ -168,7 +168,7 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                             .collect();
 
                         let has_jump_labels = !line_jump_labels.is_empty();
-                        let key = format!("{}-{}-{}-{}", line_num, version, has_sel, has_jump_labels);
+                        let key = format!("{line_num}-{version}-{has_sel}-{has_jump_labels}");
                         rsx! {
                             Line {
                                 key: "{key}",

@@ -1427,14 +1427,14 @@ impl EditorContext {
             } => {
                 // Apply the workspace edit
                 if let Err(e) = self.editor.apply_workspace_edit(offset_encoding, &edit) {
-                    log::error!("Failed to apply rename edit: {:?}", e);
+                    log::error!("Failed to apply rename edit: {e:?}");
                     self.show_notification(
-                        format!("Rename failed: {:?}", e),
+                        format!("Rename failed: {e:?}"),
                         NotificationSeverity::Error,
                     );
                 } else {
                     self.show_notification(
-                        format!("Renamed to '{}'", new_name),
+                        format!("Renamed to '{new_name}'"),
                         NotificationSeverity::Success,
                     );
                 }
@@ -1448,7 +1448,7 @@ impl EditorContext {
                 self.populate_symbol_picker_items();
             }
             LspResponse::Error(msg) => {
-                log::error!("LSP error: {}", msg);
+                log::error!("LSP error: {msg}");
             }
         }
     }
@@ -1640,7 +1640,7 @@ impl EditorContext {
 
     /// Restart a language server by name.
     pub(crate) fn restart_lsp_server(&mut self, name: &str) {
-        log::info!("Restarting LSP server: {}", name);
+        log::info!("Restarting LSP server: {name}");
 
         // Get the current document and its language config
         let view_id = self.editor.tree.focus;
@@ -1677,14 +1677,14 @@ impl EditorContext {
             enable_snippets,
         ) {
             Some(Ok(_client)) => {
-                log::info!("LSP server '{}' restarted successfully", name);
+                log::info!("LSP server '{name}' restarted successfully");
             }
             Some(Err(e)) => {
-                log::error!("Failed to restart LSP server '{}': {}", name, e);
+                log::error!("Failed to restart LSP server '{name}': {e}");
                 return;
             }
             None => {
-                log::warn!("LSP server '{}' not found in registry", name);
+                log::warn!("LSP server '{name}' not found in registry");
                 return;
             }
         }
@@ -2354,7 +2354,7 @@ impl EditorContext {
                     log::info!("No completions received");
                 }
                 Err(e) => {
-                    log::error!("Completion request failed: {}", e);
+                    log::error!("Completion request failed: {e}");
                 }
             }
         });
@@ -2449,7 +2449,7 @@ impl EditorContext {
                     let _ = tx.send(EditorCommand::LspResponse(LspResponse::Hover(None)));
                 }
                 Err(e) => {
-                    log::error!("Hover request failed: {}", e);
+                    log::error!("Hover request failed: {e}");
                 }
             }
         });
@@ -2495,10 +2495,10 @@ impl EditorContext {
                     )));
                 }
                 Ok(None) => {
-                    log::info!("No {} found", title);
+                    log::info!("No {title} found");
                 }
                 Err(e) => {
-                    log::error!("{} request failed: {}", title, e);
+                    log::error!("{title} request failed: {e}");
                 }
             }
         });
@@ -2519,7 +2519,7 @@ impl EditorContext {
         let ls = match doc.language_servers_with_feature(feature).next() {
             Some(ls) => ls,
             None => {
-                log::info!("No language server supports {:?}", feature);
+                log::info!("No language server supports {feature:?}");
                 return;
             }
         };
@@ -2552,7 +2552,7 @@ impl EditorContext {
                 }
             }
             _ => {
-                log::warn!("Unsupported goto feature: {:?}", feature);
+                log::warn!("Unsupported goto feature: {feature:?}");
             }
         }
     }
@@ -2603,7 +2603,7 @@ impl EditorContext {
                     log::info!("No references found");
                 }
                 Err(e) => {
-                    log::error!("References request failed: {}", e);
+                    log::error!("References request failed: {e}");
                 }
             }
         });
@@ -2663,7 +2663,7 @@ impl EditorContext {
             self.open_file(&resolved);
         } else {
             self.editor
-                .set_error(format!("File not found: {}", path_str));
+                .set_error(format!("File not found: {path_str}"));
         }
     }
 
@@ -2757,7 +2757,7 @@ impl EditorContext {
                     log::info!("No document highlights found");
                 }
                 Err(e) => {
-                    log::error!("Document highlight request failed: {}", e);
+                    log::error!("Document highlight request failed: {e}");
                 }
             }
         });
@@ -2854,7 +2854,7 @@ impl EditorContext {
                     let _ = tx.send(EditorCommand::LspResponse(LspResponse::SignatureHelp(None)));
                 }
                 Err(e) => {
-                    log::error!("Signature help request failed: {}", e);
+                    log::error!("Signature help request failed: {e}");
                 }
             }
         });
@@ -2966,7 +2966,7 @@ impl EditorContext {
                     log::info!("No code actions available");
                 }
                 Err(e) => {
-                    log::error!("Code actions request failed: {}", e);
+                    log::error!("Code actions request failed: {e}");
                 }
             }
         });
@@ -3017,7 +3017,7 @@ impl EditorContext {
                                     Some(resolved)
                                 }
                                 Err(e) => {
-                                    log::error!("Failed to resolve code action: {}", e);
+                                    log::error!("Failed to resolve code action: {e}");
                                     None
                                 }
                             }
@@ -3045,7 +3045,7 @@ impl EditorContext {
                         .editor
                         .apply_workspace_edit(action.offset_encoding, workspace_edit)
                     {
-                        log::error!("Failed to apply workspace edit: {:?}", e);
+                        log::error!("Failed to apply workspace edit: {e:?}");
                     }
                 } else {
                     log::warn!("Code action has no workspace edit after resolution");
@@ -3179,7 +3179,7 @@ impl EditorContext {
                     ));
                 }
                 Err(e) => {
-                    log::debug!("Code actions check failed: {}", e);
+                    log::debug!("Code actions check failed: {e}");
                     let _ = tx.send(EditorCommand::LspResponse(
                         LspResponse::CodeActionsAvailable(false, Vec::new()),
                     ));
@@ -3252,7 +3252,7 @@ impl EditorContext {
                     log::debug!("No inlay hints available");
                 }
                 Err(e) => {
-                    log::error!("Inlay hints request failed: {}", e);
+                    log::error!("Inlay hints request failed: {e}");
                 }
             }
         });
@@ -3533,9 +3533,9 @@ impl EditorContext {
                     });
                 }
                 Err(e) => {
-                    log::error!("Rename request failed: {}", e);
+                    log::error!("Rename request failed: {e}");
                     let _ = tx.send(EditorCommand::ShowNotification {
-                        message: format!("Rename failed: {}", e),
+                        message: format!("Rename failed: {e}"),
                         severity: NotificationSeverity::Error,
                     });
                 }
@@ -3601,7 +3601,7 @@ impl EditorContext {
                     log::info!("No document symbols available");
                 }
                 Err(e) => {
-                    log::error!("Document symbols request failed: {}", e);
+                    log::error!("Document symbols request failed: {e}");
                 }
             }
         });
@@ -3678,7 +3678,7 @@ impl EditorContext {
                     log::info!("No workspace symbols available");
                 }
                 Err(e) => {
-                    log::error!("Workspace symbols request failed: {}", e);
+                    log::error!("Workspace symbols request failed: {e}");
                 }
             }
         });
@@ -3859,8 +3859,8 @@ impl EditorContext {
 
                 // Format: "[error] message" or "[error E0308] message"
                 let prefix = match &entry.diagnostic.code {
-                    Some(code) => format!("[{} {}]", severity_label, code),
-                    None => format!("[{}]", severity_label),
+                    Some(code) => format!("[{severity_label} {code}]"),
+                    None => format!("[{severity_label}]"),
                 };
 
                 // Truncate message to fit (accounting for prefix)
@@ -3874,7 +3874,7 @@ impl EditorContext {
                     entry.diagnostic.message.clone()
                 };
 
-                let display = format!("{} {}", prefix, message);
+                let display = format!("{prefix} {message}");
 
                 // Secondary: "filename:line" for workspace, "Line N" for document
                 let secondary = match &entry.path {
@@ -4075,7 +4075,7 @@ fn compute_tokens_for_rope(
 pub(crate) fn color_to_css(color: &helix_view::graphics::Color) -> Option<String> {
     use helix_view::graphics::Color;
     match color {
-        Color::Rgb(r, g, b) => Some(format!("#{:02x}{:02x}{:02x}", r, g, b)),
+        Color::Rgb(r, g, b) => Some(format!("#{r:02x}{g:02x}{b:02x}")),
         Color::Reset => None,
         Color::Black => Some("#282c34".into()),
         Color::Red => Some("#e06c75".into()),

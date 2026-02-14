@@ -34,7 +34,7 @@ impl ClipboardOps for EditorContext {
             .registers
             .write(register, vec![selected_text.clone()])
         {
-            log::warn!("Failed to write to register '{}': {e}", register);
+            log::warn!("Failed to write to register '{register}': {e}");
         }
 
         // Sync internal clipboard when using '+' register
@@ -43,9 +43,8 @@ impl ClipboardOps for EditorContext {
         }
 
         log::info!(
-            "Yanked {} characters to register '{}'",
+            "Yanked {} characters to register '{register}'",
             selected_text.len(),
-            register
         );
     }
 
@@ -67,7 +66,7 @@ impl ClipboardOps for EditorContext {
             .registers
             .write(register, vec![selected_text.clone()])
         {
-            log::warn!("Failed to write to register '{}': {e}", register);
+            log::warn!("Failed to write to register '{register}': {e}");
         }
 
         if register == '+' {
@@ -75,9 +74,8 @@ impl ClipboardOps for EditorContext {
         }
 
         log::info!(
-            "Yanked main selection ({} chars) to register '{}'",
+            "Yanked main selection ({} chars) to register '{register}'",
             selected_text.len(),
-            register
         );
     }
 
@@ -90,7 +88,7 @@ impl ClipboardOps for EditorContext {
             .editor
             .registers
             .read(register, &self.editor)
-            .and_then(|mut values| values.next().map(|v| v.into_owned()))
+            .and_then(|mut values| values.next().map(std::borrow::Cow::into_owned))
             .or_else(|| {
                 if register == '+' {
                     Some(self.clipboard.clone())
@@ -142,9 +140,8 @@ impl ClipboardOps for EditorContext {
         doc.apply(&transaction, view_id);
 
         log::info!(
-            "Pasted {} characters from register '{}'",
+            "Pasted {} characters from register '{register}'",
             clipboard_text.len(),
-            register
         );
     }
 
@@ -157,7 +154,7 @@ impl ClipboardOps for EditorContext {
             .editor
             .registers
             .read(register, &self.editor)
-            .and_then(|mut values| values.next().map(|v| v.into_owned()))
+            .and_then(|mut values| values.next().map(std::borrow::Cow::into_owned))
             .or_else(|| {
                 if register == '+' {
                     Some(self.clipboard.clone())
@@ -225,7 +222,7 @@ impl ClipboardOps for EditorContext {
                 .registers
                 .write(register, vec![selected_text.clone()])
             {
-                log::warn!("Failed to write to register '{}': {e}", register);
+                log::warn!("Failed to write to register '{register}': {e}");
             }
             // Sync internal clipboard when using '+' register
             if register == '+' {

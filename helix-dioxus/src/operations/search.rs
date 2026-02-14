@@ -170,12 +170,12 @@ impl SearchOps for EditorContext {
             doc.set_selection(view_id, new_selection);
             let wrapped = found_byte_pos.is_none();
             if wrapped {
-                log::info!("Wrapped: found '{}' at char position {}", pattern, char_pos);
+                log::info!("Wrapped: found '{pattern}' at char position {char_pos}");
             } else {
-                log::info!("Found '{}' at char position {}", pattern, char_pos);
+                log::info!("Found '{pattern}' at char position {char_pos}");
             }
         } else {
-            log::info!("Pattern '{}' not found", pattern);
+            log::info!("Pattern '{pattern}' not found");
         }
     }
 
