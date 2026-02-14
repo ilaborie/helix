@@ -408,11 +408,13 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - [x] Severity-colored lightbulb indicator - change color based on diagnostic severity (red/yellow/blue/cyan)
 - [x] Code actions search box - filter input with count display, typing filters actions
 - [x] Diagnostic scrollbar markers - show diagnostic and search positions on right scrollbar edge
+- [x] Jump list gutter markers - Bookmark icon on lines with jump list entries, matching picker icon
 - [ ] Code actions preview panel - show fix preview before applying (needs LSP resolve)
 - [ ] Dialog search mode setting - user setting to toggle between: (1) current behavior where typing filters directly (arrows for navigation), or (2) vim-style where j/k and arrows navigate, '/' toggles search input focus. Applies to pickers and inline dialogs (code actions, completion, etc.)
 - [ ] Cursor block visibility — cursor is hard to spot against selection/line-highlight backgrounds, especially after `w`/`b` motions that create multi-char selections. Needs more prominent styling or animation
 - [ ] Clipboard register (`+`) visibility in register dialog — register dialog opens but content display needs polish
 - [ ] `*` register — currently shows editor selection text; should instead reflect the search register set by the `*` (search word under cursor) command, or be wired to the system primary selection
+- [ ] Jump list clear — `:jumplist-clear` command or delete action in jump list picker
 
 ### LSP Improvements
 - [ ] Investigate rust-analyzer diagnostic line reporting - diagnostics may be reported on the line where parsing fails rather than where the actual error is (e.g., unterminated string reports on the next line). Consider requesting upstream fix or mapping diagnostic positions back to the originating code
@@ -421,6 +423,7 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - **Window/Splits**: Not supported — helix-dioxus uses a single-view design. `C-w` prefix and `Space w` sub-menu will not be implemented.
 
 ### Recently Completed
+- [x] Jump list gutter markers — orange Bookmark icon in indicator gutter for lines with jump list entries, `jump_lines` in `EditorSnapshot`, cache key updated for re-renders
 - [x] Fix Alt+key bindings on macOS — Option key composed special characters (ø, ˆ, ç) instead of intended keys; now uses physical key code (`evt.code()`) for Alt normalization in `translate.rs`
 - [x] Tree-sitter expand/shrink selection — `A-o` expands to parent syntax node (pushes history), `A-i` shrinks back (pops history or uses tree-sitter), both in normal and select modes, command panel entries
 - [x] Multi-selection, regex select/split, copy/rotate — multi-selection rendering (all ranges, not just primary), `s`/`S` regex select/split with prompt, `A-s` split on newline, `C`/`A-C` copy selection on next/prev line, `(`/`)` rotate selections

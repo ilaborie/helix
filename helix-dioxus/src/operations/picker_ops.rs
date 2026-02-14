@@ -416,6 +416,23 @@ impl PickerOps for EditorContext {
                         }
                     }
                 }
+                PickerMode::JumpList => {
+                    if let Ok(idx) = selected.id.parse::<usize>() {
+                        if let Some((doc_id, selection)) = self.jumplist_entries.get(idx).cloned() {
+                            let current_doc_id = {
+                                let view = self.editor.tree.get(self.editor.tree.focus);
+                                view.doc
+                            };
+                            if doc_id != current_doc_id {
+                                self.editor
+                                    .switch(doc_id, helix_view::editor::Action::Replace);
+                            }
+                            let (view, doc) = helix_view::current!(self.editor);
+                            doc.set_selection(view.id, selection);
+                            helix_view::align_view(doc, view, helix_view::Align::Center);
+                        }
+                    }
+                }
                 PickerMode::References | PickerMode::Definitions => {
                     // Extract location data before mutable borrow
                     if let Ok(idx) = selected.id.parse::<usize>() {
@@ -452,6 +469,7 @@ impl PickerOps for EditorContext {
         self.global_search_results.clear();
         self.locations.clear();
         self.command_panel_commands.clear();
+        self.jumplist_entries.clear();
         self.cancel_global_search();
     }
 }
@@ -1050,6 +1068,27 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
         ),
         (EditorCommand::JoinLines, "Join Lines", Some("J")),
         (EditorCommand::ToggleCase, "Toggle Case", Some("~")),
+        // Jump list
+        (
+            EditorCommand::JumpBackward,
+            "Jump Backward",
+            Some("C-o"),
+        ),
+        (
+            EditorCommand::JumpForward,
+            "Jump Forward",
+            Some("C-i"),
+        ),
+        (
+            EditorCommand::SaveSelection,
+            "Save Position to Jump List",
+            Some("C-s"),
+        ),
+        (
+            EditorCommand::ShowJumpListPicker,
+            "Jump List",
+            Some("Space j"),
+        ),
         // Application
         (
             EditorCommand::PrintWorkingDirectory,

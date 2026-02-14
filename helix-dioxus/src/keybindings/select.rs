@@ -64,6 +64,9 @@ pub fn handle_select_mode(key: &KeyEvent) -> Vec<EditorCommand> {
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         return match key.code {
             KeyCode::Char('c') => vec![EditorCommand::ToggleLineComment],
+            KeyCode::Char('i') => vec![EditorCommand::JumpForward],
+            KeyCode::Char('o') => vec![EditorCommand::JumpBackward],
+            KeyCode::Char('s') => vec![EditorCommand::SaveSelection],
             _ => vec![],
         };
     }
@@ -207,6 +210,34 @@ mod tests {
     fn select_g_prefix_unrecognized_returns_empty() {
         let cmds = handle_select_g_prefix(&key('z'));
         assert!(cmds.is_empty());
+    }
+
+    fn ctrl_key(ch: char) -> KeyEvent {
+        KeyEvent {
+            code: KeyCode::Char(ch),
+            modifiers: KeyModifiers::CONTROL,
+        }
+    }
+
+    #[test]
+    fn select_ctrl_o_jumps_backward() {
+        let cmds = handle_select_mode(&ctrl_key('o'));
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(cmds[0], EditorCommand::JumpBackward));
+    }
+
+    #[test]
+    fn select_ctrl_i_jumps_forward() {
+        let cmds = handle_select_mode(&ctrl_key('i'));
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(cmds[0], EditorCommand::JumpForward));
+    }
+
+    #[test]
+    fn select_ctrl_s_saves_selection() {
+        let cmds = handle_select_mode(&ctrl_key('s'));
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(cmds[0], EditorCommand::SaveSelection));
     }
 
     fn alt_key(ch: char) -> KeyEvent {

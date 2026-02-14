@@ -88,7 +88,10 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
             KeyCode::Char('h') => vec![EditorCommand::PreviousBuffer],
             KeyCode::Char('l') => vec![EditorCommand::NextBuffer],
             KeyCode::Char('a') => vec![EditorCommand::Increment],
+            KeyCode::Char('i') => vec![EditorCommand::JumpForward],
+            KeyCode::Char('o') => vec![EditorCommand::JumpBackward],
             KeyCode::Char('r') => vec![EditorCommand::Redo],
+            KeyCode::Char('s') => vec![EditorCommand::SaveSelection],
             KeyCode::Char('u') => vec![EditorCommand::HalfPageUp],
             KeyCode::Char('x') => vec![EditorCommand::Decrement],
             // Ctrl+Space or Ctrl+. - show code actions (quick fix)
@@ -336,6 +339,8 @@ pub fn handle_space_leader(key: &KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('h') => vec![EditorCommand::SelectReferencesToSymbol],
         // Space i - toggle inlay hints (custom extension)
         KeyCode::Char('i') => vec![EditorCommand::ToggleInlayHints],
+        // Space j - jump list picker
+        KeyCode::Char('j') => vec![EditorCommand::ShowJumpListPicker],
         // Space k - hover
         KeyCode::Char('k') => vec![EditorCommand::TriggerHover],
         // Space p - paste from system clipboard
@@ -393,6 +398,45 @@ mod tests {
             code: KeyCode::Char(ch),
             modifiers: KeyModifiers::ALT,
         }
+    }
+
+    fn ctrl_key(ch: char) -> KeyEvent {
+        KeyEvent {
+            code: KeyCode::Char(ch),
+            modifiers: KeyModifiers::CONTROL,
+        }
+    }
+
+    #[test]
+    fn ctrl_o_jumps_backward() {
+        let cmds = handle_normal_mode(&ctrl_key('o'));
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(cmds[0], EditorCommand::JumpBackward));
+    }
+
+    #[test]
+    fn ctrl_i_jumps_forward() {
+        let cmds = handle_normal_mode(&ctrl_key('i'));
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(cmds[0], EditorCommand::JumpForward));
+    }
+
+    #[test]
+    fn ctrl_s_saves_selection() {
+        let cmds = handle_normal_mode(&ctrl_key('s'));
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(cmds[0], EditorCommand::SaveSelection));
+    }
+
+    #[test]
+    fn space_j_shows_jumplist_picker() {
+        let key = KeyEvent {
+            code: KeyCode::Char('j'),
+            modifiers: KeyModifiers::NONE,
+        };
+        let cmds = handle_space_leader(&key);
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(cmds[0], EditorCommand::ShowJumpListPicker));
     }
 
     #[test]

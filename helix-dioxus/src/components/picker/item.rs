@@ -2,9 +2,9 @@
 
 use dioxus::prelude::*;
 use lucide_dioxus::{
-    Blocks, Braces, ChevronRight, CircleX, Code, Component, File, FileCode, FileText, Folder, Hash,
-    Info, Layers, Lightbulb, Link2, Package, SquareFunction, Terminal, TextSearch, TriangleAlert,
-    Variable,
+    Blocks, Bookmark, Braces, ChevronRight, CircleX, Code, Component, File, FileCode, FileText,
+    Folder, Hash, Info, Layers, Lightbulb, Link2, Package, SquareFunction, Terminal, TextSearch,
+    TriangleAlert, Variable,
 };
 
 use crate::state::{PickerIcon, PickerItem};
@@ -50,6 +50,8 @@ pub fn PickerItemRow(
         PickerIcon::Definition | PickerIcon::Register => "#c678dd", // Purple
         // Command panel
         PickerIcon::Command => "#56b6c2", // Cyan
+        // Jump list
+        PickerIcon::JumpEntry => "#d19a66", // Orange
         // Default colors
         PickerIcon::File | PickerIcon::Buffer => "#abb2bf", // Default gray
     };
@@ -111,6 +113,7 @@ pub fn PickerItemRow(
                     PickerIcon::Definition => rsx! { FileCode { size: 16, color: icon_color } },
                     PickerIcon::Register => rsx! { FileText { size: 16, color: icon_color } },
                     PickerIcon::Command => rsx! { Terminal { size: 16, color: icon_color } },
+                    PickerIcon::JumpEntry => rsx! { Bookmark { size: 16, color: icon_color } },
                 }}
             }
 

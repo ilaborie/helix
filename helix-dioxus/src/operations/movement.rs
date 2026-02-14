@@ -3,6 +3,7 @@
 use helix_core::movement::Movement;
 use helix_view::{Align, DocumentId, ViewId};
 
+use super::JumpOps;
 use crate::state::{Direction, EditorContext};
 
 /// Number of lines per page for page up/down movement.
@@ -198,11 +199,13 @@ impl MovementOps for EditorContext {
     }
 
     fn goto_first_line(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        self.push_jump();
         let doc = self.editor.document_mut(doc_id).expect("doc exists");
         doc.set_selection(view_id, helix_core::Selection::point(0));
     }
 
     fn goto_last_line(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        self.push_jump();
         let doc = self.editor.document_mut(doc_id).expect("doc exists");
         let text = doc.text().slice(..);
 
@@ -339,6 +342,7 @@ impl MovementOps for EditorContext {
     }
 
     fn goto_last_modification(&mut self) {
+        self.push_jump();
         let (view, doc) = helix_view::current!(self.editor);
         let pos = doc.history.get_mut().last_edit_pos();
         if let Some(pos) = pos {
@@ -352,6 +356,7 @@ impl MovementOps for EditorContext {
     }
 
     fn goto_first_diagnostic(&mut self, _doc_id: DocumentId, _view_id: ViewId) {
+        self.push_jump();
         let (view, doc) = helix_view::current!(self.editor);
         if let Some(diag) = doc.diagnostics().first() {
             let selection = helix_core::Selection::single(diag.range.start, diag.range.end);
@@ -360,6 +365,7 @@ impl MovementOps for EditorContext {
     }
 
     fn goto_last_diagnostic(&mut self, _doc_id: DocumentId, _view_id: ViewId) {
+        self.push_jump();
         let (view, doc) = helix_view::current!(self.editor);
         if let Some(diag) = doc.diagnostics().last() {
             let selection = helix_core::Selection::single(diag.range.start, diag.range.end);

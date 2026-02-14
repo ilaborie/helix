@@ -3,7 +3,7 @@
 //! Renders the document content with syntax highlighting and cursor display.
 
 use dioxus::prelude::*;
-use lucide_dioxus::Lightbulb;
+use lucide_dioxus::{Bookmark, Lightbulb};
 
 use crate::components::{
     diagnostics_for_line, first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker,
@@ -48,7 +48,8 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                         let line_num = line.line_number;
                         let show_lightbulb = has_code_actions && line_num == cursor_line;
                         let severity = highest_severity_for_line(diagnostics, line_num);
-                        let key = format!("ind-{}-{}-{}-{}", line_num, version, show_lightbulb, severity.is_some());
+                        let has_jump = snapshot.jump_lines.contains(&line_num);
+                        let key = format!("ind-{}-{}-{}-{}-{}", line_num, version, show_lightbulb, severity.is_some(), has_jump);
                         // Use diagnostic severity color if available, otherwise yellow
                         let lightbulb_color = severity
                             .map(|s| s.css_color())
@@ -75,7 +76,14 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                                 }
 
                                 // Future: Breakpoint indicator (center)
-                                // Future: Jumplist number (bottom-left)
+
+                                if has_jump {
+                                    span {
+                                        class: "indicator-jumplist icon-wrapper",
+                                        title: "Jump list entry (C-o/C-i)",
+                                        Bookmark { size: 10, color: "#d19a66" }
+                                    }
+                                }
                             }
                         }
                     }

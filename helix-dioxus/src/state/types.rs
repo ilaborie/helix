@@ -68,6 +68,8 @@ pub enum PickerIcon {
     Register,
     // Command panel icon
     Command,
+    // Jump list icon
+    JumpEntry,
 }
 
 /// Generic picker item with match highlighting.
@@ -96,6 +98,7 @@ pub enum PickerMode {
     Definitions,
     Registers,
     Commands,
+    JumpList,
 }
 
 /// Minimal diagnostic info for scrollbar markers.
@@ -136,6 +139,8 @@ pub struct EditorSnapshot {
     pub regex_input: String,
     /// Line numbers with search matches (for scrollbar markers).
     pub search_match_lines: Vec<usize>,
+    /// Lines with jump list entries (1-indexed, for gutter markers).
+    pub jump_lines: Vec<usize>,
 
     // Picker state
     pub picker_visible: bool,
@@ -772,6 +777,16 @@ pub enum EditorCommand {
     // Command panel
     /// Show the command panel (fuzzy command palette).
     ShowCommandPanel,
+
+    // Jump list
+    /// Jump backward through position history (C-o).
+    JumpBackward,
+    /// Jump forward through position history (C-i).
+    JumpForward,
+    /// Save current position to the jump list (C-s).
+    SaveSelection,
+    /// Show the jump list picker (Space j).
+    ShowJumpListPicker,
 }
 
 /// Direction for cursor movement.

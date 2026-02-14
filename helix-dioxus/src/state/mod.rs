@@ -38,8 +38,8 @@ use crate::lsp::{
     SignatureHelpSnapshot, StoredCodeAction, SymbolKind, SymbolSnapshot,
 };
 use crate::operations::{
-    collect_search_match_lines, BufferOps, CliOps, ClipboardOps, EditingOps, LspOps, MovementOps,
-    PickerOps, SearchOps, SelectionOps,
+    collect_search_match_lines, BufferOps, CliOps, ClipboardOps, EditingOps, JumpOps, LspOps,
+    MovementOps, PickerOps, SearchOps, SelectionOps,
 };
 
 use lsp_events::LspEventOps;
@@ -174,6 +174,10 @@ pub struct EditorContext {
     // Command panel state - pub(crate) for operations access
     /// Commands stored for the command panel picker (indexed by picker item ID).
     pub(crate) command_panel_commands: Vec<EditorCommand>,
+
+    // Jump list picker state - pub(crate) for operations access
+    /// Jump list entries stored for picker confirm (indexed by picker item ID).
+    pub(crate) jumplist_entries: Vec<(helix_view::DocumentId, helix_core::Selection)>,
 
     // Application state - pub(crate) for operations access
     pub(crate) should_quit: bool,
@@ -318,6 +322,7 @@ impl EditorContext {
             global_search_cancel: None,
             // Command panel state
             command_panel_commands: Vec::new(),
+            jumplist_entries: Vec::new(),
             should_quit: false,
             snapshot_version: 0,
         })
@@ -1106,6 +1111,12 @@ impl EditorContext {
                 self.show_command_panel();
             }
 
+            // Jump list
+            EditorCommand::JumpBackward => self.jump_backward(),
+            EditorCommand::JumpForward => self.jump_forward(),
+            EditorCommand::SaveSelection => self.save_selection(),
+            EditorCommand::ShowJumpListPicker => self.show_jumplist_picker(),
+
             EditorCommand::ClearRegister(name) => match name {
                 '+' => {
                     self.clipboard.clear();
@@ -1570,6 +1581,18 @@ impl EditorContext {
             collect_search_match_lines(text, &self.last_search)
         };
 
+        // Collect jump list lines for gutter markers
+        let doc_id = view.doc;
+        let jump_lines: Vec<usize> = view
+            .jumps
+            .iter()
+            .filter(|(jd, _)| *jd == doc_id)
+            .map(|(_, sel)| {
+                let cursor = sel.primary().cursor(text.slice(..));
+                text.char_to_line(cursor) + 1 // 1-indexed to match line_number
+            })
+            .collect();
+
         let (open_buffers, buffer_scroll_offset) = self.buffer_bar_snapshot();
 
         // Increment snapshot version for change detection
@@ -1591,6 +1614,7 @@ impl EditorContext {
             search_backwards: self.search_backwards,
             search_input: self.search_input.clone(),
             search_match_lines,
+            jump_lines,
             regex_mode: self.regex_mode,
             regex_split: self.regex_split,
             regex_input: self.regex_input.clone(),
@@ -3348,6 +3372,7 @@ impl EditorContext {
             Some(PickerMode::WorkspaceDiagnostics) => self.show_workspace_diagnostics_picker(),
             Some(PickerMode::References) => self.show_references_picker(),
             Some(PickerMode::Definitions) => self.show_definitions_picker(),
+            Some(PickerMode::JumpList) => self.show_jumplist_picker(),
             None => {}
         }
     }
