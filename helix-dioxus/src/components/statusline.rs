@@ -5,9 +5,9 @@
 use dioxus::prelude::*;
 use lucide_dioxus::{CircleCheck, CircleX, LoaderCircle, Plug, TriangleAlert};
 
+use crate::hooks::use_editor_snapshot;
 use crate::lsp::{LspServerSnapshot, LspServerStatus};
 use crate::state::EditorCommand;
-use crate::AppState;
 
 /// Determine the aggregate status for display.
 fn aggregate_lsp_status(servers: &[LspServerSnapshot]) -> LspServerStatus {
@@ -88,11 +88,7 @@ fn LspStatusBlock(servers: Vec<LspServerSnapshot>, on_click: EventHandler<MouseE
 /// Status line component that shows editor state.
 #[component]
 pub fn StatusLine(version: ReadSignal<usize>, on_change: EventHandler<()>) -> Element {
-    // Read the signal to subscribe to changes
-    let _ = version();
-
-    let app_state = use_context::<AppState>();
-    let snapshot = app_state.get_snapshot();
+    let (app_state, snapshot) = use_editor_snapshot(version);
 
     let mode = &snapshot.mode;
     let file_name = &snapshot.file_name;

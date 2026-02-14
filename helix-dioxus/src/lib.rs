@@ -39,6 +39,7 @@ use dioxus::desktop::tao::window::Icon;
 pub mod components;
 pub mod config;
 pub mod events;
+pub mod hooks;
 pub mod keybindings;
 pub mod lsp;
 pub mod operations;
@@ -47,6 +48,8 @@ pub mod state;
 // Internal modules
 mod app;
 
+#[cfg(test)]
+mod integration_tests;
 #[cfg(test)]
 mod test_helpers;
 

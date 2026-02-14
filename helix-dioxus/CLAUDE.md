@@ -21,6 +21,7 @@ helix-dioxus/src/
 ├── config.rs                   # DhxConfig: window, font, logging settings (from dhx.toml)
 ├── app.rs                      # Root App component
 ├── events.rs                   # Event registration for helix_event (MUST run before hooks)
+├── hooks.rs                    # Custom Dioxus hooks (use_editor_snapshot)
 │
 ├── bin/dhx/                    # Binary entry point
 │   ├── main.rs                 # CLI: loads config, inits tracing/loader, launches app
@@ -411,9 +412,9 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - ~~Multiple splits/views support~~ **Not supported** — single-view design decision
 - [x] ~~System clipboard integration~~ Uses `Editor.registers` with `'+'` register for system clipboard
 - [x] ~~Extract theme colors to `theme.rs` or `colors.rs`~~ Extracted to CSS custom properties in `:root`
-- [ ] Add custom hooks (`use_editor_state`, `use_keybinding`)
+- [x] ~~Add custom hooks (`use_editor_state`, `use_keybinding`)~~ `use_editor_snapshot()` hook in `hooks.rs` for DRY component state access
 - [x] ~~Consider splitting picker into `FilePicker`, `BufferPicker` components~~ Split into picker/ folder
-- [ ] Add integration tests for key operations
+- [x] ~~Add integration tests for key operations~~ `integration_tests.rs` with dispatch harness, tests for normal/insert/search/select/command/picker modes
 - [x] ~~Named registers (`"a`–`"z`) — register selection before yank/paste (e.g., `"ay`, `"ap`)~~ Full register support with `"` prefix key, named/special registers, black hole `_`, statusline indicator
 - [x] ~~Register picker (`:reg` command) — picker-style overlay showing all populated registers~~ GenericPicker with register browsing, confirm sets selected register
 
@@ -424,11 +425,11 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - [x] Jump list gutter markers - Bookmark icon on lines with jump list entries, matching picker icon
 - [x] Picker file preview panel - side-by-side syntax-highlighted file preview in picker (40%/60% split), with search match highlighting for global search
 - [ ] Code actions preview panel - show fix preview before applying (needs LSP resolve)
-- [ ] Dialog search mode setting - user setting to toggle between: (1) current behavior where typing filters directly (arrows for navigation), or (2) vim-style where j/k and arrows navigate, '/' toggles search input focus. Applies to pickers and inline dialogs (code actions, completion, etc.)
-- [ ] Cursor block visibility — cursor is hard to spot against selection/line-highlight backgrounds, especially after `w`/`b` motions that create multi-char selections. Needs more prominent styling or animation
-- [ ] Clipboard register (`+`) visibility in register dialog — register dialog opens but content display needs polish
-- [ ] `*` register — currently shows editor selection text; should instead reflect the search register set by the `*` (search word under cursor) command, or be wired to the system primary selection
-- [ ] Jump list clear — `:jumplist-clear` command or delete action in jump list picker
+- [x] ~~Dialog search mode setting~~ `[dialog] search_mode = "vim-style"` in `dhx.toml`, j/k navigate pickers, `/` toggles search focus, visual feedback with focused border and cursor
+- [x] ~~Cursor block visibility~~ `cursor-pulse-in-selection` CSS animation with stronger glow when cursor is inside selection
+- [x] ~~Clipboard register (`+`) visibility in register dialog~~ Line count and byte count info in register dialog header
+- [x] ~~`*` register~~ macOS fallback to clipboard content (no primary selection on macOS)
+- [x] ~~Jump list clear~~ `:jumplist-clear` command with `JumpList::clear()`, notification, command panel entry
 
 ### LSP Improvements
 - [ ] Investigate rust-analyzer diagnostic line reporting - diagnostics may be reported on the line where parsing fails rather than where the actual error is (e.g., unterminated string reports on the next line). Consider requesting upstream fix or mapping diagnostic positions back to the originating code
@@ -437,6 +438,7 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - **Window/Splits**: Not supported — helix-dioxus uses a single-view design. `C-w` prefix and `Space w` sub-menu will not be implemented.
 
 ### Recently Completed
+- [x] Planned enhancements batch (7 items) — cursor-in-selection glow animation, `:jumplist-clear` command with `JumpList::clear()`, `*` register macOS clipboard fallback, register dialog line/byte count info, integration tests for key operations (normal/insert/search/select/command/picker modes), `use_editor_snapshot()` hook for DRY component state, dialog search mode setting (`vim-style` in `dhx.toml` with j/k navigation and `/` search focus toggle)
 - [x] Missing `:` commands batch (7 commands) — `:sort` (sort multi-cursor selections), `:reflow [width]` (rewrap text), `:config-open` / `:log-open` (open config/log files), `:encoding [label]` (show/set encoding), `:set-line-ending [lf|crlf]` (show/set line endings with Transaction), `:tree-sitter-scopes` (show TS scopes at cursor), `TextManipulationOps` extension trait, `CliCommand(String)` variant for command panel passthrough, 6 command panel entries
 - [x] Macro recording/replay (`Q`/`q`) — `Q` toggles recording to register (`"aQ` records to `a`, default `@`), `q` replays from register, `MacroOps` extension trait, statusline `REC [@]` indicator with blink animation, help bar hints, prevents recursion during replay, works in normal and select modes
 - [x] Theme switching — `:theme <name>` applies theme directly, `:theme` (no args) opens theme picker with all available themes, current theme highlighted, live preview on navigation (arrows/filter update UI immediately, Escape restores original theme), dynamic CSS variable injection from theme scopes (ui.background, ui.text, diagnostics, etc.), command panel entry, `ThemeOps` extension trait

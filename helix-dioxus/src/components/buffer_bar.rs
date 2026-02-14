@@ -8,6 +8,7 @@ use lucide_dioxus::{
     Terminal, X,
 };
 
+use crate::hooks::use_editor_snapshot;
 use crate::state::{BufferInfo, EditorCommand};
 use crate::AppState;
 
@@ -52,11 +53,7 @@ const MAX_VISIBLE_TABS: usize = 8;
 /// Buffer bar component that displays open buffers as clickable tabs.
 #[component]
 pub fn BufferBar(version: ReadSignal<usize>, on_change: EventHandler<()>) -> Element {
-    // Read the signal to subscribe to changes
-    let _ = version();
-
-    let app_state = use_context::<AppState>();
-    let snapshot = app_state.get_snapshot();
+    let (app_state, snapshot) = use_editor_snapshot(version);
 
     let buffers = &snapshot.open_buffers;
     let scroll_offset = snapshot.buffer_scroll_offset;

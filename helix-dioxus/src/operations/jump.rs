@@ -18,6 +18,8 @@ pub trait JumpOps {
     fn save_selection(&mut self);
     /// Show the jump list picker (Space j).
     fn show_jumplist_picker(&mut self);
+    /// Clear all entries from the jump list.
+    fn clear_jumplist(&mut self);
 }
 
 impl JumpOps for EditorContext {
@@ -66,6 +68,15 @@ impl JumpOps for EditorContext {
         self.push_jump();
         self.show_notification(
             "Position saved to jump list".to_string(),
+            NotificationSeverity::Info,
+        );
+    }
+
+    fn clear_jumplist(&mut self) {
+        let view = self.editor.tree.get_mut(self.editor.tree.focus);
+        view.jumps.clear();
+        self.show_notification(
+            "Jump list cleared".to_string(),
             NotificationSeverity::Info,
         );
     }
@@ -237,6 +248,32 @@ mod tests {
         // Jump forward at end of list should not panic
         ctx.jump_forward();
         assert_state(&ctx, "#[h|]#ello\n");
+    }
+
+    #[test]
+    fn clear_jumplist_removes_all_entries() {
+        let _guard = crate::test_helpers::init();
+        let mut ctx = test_context("#[h|]#ello\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+
+        // Build up the jump list
+        ctx.push_jump();
+        ctx.move_cursor(doc_id, view_id, crate::state::Direction::Down);
+        ctx.push_jump();
+
+        // Verify we have jumps
+        let (view, _doc) = helix_view::current_ref!(ctx.editor);
+        assert!(
+            view.jumps.iter().count() >= 2,
+            "expected at least 2 jumps before clearing"
+        );
+
+        // Clear the jump list
+        ctx.clear_jumplist();
+
+        // Verify the jump list is empty
+        let (view, _doc) = helix_view::current_ref!(ctx.editor);
+        assert_eq!(view.jumps.iter().count(), 0, "jump list should be empty");
     }
 
     #[test]

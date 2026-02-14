@@ -16,6 +16,25 @@ pub struct DhxConfig {
     pub window: WindowConfig,
     pub font: FontConfig,
     pub logging: LoggingConfig,
+    pub dialog: DialogConfig,
+}
+
+/// Dialog/picker interaction mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DialogSearchMode {
+    /// Current behavior: typing filters directly, arrows navigate.
+    #[default]
+    Direct,
+    /// Vim-style: j/k navigate, `/` focuses search input.
+    VimStyle,
+}
+
+/// Dialog configuration.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct DialogConfig {
+    pub search_mode: DialogSearchMode,
 }
 
 /// Window configuration.
@@ -51,6 +70,7 @@ impl Default for DhxConfig {
             window: WindowConfig::default(),
             font: FontConfig::default(),
             logging: LoggingConfig::default(),
+            dialog: DialogConfig::default(),
         }
     }
 }
@@ -256,5 +276,31 @@ size = 18.0
     fn load_from_nonexistent_path_returns_error() {
         let result = DhxConfig::load_from(Path::new("/nonexistent/dhx.toml"));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn default_dialog_search_mode_is_direct() {
+        let config = DhxConfig::default();
+        assert_eq!(config.dialog.search_mode, DialogSearchMode::Direct);
+    }
+
+    #[test]
+    fn deserialize_vim_style_dialog_mode() {
+        let toml_str = r#"
+[dialog]
+search_mode = "vim-style"
+"#;
+        let config = toml::from_str::<DhxConfig>(toml_str).expect("should deserialize");
+        assert_eq!(config.dialog.search_mode, DialogSearchMode::VimStyle);
+    }
+
+    #[test]
+    fn deserialize_direct_dialog_mode() {
+        let toml_str = r#"
+[dialog]
+search_mode = "direct"
+"#;
+        let config = toml::from_str::<DhxConfig>(toml_str).expect("should deserialize");
+        assert_eq!(config.dialog.search_mode, DialogSearchMode::Direct);
     }
 }

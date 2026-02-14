@@ -99,6 +99,12 @@ impl JumpList {
         self.jumps.retain(|(other_id, _)| other_id != doc_id);
     }
 
+    /// Clear all entries from the jump list.
+    pub fn clear(&mut self) {
+        self.jumps.clear();
+        self.current = 0;
+    }
+
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = &Jump> {
         self.jumps.iter()
     }

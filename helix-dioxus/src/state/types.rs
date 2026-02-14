@@ -7,6 +7,7 @@ use std::path::PathBuf;
 
 use helix_view::DocumentId;
 
+use crate::config::DialogSearchMode;
 use crate::lsp::{
     CodeActionSnapshot, CompletionItemSnapshot, DiagnosticSeverity, DiagnosticSnapshot,
     HoverSnapshot, InlayHintSnapshot, LocationSnapshot, LspServerSnapshot, SignatureHelpSnapshot,
@@ -336,6 +337,12 @@ pub struct EditorSnapshot {
     pub current_theme: String,
     /// CSS variable overrides generated from the current theme.
     pub theme_css_vars: String,
+
+    // Dialog configuration
+    /// Dialog search mode (direct or vim-style).
+    pub dialog_search_mode: DialogSearchMode,
+    /// Whether the picker search input is focused (vim-style mode only).
+    pub picker_search_focused: bool,
 
     // Application state
     pub should_quit: bool,
@@ -933,6 +940,12 @@ pub enum EditorCommand {
     ToggleMacroRecording,
     /// Replay macro from register (q).
     ReplayMacro,
+
+    // Picker search focus (vim-style dialog mode)
+    /// Focus picker search input (/ in vim-style mode).
+    PickerFocusSearch,
+    /// Unfocus picker search input (Esc in vim-style mode when search is focused).
+    PickerUnfocusSearch,
 
     // CLI passthrough
     /// Execute a CLI command by string (e.g., ":sort", ":reflow").

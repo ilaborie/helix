@@ -10,17 +10,15 @@ use crate::components::{
     DiagnosticUnderline, ErrorLens, Scrollbar,
 };
 use crate::lsp::DiagnosticSnapshot;
+use crate::hooks::use_editor_snapshot;
 use crate::state::{LineSnapshot, TokenSpan, WordJumpLabel};
-use crate::AppState;
 
 /// Editor view component that renders the document content.
 #[component]
 pub fn EditorView(version: ReadSignal<usize>) -> Element {
-    // Read the signal to subscribe to changes
-    let version = version();
-
-    let app_state = use_context::<AppState>();
-    let snapshot = app_state.get_snapshot();
+    let (_app_state, snapshot) = use_editor_snapshot(version);
+    // Read the version value for use_effect dependency
+    let version = snapshot.snapshot_version;
 
     let mode = &snapshot.mode;
     let diagnostics = &snapshot.diagnostics;

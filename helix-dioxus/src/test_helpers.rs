@@ -138,6 +138,14 @@ pub fn alt_key(ch: char) -> KeyEvent {
     }
 }
 
+/// Create a `KeyEvent` for a special (non-character) key.
+pub fn special_key(code: KeyCode) -> KeyEvent {
+    KeyEvent {
+        code,
+        modifiers: KeyModifiers::NONE,
+    }
+}
+
 /// Assert that a command list contains exactly one command matching the pattern.
 ///
 /// Usage: `assert_single_command!(cmds, EditorCommand::JumpBackward);`

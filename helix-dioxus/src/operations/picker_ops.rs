@@ -1125,6 +1125,11 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
             "Jump List",
             Some("Space j"),
         ),
+        (
+            EditorCommand::CliCommand("jumplist-clear".to_string()),
+            "Clear Jump List",
+            Some(":jumplist-clear"),
+        ),
         // Application
         (
             EditorCommand::PrintWorkingDirectory,

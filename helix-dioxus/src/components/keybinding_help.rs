@@ -341,6 +341,9 @@ fn RegisterDialog(name: char, content: String, on_close: EventHandler) -> Elemen
         "(empty)".to_string()
     };
 
+    let line_count = content.lines().count();
+    let byte_count = content.len();
+
     rsx! {
         // Backdrop to close on click outside
         div {
@@ -357,6 +360,11 @@ fn RegisterDialog(name: char, content: String, on_close: EventHandler) -> Elemen
                 div { class: "register-dialog-title",
                     span { class: "register-dialog-name", "{name}" }
                     " {label}"
+                    if has_content {
+                        span { class: "register-dialog-info",
+                            " ({line_count}L, {byte_count}B)"
+                        }
+                    }
                 }
                 div {
                     class: "register-dialog-close",

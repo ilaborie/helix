@@ -208,12 +208,17 @@ body {
     animation: cursor-pulse-insert 1.5s ease-in-out infinite;
 }
 
-/* Cursor inside selection: shift to orange for contrast */
+@keyframes cursor-pulse-in-selection {
+    0%, 100% { box-shadow: 0 0 0 2px var(--cursor-in-selection), 0 0 8px 3px var(--cursor-in-selection); }
+    50% { box-shadow: 0 0 0 3px var(--cursor-in-selection), 0 0 16px 5px var(--cursor-in-selection); }
+}
+
+/* Cursor inside selection: shift to orange for contrast with stronger glow */
 .line-selected .cursor-block-normal {
     background-color: var(--cursor-in-selection);
     color: var(--cursor-fg);
-    box-shadow: 0 0 0 2px var(--cursor-in-selection), 0 0 6px 2px var(--cursor-in-selection);
-    animation: none;
+    box-shadow: 0 0 0 2px var(--cursor-in-selection), 0 0 8px 3px var(--cursor-in-selection);
+    animation: cursor-pulse-in-selection 1.2s ease-in-out infinite;
 }
 
 /* Select mode cursor inside selection: keep purple but solid */
@@ -377,6 +382,10 @@ body {
     border-radius: 4px;
     padding: 6px 8px;
     margin-bottom: 4px;
+}
+
+.picker-search-focused {
+    border-color: var(--accent);
 }
 
 .picker-search-input {
@@ -1618,6 +1627,12 @@ kbd {
     color: var(--accent);
     font-weight: 600;
     font-size: 13px;
+}
+
+.register-dialog-info {
+    color: var(--text-dim);
+    font-weight: normal;
+    font-size: 11px;
 }
 
 .register-dialog-close {

@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use crate::operations::{
-    BufferOps, EditingOps, PickerOps, ShellOps, TextManipulationOps, ThemeOps,
+    BufferOps, EditingOps, JumpOps, PickerOps, ShellOps, TextManipulationOps, ThemeOps,
 };
 use crate::state::{EditorContext, NotificationSeverity, ShellBehavior};
 
@@ -352,6 +352,11 @@ impl CliOps for EditorContext {
                     };
                     self.show_notification(msg, NotificationSeverity::Info);
                 }
+            }
+
+            // Jump list
+            "jumplist-clear" => {
+                self.clear_jumplist();
             }
 
             // Tree-sitter scopes

@@ -194,6 +194,11 @@ pub struct EditorContext {
     pub(crate) word_jump_extend: bool,
     pub(crate) word_jump_first_idx: Option<char>,
 
+    // Dialog configuration
+    pub(crate) dialog_search_mode: crate::config::DialogSearchMode,
+    /// Whether the picker search input is focused (vim-style mode only).
+    pub(crate) picker_search_focused: bool,
+
     // Application state - pub(crate) for operations access
     pub(crate) should_quit: bool,
 
@@ -204,7 +209,7 @@ pub struct EditorContext {
 impl EditorContext {
     /// Create a new editor context with the given file.
     pub fn new(
-        _dhx_config: &crate::config::DhxConfig,
+        dhx_config: &crate::config::DhxConfig,
         file: Option<PathBuf>,
         command_rx: mpsc::Receiver<EditorCommand>,
         command_tx: mpsc::Sender<EditorCommand>,
@@ -349,6 +354,8 @@ impl EditorContext {
             word_jump_ranges: Vec::new(),
             word_jump_extend: false,
             word_jump_first_idx: None,
+            dialog_search_mode: dhx_config.dialog.search_mode,
+            picker_search_focused: false,
             should_quit: false,
             snapshot_version: 0,
         })
@@ -766,6 +773,7 @@ impl EditorContext {
                 self.picker_selected = 0;
                 self.picker_mode = PickerMode::default();
                 self.picker_current_path = None;
+                self.picker_search_focused = false;
                 self.command_panel_commands.clear();
             }
             EditorCommand::PickerInput(c) => {
@@ -777,6 +785,12 @@ impl EditorContext {
                 self.picker_filter.pop();
                 self.picker_selected = 0;
                 self.preview_selected_theme();
+            }
+            EditorCommand::PickerFocusSearch => {
+                self.picker_search_focused = true;
+            }
+            EditorCommand::PickerUnfocusSearch => {
+                self.picker_search_focused = false;
             }
             EditorCommand::PickerFirst => {
                 self.picker_selected = 0;
@@ -1391,16 +1405,20 @@ impl EditorContext {
 
     /// Collect register snapshots for display in the help bar.
     fn collect_register_snapshots(&self) -> Vec<RegisterSnapshot> {
-        // Get current selection text for * register
-        let (view, doc) = helix_view::current_ref!(self.editor);
-        let text = doc.text().slice(..);
-        let primary = doc.selection(view.id).primary();
-        let sel_len = primary.to() - primary.from();
-        // Only show selection if it spans more than 1 char (skip default 1-char cursor)
-        let selection_text = if sel_len > 1 {
-            text.slice(primary.from()..primary.to()).to_string()
+        // On macOS there's no X11 primary selection, so * falls back to clipboard.
+        // On Linux/X11, * shows the current primary selection text.
+        let star_content = if cfg!(target_os = "macos") {
+            self.clipboard.clone()
         } else {
-            String::new()
+            let (view, doc) = helix_view::current_ref!(self.editor);
+            let text = doc.text().slice(..);
+            let primary = doc.selection(view.id).primary();
+            let sel_len = primary.to() - primary.from();
+            if sel_len > 1 {
+                text.slice(primary.from()..primary.to()).to_string()
+            } else {
+                String::new()
+            }
         };
 
         vec![
@@ -1410,7 +1428,7 @@ impl EditorContext {
             },
             RegisterSnapshot {
                 name: '*',
-                content: selection_text,
+                content: star_content,
             },
             RegisterSnapshot {
                 name: '/',
@@ -1823,6 +1841,8 @@ impl EditorContext {
             macro_recording: self.editor.macro_recording.as_ref().map(|(reg, _)| *reg),
             current_theme: self.current_theme_name().to_string(),
             theme_css_vars: self.theme_to_css_vars(),
+            dialog_search_mode: self.dialog_search_mode,
+            picker_search_focused: self.picker_search_focused,
             should_quit: self.should_quit,
         }
     }

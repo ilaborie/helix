@@ -1,0 +1,272 @@
+//! Integration tests for key operations.
+//!
+//! These tests dispatch key sequences through keybinding handlers
+//! and verify the resulting editor state, simulating real user input.
+
+use helix_view::input::KeyCode;
+
+use crate::config::DialogSearchMode;
+use crate::keybindings::{
+    handle_normal_mode, handle_picker_mode, handle_search_mode, handle_select_mode,
+};
+use crate::operations::{EditingOps, MovementOps, SearchOps};
+use crate::state::EditorCommand;
+use crate::test_helpers::{assert_state, assert_text, doc_view, key, special_key, test_context};
+
+/// Dispatch a sequence of editor commands on the context.
+fn dispatch_commands(ctx: &mut crate::state::EditorContext, commands: &[EditorCommand]) {
+    let (doc_id, view_id) = doc_view(ctx);
+    for cmd in commands {
+        match cmd {
+            EditorCommand::MoveLeft => {
+                ctx.move_cursor(doc_id, view_id, crate::state::Direction::Left)
+            }
+            EditorCommand::MoveRight => {
+                ctx.move_cursor(doc_id, view_id, crate::state::Direction::Right)
+            }
+            EditorCommand::MoveUp => {
+                ctx.move_cursor(doc_id, view_id, crate::state::Direction::Up)
+            }
+            EditorCommand::MoveDown => {
+                ctx.move_cursor(doc_id, view_id, crate::state::Direction::Down)
+            }
+            EditorCommand::MoveWordForward => ctx.move_word_forward(doc_id, view_id),
+            EditorCommand::MoveWordBackward => ctx.move_word_backward(doc_id, view_id),
+            EditorCommand::GotoFirstLine => ctx.goto_first_line(doc_id, view_id),
+            EditorCommand::GotoLastLine => ctx.goto_last_line(doc_id, view_id),
+            EditorCommand::InsertChar(ch) => ctx.insert_char(doc_id, view_id, *ch),
+            EditorCommand::DeleteCharBackward => ctx.delete_char_backward(doc_id, view_id),
+            EditorCommand::EnterInsertMode => {
+                ctx.editor.mode = helix_view::document::Mode::Insert
+            }
+            EditorCommand::ExitInsertMode => {
+                ctx.editor.mode = helix_view::document::Mode::Normal
+            }
+            EditorCommand::EnterSelectMode => {
+                ctx.editor.mode = helix_view::document::Mode::Select
+            }
+            EditorCommand::ExitSelectMode => {
+                ctx.editor.mode = helix_view::document::Mode::Normal
+            }
+            EditorCommand::EnterSearchMode { backwards } => {
+                ctx.search_mode = true;
+                ctx.search_backwards = *backwards;
+                ctx.search_input.clear();
+            }
+            EditorCommand::ExitSearchMode => {
+                ctx.search_mode = false;
+            }
+            EditorCommand::SearchInput(ch) => {
+                ctx.search_input.push(*ch);
+            }
+            EditorCommand::SearchBackspace => {
+                ctx.search_input.pop();
+            }
+            EditorCommand::SearchExecute => {
+                ctx.execute_search(doc_id, view_id);
+            }
+            EditorCommand::EnterCommandMode => {
+                ctx.command_mode = true;
+                ctx.command_input.clear();
+            }
+            EditorCommand::ExitCommandMode => {
+                ctx.command_mode = false;
+            }
+            EditorCommand::CommandInput(ch) => {
+                ctx.command_input.push(*ch);
+            }
+            _ => {
+                // Skip commands not relevant to these tests
+            }
+        }
+    }
+}
+
+// --- Normal mode movement ---
+
+#[test]
+fn normal_mode_hjkl_movement() {
+    let mut ctx = test_context("#[h|]#ello\nworld\n");
+
+    // l → move right
+    let cmds = handle_normal_mode(&key('l'));
+    dispatch_commands(&mut ctx, &cmds);
+    assert_state(&ctx, "h#[e|]#llo\nworld\n");
+
+    // j → move down
+    let cmds = handle_normal_mode(&key('j'));
+    dispatch_commands(&mut ctx, &cmds);
+    assert_state(&ctx, "hello\nw#[o|]#rld\n");
+
+    // h → move left
+    let cmds = handle_normal_mode(&key('h'));
+    dispatch_commands(&mut ctx, &cmds);
+    assert_state(&ctx, "hello\n#[w|]#orld\n");
+
+    // k → move up
+    let cmds = handle_normal_mode(&key('k'));
+    dispatch_commands(&mut ctx, &cmds);
+    assert_state(&ctx, "#[h|]#ello\nworld\n");
+}
+
+#[test]
+fn normal_mode_arrow_movement() {
+    let mut ctx = test_context("#[h|]#ello\nworld\n");
+
+    let cmds = handle_normal_mode(&special_key(KeyCode::Right));
+    dispatch_commands(&mut ctx, &cmds);
+    assert_state(&ctx, "h#[e|]#llo\nworld\n");
+
+    let cmds = handle_normal_mode(&special_key(KeyCode::Down));
+    dispatch_commands(&mut ctx, &cmds);
+    assert_state(&ctx, "hello\nw#[o|]#rld\n");
+}
+
+// --- Goto last line ---
+
+#[test]
+fn goto_last_line() {
+    let mut ctx = test_context("#[h|]#ello\nworld\nfoo\n");
+
+    // G → goto last line
+    let cmds = handle_normal_mode(&key('G'));
+    dispatch_commands(&mut ctx, &cmds);
+    let (_view, doc) = helix_view::current_ref!(ctx.editor);
+    let text = doc.text().slice(..);
+    let cursor_line = text.char_to_line(doc.selection(_view.id).primary().cursor(text));
+    let last_line = text.len_lines().saturating_sub(1);
+    assert_eq!(cursor_line, last_line, "G should go to last line");
+}
+
+// --- Find character ---
+
+#[test]
+fn find_char_returns_pending() {
+    // f alone should produce no commands (two-key sequence handled by app.rs)
+    let cmds = handle_normal_mode(&key('f'));
+    assert!(cmds.is_empty(), "f should produce no commands (pending)");
+}
+
+// --- Insert mode and escape ---
+
+#[test]
+fn insert_mode_and_escape() {
+    let mut ctx = test_context("#[h|]#ello\n");
+
+    // i → enter insert mode
+    let cmds = handle_normal_mode(&key('i'));
+    dispatch_commands(&mut ctx, &cmds);
+    assert_eq!(ctx.editor.mode, helix_view::document::Mode::Insert);
+
+    // Type 'x'
+    let cmds = vec![EditorCommand::InsertChar('x')];
+    dispatch_commands(&mut ctx, &cmds);
+    assert_text(&ctx, "xhello\n");
+
+    // Esc → exit insert mode
+    let cmds = crate::keybindings::handle_insert_mode(&special_key(KeyCode::Esc));
+    dispatch_commands(&mut ctx, &cmds);
+    assert_eq!(ctx.editor.mode, helix_view::document::Mode::Normal);
+}
+
+// --- Search mode ---
+
+#[test]
+fn search_forward_dispatch() {
+    let mut ctx = test_context("#[h|]#ello world hello\n");
+
+    // / → enter search mode
+    let cmds = handle_normal_mode(&key('/'));
+    dispatch_commands(&mut ctx, &cmds);
+    assert!(ctx.search_mode);
+    assert!(!ctx.search_backwards);
+
+    // Type "world"
+    for ch in "world".chars() {
+        let cmds = handle_search_mode(&key(ch));
+        dispatch_commands(&mut ctx, &cmds);
+    }
+    assert_eq!(ctx.search_input, "world");
+
+    // Enter → execute search
+    let cmds = handle_search_mode(&special_key(KeyCode::Enter));
+    dispatch_commands(&mut ctx, &cmds);
+
+    // Verify selection covers "world"
+    let (_view, doc) = helix_view::current_ref!(ctx.editor);
+    let text = doc.text().slice(..);
+    let range = doc.selection(_view.id).primary();
+    let selected: String = text.slice(range.from()..range.to()).into();
+    assert_eq!(selected, "world");
+}
+
+// --- Command mode ---
+
+#[test]
+fn command_mode_entry() {
+    let mut ctx = test_context("#[h|]#ello\n");
+
+    // : → enter command mode
+    let cmds = handle_normal_mode(&key(':'));
+    dispatch_commands(&mut ctx, &cmds);
+    assert!(ctx.command_mode);
+    assert!(ctx.command_input.is_empty());
+}
+
+// --- Select mode ---
+
+#[test]
+fn select_mode_entry_and_exit() {
+    let mut ctx = test_context("#[h|]#ello\n");
+
+    // v → enter select mode
+    let cmds = handle_normal_mode(&key('v'));
+    dispatch_commands(&mut ctx, &cmds);
+    assert_eq!(ctx.editor.mode, helix_view::document::Mode::Select);
+
+    // Esc → exit select mode
+    let cmds = handle_select_mode(&special_key(KeyCode::Esc));
+    dispatch_commands(&mut ctx, &cmds);
+    assert_eq!(ctx.editor.mode, helix_view::document::Mode::Normal);
+}
+
+// --- Picker mode (direct vs vim-style) ---
+
+#[test]
+fn picker_direct_mode_typing_filters() {
+    let cmds = handle_picker_mode(&key('a'), DialogSearchMode::Direct, false);
+    crate::assert_single_command!(cmds, EditorCommand::PickerInput('a'));
+}
+
+#[test]
+fn picker_vim_mode_jk_navigates() {
+    let cmds = handle_picker_mode(&key('j'), DialogSearchMode::VimStyle, false);
+    crate::assert_single_command!(cmds, EditorCommand::PickerDown);
+
+    let cmds = handle_picker_mode(&key('k'), DialogSearchMode::VimStyle, false);
+    crate::assert_single_command!(cmds, EditorCommand::PickerUp);
+}
+
+#[test]
+fn picker_vim_mode_slash_focuses_search() {
+    let cmds = handle_picker_mode(&key('/'), DialogSearchMode::VimStyle, false);
+    crate::assert_single_command!(cmds, EditorCommand::PickerFocusSearch);
+}
+
+#[test]
+fn picker_vim_mode_typing_filters_when_focused() {
+    let cmds = handle_picker_mode(&key('a'), DialogSearchMode::VimStyle, true);
+    crate::assert_single_command!(cmds, EditorCommand::PickerInput('a'));
+}
+
+#[test]
+fn picker_vim_mode_esc_unfocuses_search() {
+    let cmds = handle_picker_mode(&special_key(KeyCode::Esc), DialogSearchMode::VimStyle, true);
+    crate::assert_single_command!(cmds, EditorCommand::PickerUnfocusSearch);
+}
+
+#[test]
+fn picker_vim_mode_esc_cancels_when_unfocused() {
+    let cmds = handle_picker_mode(&special_key(KeyCode::Esc), DialogSearchMode::VimStyle, false);
+    crate::assert_single_command!(cmds, EditorCommand::PickerCancel);
+}

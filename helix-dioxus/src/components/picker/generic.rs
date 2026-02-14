@@ -7,6 +7,7 @@
 use dioxus::prelude::*;
 use lucide_dioxus::Search;
 
+use crate::config::DialogSearchMode;
 use crate::state::{centered_window, EditorCommand, PickerItem, PickerMode, PickerPreview};
 use crate::AppState;
 
@@ -23,6 +24,8 @@ pub fn GenericPicker(
     mode: PickerMode,
     current_path: Option<String>,
     preview: Option<PickerPreview>,
+    search_mode: DialogSearchMode,
+    search_focused: bool,
 ) -> Element {
     let app_state = use_context::<AppState>();
 
@@ -69,22 +72,40 @@ pub fn GenericPicker(
                     }
 
                     // Search input display
-                    div {
-                        class: "picker-search",
-                        span {
-                            class: "icon-wrapper",
-                            style: "width: 16px; height: 16px; margin-right: 8px; color: var(--text-dim);",
-                            Search { size: 16, color: "currentColor" }
-                        }
-                        span {
-                            class: "picker-search-input",
-                            if filter.is_empty() {
+                    {
+                        let is_vim = search_mode == DialogSearchMode::VimStyle;
+                        let search_class = if is_vim && search_focused {
+                            "picker-search picker-search-focused"
+                        } else {
+                            "picker-search"
+                        };
+                        let placeholder = if is_vim && !search_focused {
+                            "Press / to search..."
+                        } else {
+                            "Type to filter..."
+                        };
+                        rsx! {
+                            div {
+                                class: "{search_class}",
                                 span {
-                                    class: "picker-search-placeholder",
-                                    "Type to filter..."
+                                    class: "icon-wrapper",
+                                    style: "width: 16px; height: 16px; margin-right: 8px; color: var(--text-dim);",
+                                    Search { size: 16, color: "currentColor" }
                                 }
-                            } else {
-                                "{filter}"
+                                span {
+                                    class: "picker-search-input",
+                                    if filter.is_empty() {
+                                        span {
+                                            class: "picker-search-placeholder",
+                                            "{placeholder}"
+                                        }
+                                    } else {
+                                        "{filter}"
+                                    }
+                                    if is_vim && search_focused {
+                                        span { class: "prompt-cursor prompt-cursor-search" }
+                                    }
+                                }
                             }
                         }
                     }
@@ -106,12 +127,23 @@ pub fn GenericPicker(
                         // Left: help text with kbd elements
                         span {
                             class: "picker-help-text",
-                            kbd { "\u{2191}\u{2193}" }
-                            " navigate \u{2022} "
-                            kbd { "Enter" }
-                            {mode.enter_hint()}
-                            kbd { "Esc" }
-                            " cancel"
+                            if search_mode == DialogSearchMode::VimStyle {
+                                kbd { "j/k" }
+                                " navigate \u{2022} "
+                                kbd { "/" }
+                                " search \u{2022} "
+                                kbd { "Enter" }
+                                {mode.enter_hint()}
+                                kbd { "Esc" }
+                                " cancel"
+                            } else {
+                                kbd { "\u{2191}\u{2193}" }
+                                " navigate \u{2022} "
+                                kbd { "Enter" }
+                                {mode.enter_hint()}
+                                kbd { "Esc" }
+                                " cancel"
+                            }
                         }
 
                         // Right: count
