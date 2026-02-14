@@ -6,7 +6,7 @@ use dioxus::prelude::*;
 
 use crate::state::InputDialogSnapshot;
 
-use super::inline_dialog::{DialogConstraints, DialogPosition, InlineDialogContainer};
+use crate::components::inline_dialog::{DialogConstraints, DialogPosition, InlineDialogContainer};
 
 /// An inline input dialog positioned at the cursor.
 #[component]

@@ -382,6 +382,11 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - Cause: `helix_view::handlers::register_hooks()` called before events are registered
 - Solution: Call `events::register()` at the start of `launch()` before creating `EditorContext`
 
+### Alt+key bindings not working on macOS
+- Cause: macOS Option key composes special characters (Alt+o → ø, Alt+i → ˆ, Alt+c → ç). `evt.key()` returns the composed character, so `KeyCode::Char('o')` with ALT modifier never matches
+- Solution: In `translate_key_code`, when Alt is pressed, use `evt.code()` (physical key) via `key_code_from_physical()` to get the intended character instead of the composed one
+- Affected bindings: Alt+o/i (expand/shrink), Alt+. (repeat), Alt+; (flip selections), Alt+d (delete no yank), Alt+c/C (copy selection), Alt+s (split), Alt+x (shrink to line bounds), Alt+` (case)
+
 ## Feature Roadmap
 
 ### Planned Enhancements
@@ -416,6 +421,7 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - **Window/Splits**: Not supported — helix-dioxus uses a single-view design. `C-w` prefix and `Space w` sub-menu will not be implemented.
 
 ### Recently Completed
+- [x] Fix Alt+key bindings on macOS — Option key composed special characters (ø, ˆ, ç) instead of intended keys; now uses physical key code (`evt.code()`) for Alt normalization in `translate.rs`
 - [x] Tree-sitter expand/shrink selection — `A-o` expands to parent syntax node (pushes history), `A-i` shrinks back (pops history or uses tree-sitter), both in normal and select modes, command panel entries
 - [x] Multi-selection, regex select/split, copy/rotate — multi-selection rendering (all ranges, not just primary), `s`/`S` regex select/split with prompt, `A-s` split on newline, `C`/`A-C` copy selection on next/prev line, `(`/`)` rotate selections
 - [x] Format document + align selections — `:format` / command panel now uses LSP `textDocument/formatting`, `&` aligns multi-cursor selections, `=` formats via LSP range formatting

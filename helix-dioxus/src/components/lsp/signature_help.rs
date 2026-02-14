@@ -4,7 +4,7 @@
 
 use dioxus::prelude::*;
 
-use super::inline_dialog::{DialogConstraints, DialogPosition, InlineDialogContainer};
+use crate::components::inline_dialog::{DialogConstraints, DialogPosition, InlineDialogContainer};
 use crate::lsp::SignatureHelpSnapshot;
 
 /// Render the signature label with the active parameter highlighted.

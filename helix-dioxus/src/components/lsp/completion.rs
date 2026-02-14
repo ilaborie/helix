@@ -4,7 +4,7 @@
 
 use dioxus::prelude::*;
 
-use super::inline_dialog::{DialogConstraints, InlineListDialog, InlineListItem};
+use crate::components::inline_dialog::{DialogConstraints, InlineListDialog, InlineListItem};
 use crate::lsp::CompletionItemSnapshot;
 
 /// A single completion item in the menu.

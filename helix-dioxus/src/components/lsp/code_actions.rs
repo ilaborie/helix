@@ -5,7 +5,7 @@
 use dioxus::prelude::*;
 use lucide_dioxus::{FileCode, Lightbulb, PackagePlus, Search, Star, Wrench};
 
-use super::inline_dialog::{DialogConstraints, InlineListDialog, InlineListItem};
+use crate::components::inline_dialog::{DialogConstraints, InlineListDialog, InlineListItem};
 use crate::lsp::CodeActionSnapshot;
 
 /// Get the icon and color for a code action kind.

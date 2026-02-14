@@ -4,7 +4,7 @@
 
 use dioxus::prelude::*;
 
-use super::inline_dialog::{DialogConstraints, DialogPosition, InlineDialogContainer};
+use crate::components::inline_dialog::{DialogConstraints, DialogPosition, InlineDialogContainer};
 use crate::lsp::HoverSnapshot;
 
 /// Hover popup that displays documentation and type info.
