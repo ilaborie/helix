@@ -40,7 +40,7 @@ use crate::lsp::{
 };
 use crate::operations::{
     collect_search_match_lines, BufferOps, CliOps, ClipboardOps, EditingOps, JumpOps, LspOps,
-    MovementOps, PickerOps, SearchOps, SelectionOps, ShellOps, WordJumpOps,
+    MovementOps, PickerOps, SearchOps, SelectionOps, ShellOps, ThemeOps, WordJumpOps,
 };
 
 use lsp_events::LspEventOps;
@@ -74,6 +74,8 @@ pub struct EditorContext {
     pub(crate) picker_current_path: Option<PathBuf>,
     /// Last picker mode used (for resume with Space ').
     pub(crate) last_picker_mode: Option<PickerMode>,
+    /// Original theme name saved for live preview rollback on Escape.
+    pub(crate) theme_before_preview: Option<String>,
 
     // Buffer bar state - pub(crate) for operations access
     pub(crate) buffer_bar_scroll: usize,
@@ -286,6 +288,7 @@ impl EditorContext {
             picker_mode: PickerMode::default(),
             picker_current_path: None,
             last_picker_mode: None,
+            theme_before_preview: None,
             buffer_bar_scroll: 0,
             clipboard: String::new(),
             // LSP state
@@ -349,6 +352,19 @@ impl EditorContext {
             should_quit: false,
             snapshot_version: 0,
         })
+    }
+
+    /// Apply the currently selected theme in the picker as a live preview.
+    /// Only acts when the picker is in Themes mode.
+    fn preview_selected_theme(&mut self) {
+        if self.picker_mode != PickerMode::Themes {
+            return;
+        }
+        let filtered = self.filtered_picker_items();
+        if let Some(item) = filtered.get(self.picker_selected) {
+            let name = item.id.clone();
+            let _ = self.apply_theme(&name);
+        }
     }
 
     /// Take the selected register (consuming it) or return the default yank register.
@@ -720,17 +736,25 @@ impl EditorContext {
                 if self.picker_selected > 0 {
                     self.picker_selected -= 1;
                 }
+                self.preview_selected_theme();
             }
             EditorCommand::PickerDown => {
                 let filtered_len = self.filtered_picker_items().len();
                 if self.picker_selected + 1 < filtered_len {
                     self.picker_selected += 1;
                 }
+                self.preview_selected_theme();
             }
             EditorCommand::PickerConfirm => {
                 self.picker_confirm();
             }
             EditorCommand::PickerCancel => {
+                // Restore original theme if previewing
+                if self.picker_mode == PickerMode::Themes {
+                    if let Some(original) = self.theme_before_preview.take() {
+                        let _ = self.apply_theme(&original);
+                    }
+                }
                 // Cancel any running global search
                 if self.picker_mode == PickerMode::GlobalSearch {
                     self.cancel_global_search();
@@ -747,27 +771,33 @@ impl EditorContext {
             EditorCommand::PickerInput(c) => {
                 self.picker_filter.push(c);
                 self.picker_selected = 0;
+                self.preview_selected_theme();
             }
             EditorCommand::PickerBackspace => {
                 self.picker_filter.pop();
                 self.picker_selected = 0;
+                self.preview_selected_theme();
             }
             EditorCommand::PickerFirst => {
                 self.picker_selected = 0;
+                self.preview_selected_theme();
             }
             EditorCommand::PickerLast => {
                 let filtered_len = self.filtered_picker_items().len();
                 if filtered_len > 0 {
                     self.picker_selected = filtered_len - 1;
                 }
+                self.preview_selected_theme();
             }
             EditorCommand::PickerPageUp => {
                 self.picker_selected = self.picker_selected.saturating_sub(10);
+                self.preview_selected_theme();
             }
             EditorCommand::PickerPageDown => {
                 let filtered_len = self.filtered_picker_items().len();
                 self.picker_selected =
                     (self.picker_selected + 10).min(filtered_len.saturating_sub(1));
+                self.preview_selected_theme();
             }
             EditorCommand::PickerConfirmItem(idx) => {
                 let filtered = self.filtered_picker_items();
@@ -1136,6 +1166,19 @@ impl EditorContext {
             // Command panel
             EditorCommand::ShowCommandPanel => {
                 self.show_command_panel();
+            }
+
+            // Theme
+            EditorCommand::SetTheme(name) => {
+                if let Err(e) = self.apply_theme(&name) {
+                    self.show_notification(
+                        format!("Theme error: {e}"),
+                        NotificationSeverity::Error,
+                    );
+                }
+            }
+            EditorCommand::ShowThemePicker => {
+                self.show_theme_picker();
             }
 
             // Jump list
@@ -1764,6 +1807,8 @@ impl EditorContext {
             word_jump_first_char: self.word_jump_first_idx,
             registers: self.collect_register_snapshots(),
             selected_register: self.editor.selected_register,
+            current_theme: self.current_theme_name().to_string(),
+            theme_css_vars: self.theme_to_css_vars(),
             should_quit: self.should_quit,
         }
     }
@@ -1926,7 +1971,7 @@ impl EditorContext {
                 let line = doc.text().char_to_line(cursor) + 1;
                 Some((path, Some(line)))
             }
-            PickerMode::Registers | PickerMode::Commands => None,
+            PickerMode::Registers | PickerMode::Commands | PickerMode::Themes => None,
         }
     }
 
@@ -3577,6 +3622,7 @@ impl EditorContext {
             Some(PickerMode::References) => self.show_references_picker(),
             Some(PickerMode::Definitions) => self.show_definitions_picker(),
             Some(PickerMode::JumpList) => self.show_jumplist_picker(),
+            Some(PickerMode::Themes) => self.show_theme_picker(),
             None => {}
         }
     }
@@ -3811,7 +3857,7 @@ fn compute_tokens_for_rope(
 }
 
 /// Convert a helix Color to a CSS color string.
-fn color_to_css(color: &helix_view::graphics::Color) -> Option<String> {
+pub(crate) fn color_to_css(color: &helix_view::graphics::Color) -> Option<String> {
     use helix_view::graphics::Color;
     match color {
         Color::Rgb(r, g, b) => Some(format!("#{:02x}{:02x}{:02x}", r, g, b)),

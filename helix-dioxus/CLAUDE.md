@@ -76,6 +76,7 @@ helix-dioxus/src/
 │   ├── buffer.rs               # BufferOps: switch_to_buffer, save_document
 │   ├── cli.rs                  # CliOps: execute_command
 │   ├── shell.rs                # ShellOps: execute_shell_command (pipe selections)
+│   ├── theme.rs                # ThemeOps: list_themes, apply_theme, theme_to_css_vars
 │   └── word_jump.rs            # WordJumpOps: compute labels, filter, jump
 │
 └── keybindings/                # Key Handling
@@ -434,6 +435,7 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - **Window/Splits**: Not supported — helix-dioxus uses a single-view design. `C-w` prefix and `Space w` sub-menu will not be implemented.
 
 ### Recently Completed
+- [x] Theme switching — `:theme <name>` applies theme directly, `:theme` (no args) opens theme picker with all available themes, current theme highlighted, live preview on navigation (arrows/filter update UI immediately, Escape restores original theme), dynamic CSS variable injection from theme scopes (ui.background, ui.text, diagnostics, etc.), command panel entry, `ThemeOps` extension trait
 - [x] Shell integration (`|`, `!`, `A-|`, `A-!`) — pipe selections through shell commands with interactive prompt, per-selection processing, CLI commands (`:pipe`, `:sh`, `:insert-output`, `:append-output`, `:pipe-to`, `:run`), help bar hints, command panel entries
 - [x] Word jump (`gw`) — EasyMotion-style two-char label navigation, `gw` in normal mode jumps to word, `gw` in select mode extends selection, labels rendered as overlay spans, dimming on first char filter, Esc to cancel
 - [x] Picker file preview panel — side-by-side two-column layout (40% list / 60% preview) with syntax-highlighted file content, focus line indicator, search match highlighting for GlobalSearch; supports all file-based picker modes (DirectoryBrowser, FilesRecursive, Buffers, Symbols, Diagnostics, GlobalSearch, References, Definitions, JumpList); single-column preserved for Registers/Commands; `compute_tokens_for_rope` extracted as reusable helper for both editor view and preview

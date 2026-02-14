@@ -9,7 +9,7 @@ use grep_searcher::sinks::UTF8;
 use grep_searcher::{BinaryDetection, SearcherBuilder};
 use ignore::WalkBuilder;
 
-use crate::operations::BufferOps;
+use crate::operations::{BufferOps, ThemeOps};
 use crate::state::{
     EditorCommand, EditorContext, GlobalSearchResult, PickerIcon, PickerItem, PickerMode,
 };
@@ -433,6 +433,10 @@ impl PickerOps for EditorContext {
                         }
                     }
                 }
+                PickerMode::Themes => {
+                    // Theme is already applied by live preview — just clear the rollback
+                    self.theme_before_preview = None;
+                }
                 PickerMode::References | PickerMode::Definitions => {
                     // Extract location data before mutable borrow
                     if let Ok(idx) = selected.id.parse::<usize>() {
@@ -582,6 +586,47 @@ impl EditorContext {
         self.picker_visible = true;
         self.picker_mode = PickerMode::Commands;
         self.last_picker_mode = Some(PickerMode::Commands);
+        self.picker_current_path = None;
+    }
+
+    /// Show the theme picker with all available themes.
+    pub(crate) fn show_theme_picker(&mut self) {
+        self.command_mode = false;
+        self.command_input.clear();
+
+        let themes = self.list_themes();
+        let current = self.current_theme_name().to_string();
+
+        // Save current theme for live preview rollback on Escape
+        self.theme_before_preview = Some(current.clone());
+
+        let items: Vec<PickerItem> = themes
+            .iter()
+            .map(|name| PickerItem {
+                id: name.clone(),
+                display: name.clone(),
+                icon: PickerIcon::Theme,
+                match_indices: vec![],
+                secondary: if *name == current {
+                    Some("current".to_string())
+                } else {
+                    None
+                },
+            })
+            .collect();
+
+        // Pre-select the current theme
+        let selected = items
+            .iter()
+            .position(|item| item.id == current)
+            .unwrap_or(0);
+
+        self.picker_items = items;
+        self.picker_filter.clear();
+        self.picker_selected = selected;
+        self.picker_visible = true;
+        self.picker_mode = PickerMode::Themes;
+        self.last_picker_mode = Some(PickerMode::Themes);
         self.picker_current_path = None;
     }
 
@@ -1109,6 +1154,12 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
         ),
         // Word jump
         (EditorCommand::GotoWord, "Goto Word (Jump)", Some("gw")),
+        // Theme
+        (
+            EditorCommand::ShowThemePicker,
+            "Switch Theme",
+            Some(":theme"),
+        ),
     ]
 }
 
