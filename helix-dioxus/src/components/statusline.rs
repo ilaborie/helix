@@ -65,7 +65,7 @@ fn LspStatusBlock(servers: Vec<LspServerSnapshot>, on_click: EventHandler<MouseE
             span {
                 class: "icon-wrapper",
                 style: "margin-right: 4px;",
-                Plug { size: 14, color: color }
+                Plug { size: 14, color: "currentColor" }
             }
             span {
                 class: match status {
@@ -75,9 +75,9 @@ fn LspStatusBlock(servers: Vec<LspServerSnapshot>, on_click: EventHandler<MouseE
                 },
                 style: "margin-right: 4px;",
                 match status {
-                    LspServerStatus::Running => rsx! { CircleCheck { size: 12, color: color } },
-                    LspServerStatus::Starting | LspServerStatus::Indexing => rsx! { LoaderCircle { size: 12, color: color } },
-                    LspServerStatus::Stopped => rsx! { CircleX { size: 12, color: color } },
+                    LspServerStatus::Running => rsx! { CircleCheck { size: 12, color: "currentColor" } },
+                    LspServerStatus::Starting | LspServerStatus::Indexing => rsx! { LoaderCircle { size: 12, color: "currentColor" } },
+                    LspServerStatus::Stopped => rsx! { CircleX { size: 12, color: "currentColor" } },
                 }
             }
             "{server_count}"
@@ -104,11 +104,11 @@ pub fn StatusLine(version: ReadSignal<usize>, on_change: EventHandler<()>) -> El
     let lsp_servers = snapshot.lsp_servers.clone();
     let selected_register = snapshot.selected_register;
 
-    // Mode-specific colors
+    // Mode-specific colors (from CSS custom properties)
     let (mode_bg, mode_fg) = match mode.as_str() {
-        "INSERT" => ("#98c379", "#282c34"), // Green
-        "SELECT" => ("#c678dd", "#282c34"), // Purple
-        _ => ("#61afef", "#282c34"),        // Blue for Normal
+        "INSERT" => ("var(--mode-insert-bg)", "var(--mode-insert-fg)"),
+        "SELECT" => ("var(--mode-select-bg)", "var(--mode-select-fg)"),
+        _ => ("var(--mode-normal-bg)", "var(--mode-normal-fg)"),
     };
 
     let modified_indicator = if snapshot.is_modified { " [+]" } else { "" };
@@ -143,11 +143,11 @@ pub fn StatusLine(version: ReadSignal<usize>, on_change: EventHandler<()>) -> El
                     if error_count > 0 {
                         span {
                             class: "statusline-errors",
-                            style: "color: #e06c75; display: flex; align-items: center;",
+                            style: "color: var(--error); display: flex; align-items: center;",
                             span {
                                 class: "icon-wrapper",
                                 style: "margin-right: 4px;",
-                                CircleX { size: 14, color: "#e06c75" }
+                                CircleX { size: 14, color: "currentColor" }
                             }
                             "{error_count}"
                         }
@@ -158,11 +158,11 @@ pub fn StatusLine(version: ReadSignal<usize>, on_change: EventHandler<()>) -> El
                     if warning_count > 0 {
                         span {
                             class: "statusline-warnings",
-                            style: "color: #e5c07b; display: flex; align-items: center;",
+                            style: "color: var(--warning); display: flex; align-items: center;",
                             span {
                                 class: "icon-wrapper",
                                 style: "margin-right: 4px;",
-                                TriangleAlert { size: 14, color: "#e5c07b" }
+                                TriangleAlert { size: 14, color: "currentColor" }
                             }
                             "{warning_count}"
                         }

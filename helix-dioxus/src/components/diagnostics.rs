@@ -18,11 +18,12 @@ pub fn DiagnosticMarker(severity: DiagnosticSeverity) -> Element {
     rsx! {
         span {
             class: "diagnostic-marker icon-wrapper",
+            style: "color: {color};",
             match severity {
-                DiagnosticSeverity::Error => rsx! { CircleX { size: 10, color: color } },
-                DiagnosticSeverity::Warning => rsx! { TriangleAlert { size: 10, color: color } },
-                DiagnosticSeverity::Info => rsx! { Info { size: 10, color: color } },
-                DiagnosticSeverity::Hint => rsx! { Lightbulb { size: 10, color: color } },
+                DiagnosticSeverity::Error => rsx! { CircleX { size: 10, color: "currentColor" } },
+                DiagnosticSeverity::Warning => rsx! { TriangleAlert { size: 10, color: "currentColor" } },
+                DiagnosticSeverity::Info => rsx! { Info { size: 10, color: "currentColor" } },
+                DiagnosticSeverity::Hint => rsx! { Lightbulb { size: 10, color: "currentColor" } },
             }
         }
     }
@@ -56,7 +57,7 @@ pub fn ErrorLens(diagnostic: DiagnosticSnapshot) -> Element {
             span {
                 class: "icon-wrapper",
                 style: "margin-right: 4px;",
-                Circle { size: 8, color: color }
+                Circle { size: 8, color: "currentColor" }
             }
             "{message}"
         }

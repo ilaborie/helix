@@ -50,10 +50,10 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                         let severity = highest_severity_for_line(diagnostics, line_num);
                         let has_jump = snapshot.jump_lines.contains(&line_num);
                         let key = format!("ind-{}-{}-{}-{}-{}", line_num, version, show_lightbulb, severity.is_some(), has_jump);
-                        // Use diagnostic severity color if available, otherwise yellow
+                        // Use diagnostic severity color if available, otherwise warning
                         let lightbulb_color = severity
                             .map(|s| s.css_color())
-                            .unwrap_or("#e5c07b");
+                            .unwrap_or("var(--warning)");
                         rsx! {
                             div {
                                 key: "{key}",
@@ -65,8 +65,9 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                                 if show_lightbulb {
                                     span {
                                         class: "indicator-diagnostic icon-wrapper",
+                                        style: "color: {lightbulb_color};",
                                         title: "Code actions available (Ctrl+Space)",
-                                        Lightbulb { size: 10, color: lightbulb_color }
+                                        Lightbulb { size: 10, color: "currentColor" }
                                     }
                                 } else if let Some(sev) = severity {
                                     span {
@@ -80,8 +81,9 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                                 if has_jump {
                                     span {
                                         class: "indicator-jumplist icon-wrapper",
+                                        style: "color: var(--orange);",
                                         title: "Jump list entry (C-o/C-i)",
-                                        Bookmark { size: 10, color: "#d19a66" }
+                                        Bookmark { size: 10, color: "currentColor" }
                                     }
                                 }
                             }

@@ -20,14 +20,14 @@ pub enum DiagnosticSeverity {
 }
 
 impl DiagnosticSeverity {
-    /// Returns the CSS color class for this severity.
+    /// Returns the CSS variable reference for this severity's color.
     #[must_use]
     pub fn css_color(&self) -> &'static str {
         match self {
-            Self::Error => "#e06c75",   // Red
-            Self::Warning => "#e5c07b", // Yellow
-            Self::Info => "#61afef",    // Blue
-            Self::Hint => "#56b6c2",    // Cyan
+            Self::Error => "var(--error)",
+            Self::Warning => "var(--warning)",
+            Self::Info => "var(--info)",
+            Self::Hint => "var(--hint)",
         }
     }
 }
@@ -137,19 +137,19 @@ impl CompletionItemKind {
         }
     }
 
-    /// Returns the CSS color for this kind.
+    /// Returns the CSS variable reference for this kind's color.
     #[must_use]
     pub fn css_color(&self) -> &'static str {
         match self {
-            Self::Function | Self::Method | Self::Constructor => "#61afef", // Blue
-            Self::Variable | Self::Field | Self::Property => "#e06c75",     // Red
-            Self::Class | Self::Struct | Self::Interface => "#e5c07b",      // Yellow
-            Self::Module | Self::Folder => "#c678dd",                       // Purple
-            Self::Keyword => "#c678dd",                                     // Purple
-            Self::Constant | Self::EnumMember => "#d19a66",                 // Orange
-            Self::Enum => "#e5c07b",                                        // Yellow
-            Self::Snippet => "#98c379",                                     // Green
-            _ => "#abb2bf",                                                 // Default gray
+            Self::Function | Self::Method | Self::Constructor => "var(--accent)",
+            Self::Variable | Self::Field | Self::Property => "var(--error)",
+            Self::Class | Self::Struct | Self::Interface => "var(--warning)",
+            Self::Module | Self::Folder => "var(--purple)",
+            Self::Keyword => "var(--purple)",
+            Self::Constant | Self::EnumMember => "var(--orange)",
+            Self::Enum => "var(--warning)",
+            Self::Snippet => "var(--success)",
+            _ => "var(--text)",
         }
     }
 }
@@ -344,14 +344,14 @@ pub enum LspServerStatus {
 }
 
 impl LspServerStatus {
-    /// Returns the CSS color for this status.
+    /// Returns the CSS variable reference for this status's color.
     #[must_use]
     pub fn css_color(&self) -> &'static str {
         match self {
-            Self::Starting => "#e5c07b", // Yellow
-            Self::Indexing => "#61afef", // Blue (indexing)
-            Self::Running => "#98c379",  // Green
-            Self::Stopped => "#5c6370",  // Gray
+            Self::Starting => "var(--warning)",
+            Self::Indexing => "var(--info)",
+            Self::Running => "var(--success)",
+            Self::Stopped => "var(--text-dim)",
         }
     }
 }

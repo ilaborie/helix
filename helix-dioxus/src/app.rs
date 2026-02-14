@@ -475,8 +475,8 @@ pub fn App() -> Element {
             class: "app-container",
             tabindex: 0,
             onkeydown: onkeydown,
-            // position: relative needed for picker overlay positioning
-            style: "position: relative;",
+            // CSS custom properties from theme applied as inline style (cascades to all children)
+            style: "position: relative; {snapshot.theme_css_vars}",
 
             // Buffer bar at the top
             BufferBar {

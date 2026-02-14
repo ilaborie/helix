@@ -162,7 +162,7 @@ fn LspServerRow(
                 span {
                     class: "lsp-server-active icon-wrapper",
                     title: "Active for current document",
-                    Circle { size: 10, color: "#98c379" }
+                    Circle { size: 10, color: "currentColor" }
                 }
             }
 
@@ -176,7 +176,7 @@ fn LspServerRow(
                 },
                 span {
                     class: "icon-wrapper",
-                    RefreshCw { size: 14, color: "#abb2bf" }
+                    RefreshCw { size: 14, color: "currentColor" }
                 }
             }
         }

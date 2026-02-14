@@ -14,6 +14,7 @@ mod picker_ops;
 mod search;
 mod selection;
 mod shell;
+mod theme;
 mod word_jump;
 
 pub use buffer::BufferOps;
@@ -27,4 +28,5 @@ pub use picker_ops::PickerOps;
 pub use search::{collect_search_match_lines, SearchOps};
 pub use selection::SelectionOps;
 pub use shell::ShellOps;
+pub use theme::ThemeOps;
 pub use word_jump::WordJumpOps;

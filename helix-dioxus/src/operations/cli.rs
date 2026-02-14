@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use crate::operations::{BufferOps, EditingOps, PickerOps, ShellOps};
+use crate::operations::{BufferOps, EditingOps, PickerOps, ShellOps, ThemeOps};
 use crate::state::{EditorContext, NotificationSeverity, ShellBehavior};
 
 /// Extension trait for CLI command operations.
@@ -149,6 +149,22 @@ impl CliOps for EditorContext {
             "cmd" | "commands" => {
                 self.show_command_panel();
             }
+
+            // Theme
+            "theme" => match args {
+                Some(name) => {
+                    let name = name.to_string();
+                    if let Err(e) = self.apply_theme(&name) {
+                        self.show_notification(
+                            format!("Theme error: {e}"),
+                            NotificationSeverity::Error,
+                        );
+                    }
+                }
+                None => {
+                    self.show_theme_picker();
+                }
+            },
 
             // History navigation
             "earlier" => {

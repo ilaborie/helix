@@ -73,8 +73,8 @@ pub fn GenericPicker(
                         class: "picker-search",
                         span {
                             class: "icon-wrapper",
-                            style: "width: 16px; height: 16px; margin-right: 8px; color: #5c6370;",
-                            Search { size: 16, color: "#5c6370" }
+                            style: "width: 16px; height: 16px; margin-right: 8px; color: var(--text-dim);",
+                            Search { size: 16, color: "currentColor" }
                         }
                         span {
                             class: "picker-search-input",

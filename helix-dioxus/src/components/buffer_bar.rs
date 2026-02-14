@@ -142,25 +142,24 @@ fn BufferTab(buffer: BufferInfo, on_action: EventHandler<()>) -> Element {
     let doc_id_close = buffer.id;
 
     let bg_color = if buffer.is_current {
-        "#282c34" // Active tab background
+        "var(--bg-primary)"
     } else {
         "transparent"
     };
 
     let text_color = if buffer.is_current {
-        "#abb2bf" // Active tab text
+        "var(--text)"
     } else {
-        "#5c6370" // Inactive tab text
+        "var(--text-dim)"
     };
 
     let border_bottom = if buffer.is_current {
-        "2px solid #61afef" // Active indicator
+        "2px solid var(--accent)"
     } else {
         "2px solid transparent"
     };
 
-    // Modified indicator color - use a warmer color for visibility
-    let modified_color = "#e5c07b";
+    let modified_color = "var(--warning)";
 
     rsx! {
         div {
@@ -234,9 +233,9 @@ fn ScrollButton(direction: &'static str, onclick: EventHandler<MouseEvent>) -> E
             span {
                 class: "icon-wrapper",
                 if is_left {
-                    ChevronLeft { size: 16, color: "#5c6370" }
+                    ChevronLeft { size: 16, color: "currentColor" }
                 } else {
-                    ChevronRight { size: 16, color: "#5c6370" }
+                    ChevronRight { size: 16, color: "currentColor" }
                 }
             }
         }

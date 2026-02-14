@@ -85,6 +85,8 @@ pub enum PickerIcon {
     Command,
     // Jump list icon
     JumpEntry,
+    // Theme icon
+    Theme,
 }
 
 /// Generic picker item with match highlighting.
@@ -114,6 +116,7 @@ pub enum PickerMode {
     Registers,
     Commands,
     JumpList,
+    Themes,
 }
 
 impl PickerMode {
@@ -133,6 +136,7 @@ impl PickerMode {
             Self::Registers => "Registers",
             Self::Commands => "Commands",
             Self::JumpList => "Jump List",
+            Self::Themes => "Themes",
         }
     }
 
@@ -147,7 +151,7 @@ impl PickerMode {
 
     /// Whether this picker mode supports file preview.
     pub fn supports_preview(&self) -> bool {
-        !matches!(self, Self::Registers | Self::Commands)
+        !matches!(self, Self::Registers | Self::Commands | Self::Themes)
     }
 }
 
@@ -324,6 +328,12 @@ pub struct EditorSnapshot {
     pub registers: Vec<RegisterSnapshot>,
     /// Currently selected register for the next operation (e.g., `"a`).
     pub selected_register: Option<char>,
+
+    // Theme state
+    /// Current theme name.
+    pub current_theme: String,
+    /// CSS variable overrides generated from the current theme.
+    pub theme_css_vars: String,
 
     // Application state
     pub should_quit: bool,
@@ -876,6 +886,12 @@ pub enum EditorCommand {
     /// Show the command panel (fuzzy command palette).
     ShowCommandPanel,
 
+    // Theme
+    /// Set the editor theme by name.
+    SetTheme(String),
+    /// Show the theme picker.
+    ShowThemePicker,
+
     // Jump list
     /// Jump backward through position history (C-o).
     JumpBackward,
@@ -1154,6 +1170,7 @@ mod tests {
             PickerMode::Registers,
             PickerMode::Commands,
             PickerMode::JumpList,
+            PickerMode::Themes,
         ];
         for mode in modes {
             let title = mode.title();
@@ -1215,5 +1232,19 @@ mod tests {
             !PickerMode::Commands.supports_preview(),
             "Commands should not support preview"
         );
+        assert!(
+            !PickerMode::Themes.supports_preview(),
+            "Themes should not support preview"
+        );
+    }
+
+    #[test]
+    fn themes_picker_mode_title() {
+        assert_eq!(PickerMode::Themes.title(), "Themes");
+    }
+
+    #[test]
+    fn themes_picker_mode_enter_hint() {
+        assert!(PickerMode::Themes.enter_hint().contains("select"));
     }
 }

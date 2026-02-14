@@ -11,24 +11,24 @@ use crate::lsp::CodeActionSnapshot;
 /// Get the icon and color for a code action kind.
 fn action_kind_style(kind: Option<&str>, is_preferred: bool) -> (&'static str, Element) {
     if is_preferred {
-        return ("#e5c07b", rsx! { Star { size: 12, color: "#e5c07b" } });
+        return ("var(--warning)", rsx! { Star { size: 12, color: "currentColor" } });
     }
 
     match kind {
         Some(k) if k.starts_with("quickfix") => {
-            ("#98c379", rsx! { Wrench { size: 12, color: "#98c379" } })
+            ("var(--success)", rsx! { Wrench { size: 12, color: "currentColor" } })
         }
         Some(k) if k.starts_with("refactor.extract") => (
-            "#61afef",
-            rsx! { PackagePlus { size: 12, color: "#61afef" } },
+            "var(--accent)",
+            rsx! { PackagePlus { size: 12, color: "currentColor" } },
         ),
         Some(k) if k.starts_with("refactor") => {
-            ("#c678dd", rsx! { FileCode { size: 12, color: "#c678dd" } })
+            ("var(--purple)", rsx! { FileCode { size: 12, color: "currentColor" } })
         }
         Some(k) if k.starts_with("source") => {
-            ("#56b6c2", rsx! { FileCode { size: 12, color: "#56b6c2" } })
+            ("var(--hint)", rsx! { FileCode { size: 12, color: "currentColor" } })
         }
-        _ => ("#abb2bf", rsx! { Lightbulb { size: 12, color: "#abb2bf" } }),
+        _ => ("var(--text)", rsx! { Lightbulb { size: 12, color: "currentColor" } }),
     }
 }
 
@@ -79,6 +79,7 @@ fn CodeActionItem(action: CodeActionSnapshot, is_selected: bool) -> Element {
             // Action type icon (colored)
             span {
                 class: "code-action-icon icon-wrapper",
+                style: "color: {kind_color};",
                 {icon}
             }
 
@@ -148,7 +149,8 @@ pub fn CodeActionsMenu(
                 class: "code-actions-search",
                 span {
                     class: "icon-wrapper",
-                    Search { size: 14, color: "#5c6370" }
+                    style: "color: var(--text-dim);",
+                    Search { size: 14, color: "currentColor" }
                 }
                 span {
                     class: "code-actions-search-input",
