@@ -211,9 +211,6 @@ pub struct EditorContext {
     // Application state - pub(crate) for operations access
     pub(crate) should_quit: bool,
 
-    /// Config store for runtime updates (`:config-reload`, `:set`).
-    pub(crate) config_store: Arc<arc_swap::ArcSwap<helix_view::editor::Config>>,
-
     /// Snapshot version counter, incremented on each snapshot creation.
     snapshot_version: u64,
 }
@@ -241,9 +238,8 @@ impl EditorContext {
 
         // Load editor configuration from config.toml [editor] section
         let editor_config = load_editor_config();
-        let config_store = Arc::new(arc_swap::ArcSwap::from_pointee(editor_config));
         let editor_config: Arc<dyn arc_swap::access::DynAccess<helix_view::editor::Config>> =
-            Arc::clone(&config_store) as _;
+            Arc::new(arc_swap::ArcSwap::from_pointee(editor_config));
 
         // Load theme name from config.toml
         let theme_name = load_theme_name();
@@ -374,7 +370,6 @@ impl EditorContext {
             dialog_search_mode: dhx_config.dialog.search_mode,
             picker_search_focused: false,
             should_quit: false,
-            config_store,
             snapshot_version: 0,
         })
     }

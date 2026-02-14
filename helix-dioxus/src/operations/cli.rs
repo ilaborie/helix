@@ -439,7 +439,7 @@ impl CliOps for EditorContext {
 
         // 1. Reload editor config from config.toml [editor] section
         let new_config = load_editor_config();
-        self.config_store.store(Arc::new(new_config));
+        self.editor.config = Arc::new(arc_swap::ArcSwap::from_pointee(new_config));
 
         // 2. Reload syntax language loader (languages.toml)
         match helix_core::config::user_lang_loader() {
@@ -539,7 +539,7 @@ impl CliOps for EditorContext {
         };
 
         // Apply the new config
-        self.config_store.store(Arc::new(new_config));
+        self.editor.config = Arc::new(arc_swap::ArcSwap::from_pointee(new_config));
         self.editor.refresh_config(&old_config);
         self.show_notification(format!("Set {key} = {value}"), NotificationSeverity::Info);
     }
@@ -619,7 +619,7 @@ impl CliOps for EditorContext {
                 .unwrap_or_default()
         };
 
-        self.config_store.store(Arc::new(new_config));
+        self.editor.config = Arc::new(arc_swap::ArcSwap::from_pointee(new_config));
         self.editor.refresh_config(&old_config);
         self.show_notification(
             format!("Toggled {key} = {display_val}"),
