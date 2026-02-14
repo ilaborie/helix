@@ -1757,6 +1757,7 @@ impl EditorContext {
             // Word jump state
             word_jump_active: self.word_jump_active,
             word_jump_labels: self.word_jump_labels.clone(),
+            word_jump_first_char: self.word_jump_first_idx,
             registers: self.collect_register_snapshots(),
             selected_register: self.editor.selected_register,
             should_quit: self.should_quit,

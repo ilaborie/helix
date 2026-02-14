@@ -151,6 +151,7 @@ const CUSTOM_SCRIPT: &str = include_str!("../assets/script.js");
 Functions defined in `script.js`:
 - `focusAppContainer()` - focuses app on mount
 - `scrollCursorIntoView()` - scrolls cursor into view
+- Global `keydown` listener - re-focuses app container when WebView loses focus after re-renders
 
 **CSS Custom Properties** (`styles.css` uses `:root` variables for theming):
 - Colors: `--bg-primary`, `--bg-secondary`, `--bg-highlight`, `--bg-selection`, `--bg-deep`, `--text`, `--text-dim`, `--text-dimmer`, `--accent`, `--error`, `--warning`, `--info`, `--hint`, `--success`, `--purple`, `--orange`
@@ -385,6 +386,11 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 ### Panic: "Tried to register handler for unknown event"
 - Cause: `helix_view::handlers::register_hooks()` called before events are registered
 - Solution: Call `events::register()` at the start of `launch()` before creating `EditorContext`
+
+### WebView loses focus after re-renders (keys stop working)
+- Cause: Dioxus desktop WebView can lose focus on the app container div after re-renders, causing `onkeydown` to stop firing
+- Solution: Global `document.addEventListener('keydown', ...)` in `script.js` re-focuses the app container whenever focus is lost
+- This is essential — without it, keyboard input intermittently stops working
 
 ### Alt+key bindings not working on macOS
 - Cause: macOS Option key composes special characters (Alt+o → ø, Alt+i → ˆ, Alt+c → ç). `evt.key()` returns the composed character, so `KeyCode::Char('o')` with ALT modifier never matches

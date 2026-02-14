@@ -316,6 +316,8 @@ pub struct EditorSnapshot {
     pub word_jump_active: bool,
     /// Word jump labels to render over the editor content.
     pub word_jump_labels: Vec<WordJumpLabel>,
+    /// First character already typed (None = waiting for first char).
+    pub word_jump_first_char: Option<char>,
 
     // Register state
     /// Register snapshots for display in the help bar.

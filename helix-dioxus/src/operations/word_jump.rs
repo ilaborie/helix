@@ -35,12 +35,12 @@ impl WordJumpOps for EditorContext {
             return;
         }
 
-        // Get visible range from view offset
+        // Get visible range from view offset (same calculation as snapshot())
         let view_offset = doc.view_offset(view_id);
         let visible_start_char = view_offset.anchor.min(total_chars);
         let visible_start_line = text.char_to_line(visible_start_char);
-        // Estimate visible lines from editor area (use 50 as reasonable default)
-        let visible_end_line = (visible_start_line + 50).min(text.len_lines());
+        // Use 40 lines to match the viewport_lines used in snapshot()
+        let visible_end_line = (visible_start_line + 40).min(text.len_lines());
         let visible_end_char = if visible_end_line < text.len_lines() {
             text.line_to_char(visible_end_line)
         } else {
@@ -127,7 +127,6 @@ impl WordJumpOps for EditorContext {
         if any_match {
             self.word_jump_first_idx = Some(ch_lower);
         } else {
-            // No match — cancel
             self.cancel_word_jump();
         }
     }
@@ -197,6 +196,7 @@ fn is_word_char(ch: char) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_helpers::{assert_state, doc_view, test_context};
 
     #[test]
     fn is_word_char_alpha() {
@@ -212,5 +212,346 @@ mod tests {
         assert!(!is_word_char('.'));
         assert!(!is_word_char('('));
         assert!(!is_word_char('\n'));
+    }
+
+    // --- compute_word_jump_labels ---
+
+    #[test]
+    fn compute_labels_activates_word_jump() {
+        let mut ctx = test_context("#[|h]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+
+        ctx.compute_word_jump_labels(doc_id, view_id);
+
+        assert!(ctx.word_jump_active);
+        assert!(ctx.word_jump_first_idx.is_none());
+    }
+
+    #[test]
+    fn compute_labels_finds_words() {
+        let mut ctx = test_context("#[|h]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+
+        ctx.compute_word_jump_labels(doc_id, view_id);
+
+        assert_eq!(ctx.word_jump_labels.len(), 2);
+        assert_eq!(ctx.word_jump_ranges.len(), 2);
+    }
+
+    #[test]
+    fn compute_labels_generates_two_char_labels() {
+        let mut ctx = test_context("#[|h]#ello world foo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+
+        ctx.compute_word_jump_labels(doc_id, view_id);
+
+        assert_eq!(ctx.word_jump_labels[0].label, ['a', 'a']);
+        assert_eq!(ctx.word_jump_labels[1].label, ['a', 'b']);
+        assert_eq!(ctx.word_jump_labels[2].label, ['a', 'c']);
+    }
+
+    #[test]
+    fn compute_labels_skips_single_char_words() {
+        let mut ctx = test_context("#[|a]# bb cc\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+
+        ctx.compute_word_jump_labels(doc_id, view_id);
+
+        // "a" is 1 char → skipped, "bb" and "cc" are 2+ chars
+        assert_eq!(ctx.word_jump_labels.len(), 2);
+    }
+
+    #[test]
+    fn compute_labels_empty_doc() {
+        let mut ctx = test_context("#[| ]#");
+        let (doc_id, view_id) = doc_view(&ctx);
+
+        ctx.compute_word_jump_labels(doc_id, view_id);
+
+        // A space-only doc has no words, but word_jump_active is still set
+        assert!(ctx.word_jump_labels.is_empty());
+    }
+
+    #[test]
+    fn compute_labels_records_line_and_col() {
+        let mut ctx = test_context("#[|h]#ello\n  world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+
+        ctx.compute_word_jump_labels(doc_id, view_id);
+
+        assert_eq!(ctx.word_jump_labels.len(), 2);
+        // "hello" at line 1, col 0
+        assert_eq!(ctx.word_jump_labels[0].line, 1);
+        assert_eq!(ctx.word_jump_labels[0].col, 0);
+        // "world" at line 2, col 2
+        assert_eq!(ctx.word_jump_labels[1].line, 2);
+        assert_eq!(ctx.word_jump_labels[1].col, 2);
+    }
+
+    #[test]
+    fn compute_labels_not_dimmed_initially() {
+        let mut ctx = test_context("#[|h]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+
+        ctx.compute_word_jump_labels(doc_id, view_id);
+
+        for label in &ctx.word_jump_labels {
+            assert!(!label.dimmed);
+        }
+    }
+
+    // --- filter_word_jump_first_char ---
+
+    #[test]
+    fn filter_first_char_sets_first_idx() {
+        let mut ctx = test_context("#[|h]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.compute_word_jump_labels(doc_id, view_id);
+
+        ctx.filter_word_jump_first_char('a');
+
+        assert_eq!(ctx.word_jump_first_idx, Some('a'));
+        assert!(ctx.word_jump_active);
+    }
+
+    #[test]
+    fn filter_first_char_dims_non_matching() {
+        // Need 27+ words so labels span 'a_' and 'b_' prefixes
+        let text =
+            "aa bb cc dd ee ff gg hh ii jj kk ll mm nn oo pp qq rr ss tt uu vv ww xx yy zz aaa";
+        let mut ctx = test_context(&format!("#[|{text}]#\n"));
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.compute_word_jump_labels(doc_id, view_id);
+        assert!(
+            ctx.word_jump_labels.len() > 26,
+            "need >26 labels for multi-prefix"
+        );
+
+        ctx.filter_word_jump_first_char('b');
+
+        // Labels starting with 'b' are undimmed, others dimmed
+        for label in &ctx.word_jump_labels {
+            if label.label[0] == 'b' {
+                assert!(
+                    !label.dimmed,
+                    "label {:?} should not be dimmed",
+                    label.label
+                );
+            } else {
+                assert!(label.dimmed, "label {:?} should be dimmed", label.label);
+            }
+        }
+    }
+
+    #[test]
+    fn filter_first_char_no_match_cancels() {
+        let mut ctx = test_context("#[|h]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.compute_word_jump_labels(doc_id, view_id);
+
+        // Only 2 labels, both start with 'a'; 'z' won't match
+        ctx.filter_word_jump_first_char('z');
+
+        assert!(!ctx.word_jump_active);
+        assert!(ctx.word_jump_labels.is_empty());
+    }
+
+    #[test]
+    fn filter_first_char_case_insensitive() {
+        let mut ctx = test_context("#[|h]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.compute_word_jump_labels(doc_id, view_id);
+
+        ctx.filter_word_jump_first_char('A');
+
+        assert_eq!(ctx.word_jump_first_idx, Some('a'));
+    }
+
+    // --- Regression: few labels all share first char ---
+
+    #[test]
+    fn filter_first_char_few_labels_all_same_prefix() {
+        // Regression: with <27 words, ALL labels start with 'a'.
+        // After filtering by 'a', all labels are undimmed but first_idx must be set.
+        let mut ctx = test_context("#[|h]#ello world foo bar\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.compute_word_jump_labels(doc_id, view_id);
+
+        // All labels start with 'a'
+        assert!(ctx.word_jump_labels.iter().all(|l| l.label[0] == 'a'));
+
+        ctx.filter_word_jump_first_char('a');
+
+        // first_idx MUST be set even though all labels remain undimmed
+        assert_eq!(ctx.word_jump_first_idx, Some('a'));
+        assert!(ctx.word_jump_active);
+        assert!(ctx.word_jump_labels.iter().all(|l| !l.dimmed));
+    }
+
+    // --- execute_word_jump ---
+
+    #[test]
+    fn execute_jump_moves_cursor() {
+        let mut ctx = test_context("#[|h]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.compute_word_jump_labels(doc_id, view_id);
+        ctx.filter_word_jump_first_char('a');
+
+        // label 'ab' = index 1 = "world" at char_pos 6
+        ctx.execute_word_jump('b');
+
+        assert_state(&ctx, "hello #[w|]#orld\n");
+    }
+
+    #[test]
+    fn execute_jump_first_label() {
+        let mut ctx = test_context("hello #[|w]#orld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.compute_word_jump_labels(doc_id, view_id);
+        ctx.filter_word_jump_first_char('a');
+
+        // label 'aa' = index 0 = "hello" at char_pos 0
+        ctx.execute_word_jump('a');
+
+        assert_state(&ctx, "#[h|]#ello world\n");
+    }
+
+    #[test]
+    fn execute_jump_clears_state() {
+        let mut ctx = test_context("#[|h]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.compute_word_jump_labels(doc_id, view_id);
+        ctx.filter_word_jump_first_char('a');
+        ctx.execute_word_jump('a');
+
+        assert!(!ctx.word_jump_active);
+        assert!(ctx.word_jump_labels.is_empty());
+        assert!(ctx.word_jump_first_idx.is_none());
+    }
+
+    #[test]
+    fn execute_jump_no_first_idx_cancels() {
+        let mut ctx = test_context("#[|h]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.compute_word_jump_labels(doc_id, view_id);
+        // Skip filter_word_jump_first_char — first_idx is None
+
+        ctx.execute_word_jump('a');
+
+        // Should cancel without moving — selection unchanged
+        assert!(!ctx.word_jump_active);
+        assert_state(&ctx, "#[|h]#ello world\n");
+    }
+
+    #[test]
+    fn execute_jump_invalid_second_char_no_move() {
+        let mut ctx = test_context("#[|h]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.compute_word_jump_labels(doc_id, view_id);
+        ctx.filter_word_jump_first_char('a');
+
+        // Only 2 labels: aa, ab. 'z' doesn't match any.
+        ctx.execute_word_jump('z');
+
+        // Cursor stays at original position, state cleared
+        assert!(!ctx.word_jump_active);
+        assert_state(&ctx, "#[|h]#ello world\n");
+    }
+
+    // --- Regression: full two-char sequence with few labels ---
+
+    #[test]
+    fn full_sequence_few_labels_jumps_correctly() {
+        // Regression test for the bug: with <27 words, all labels start with 'a'.
+        // The full sequence (compute → filter 'a' → execute second char) must work.
+        let mut ctx = test_context("#[|f]#n main() {\n    let foo = bar;\n}\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.compute_word_jump_labels(doc_id, view_id);
+
+        let label_count = ctx.word_jump_labels.len();
+        assert!(
+            label_count < 27,
+            "must have <27 labels for this regression test"
+        );
+        assert!(label_count >= 2, "need at least 2 labels");
+
+        // All labels start with 'a'
+        assert!(ctx.word_jump_labels.iter().all(|l| l.label[0] == 'a'));
+
+        // Step 1: filter by first char 'a'
+        ctx.filter_word_jump_first_char('a');
+        assert_eq!(ctx.word_jump_first_idx, Some('a'));
+        assert!(ctx.word_jump_active);
+
+        // Step 2: type second char — pick the last label to jump far
+        let last_label = ctx.word_jump_labels.last().expect("has labels");
+        let second_char = last_label.label[1];
+        let target_pos = *ctx.word_jump_ranges.last().expect("has ranges");
+
+        ctx.execute_word_jump(second_char);
+
+        // Cursor must have moved to the target position
+        let (view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view.id);
+        let head = sel.primary().cursor(doc.text().slice(..));
+        assert_eq!(head, target_pos, "cursor should jump to target word");
+    }
+
+    // --- extend mode ---
+
+    #[test]
+    fn execute_jump_extend_preserves_anchor() {
+        // Use #[h|]# so anchor=0, head=1
+        let mut ctx = test_context("#[h|]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.word_jump_extend = true;
+        ctx.compute_word_jump_labels(doc_id, view_id);
+        ctx.filter_word_jump_first_char('a');
+
+        // Jump to "world" at pos 6 — should extend from anchor 0
+        ctx.execute_word_jump('b');
+
+        let (view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view.id);
+        let primary = sel.primary();
+        assert_eq!(primary.anchor, 0);
+        assert_eq!(primary.head, 6);
+    }
+
+    // --- cancel ---
+
+    #[test]
+    fn cancel_clears_all_state() {
+        let mut ctx = test_context("#[|h]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.compute_word_jump_labels(doc_id, view_id);
+        ctx.filter_word_jump_first_char('a');
+
+        ctx.cancel_word_jump();
+
+        assert!(!ctx.word_jump_active);
+        assert!(ctx.word_jump_labels.is_empty());
+        assert!(ctx.word_jump_ranges.is_empty());
+        assert!(!ctx.word_jump_extend);
+        assert!(ctx.word_jump_first_idx.is_none());
+    }
+
+    // --- snapshot integration ---
+
+    #[test]
+    fn snapshot_reflects_first_char_state() {
+        let mut ctx = test_context("#[|h]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.compute_word_jump_labels(doc_id, view_id);
+
+        let snap1 = ctx.snapshot(40);
+        assert!(snap1.word_jump_active);
+        assert!(snap1.word_jump_first_char.is_none());
+
+        ctx.filter_word_jump_first_char('a');
+
+        let snap2 = ctx.snapshot(40);
+        assert!(snap2.word_jump_active);
+        assert_eq!(snap2.word_jump_first_char, Some('a'));
     }
 }
