@@ -392,11 +392,12 @@ Window/split management is not supported. helix-dioxus uses a single-view design
 | `:tree-sitter-scopes` | | Show tree-sitter scopes at cursor |
 | `:jumplist-clear` | | Clear jump list |
 
+| `:config-reload` | | Reload config (editor, languages, theme) |
+
 ### Missing Notable Commands
 
 | Command | Helix Action | Notes |
 |---------|-------------|-------|
-| `:config-reload` | Reload configuration | Requires config event channel |
 | `:set` | Change editor settings | e.g. `:set line-number relative` |
 | `:format` | Format document | Available via command panel and `=` binding |
 | `:lsp-restart` | Restart LSP | Available via LSP status dialog |
@@ -443,7 +444,7 @@ Window/split management is not supported. helix-dioxus uses a single-view design
 | Select Mode | 35+ bindings | 0 | 100% |
 | Insert Mode | 18 bindings | 0 | 100% |
 | Macros | 4 bindings | 0 | 100% |
-| Commands | 40 commands | 4 | 91% |
+| Commands | 41 commands | 3 | 93% |
 | **Overall** | **~97%** | | |
 
 ### Design Decisions
@@ -453,5 +454,4 @@ Window/split management is not supported. helix-dioxus uses a single-view design
 ### Remaining Feature Categories
 
 1. **DAP/Debug** — `Space G` sub-menu
-2. **`:config-reload`** — reload configuration at runtime
-3. **`:set`** — change editor settings at runtime
+2. **`:set`** — change editor settings at runtime

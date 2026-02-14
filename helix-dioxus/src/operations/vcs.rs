@@ -7,9 +7,9 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use helix_core::Selection;
+use helix_vcs::FileChange;
 use helix_view::document::Mode;
 use helix_view::DocumentId;
-use helix_vcs::FileChange;
 use imara_diff::Hunk;
 
 use super::JumpOps;
@@ -86,10 +86,7 @@ fn file_change_to_picker_item(change: &FileChange, cwd: &std::path::Path) -> Pic
                 ..Default::default()
             }
         }
-        FileChange::Renamed {
-            from_path,
-            to_path,
-        } => {
+        FileChange::Renamed { from_path, to_path } => {
             let from_display = path_display(from_path, cwd);
             let to_display = path_display(to_path, cwd);
             PickerItem {

@@ -1,6 +1,7 @@
 //! CLI command execution operations.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use crate::operations::{
     BufferOps, EditingOps, JumpOps, PickerOps, ShellOps, TextManipulationOps, ThemeOps,
@@ -10,6 +11,7 @@ use crate::state::{EditorContext, NotificationSeverity, ShellBehavior};
 /// Extension trait for CLI command operations.
 pub trait CliOps {
     fn execute_command(&mut self);
+    fn reload_config(&mut self);
 }
 
 impl CliOps for EditorContext {
@@ -359,6 +361,11 @@ impl CliOps for EditorContext {
                 self.clear_jumplist();
             }
 
+            // Config reload
+            "config-reload" => {
+                self.reload_config();
+            }
+
             // Tree-sitter scopes
             "tree-sitter-scopes" => {
                 let msg = {
@@ -382,5 +389,58 @@ impl CliOps for EditorContext {
 
         self.command_mode = false;
         self.command_input.clear();
+    }
+
+    fn reload_config(&mut self) {
+        use crate::state::load_editor_config;
+
+        // Save old config for refresh_config comparison
+        let old_config = self.editor.config().clone();
+
+        // 1. Reload editor config from config.toml [editor] section
+        let new_config = load_editor_config();
+        self.config_store.store(Arc::new(new_config));
+
+        // 2. Reload syntax language loader (languages.toml)
+        match helix_core::config::user_lang_loader() {
+            Ok(lang_loader) => {
+                self.editor.syn_loader.store(Arc::new(lang_loader));
+            }
+            Err(err) => {
+                log::warn!("Failed to reload language config: {err}");
+                self.show_notification(
+                    format!("Language config error: {err}"),
+                    NotificationSeverity::Warning,
+                );
+            }
+        }
+
+        // 3. Reload theme if changed in config.toml
+        if let Some(theme_name) = crate::state::load_theme_name() {
+            if theme_name != self.editor.theme.name() {
+                if let Err(err) = self.apply_theme(&theme_name) {
+                    log::warn!("Failed to apply theme '{theme_name}': {err}");
+                    self.show_notification(
+                        format!("Theme error: {err}"),
+                        NotificationSeverity::Warning,
+                    );
+                }
+            }
+        }
+
+        // 4. Update syntax highlighting scopes from theme
+        let scopes = self.editor.theme.scopes();
+        self.editor.syn_loader.load().set_scopes(scopes.to_vec());
+
+        // 5. Re-detect language config for all open documents
+        let lang_loader = self.editor.syn_loader.load();
+        for document in self.editor.documents.values_mut() {
+            document.detect_language(&lang_loader);
+        }
+
+        // 6. Notify the editor about config changes
+        self.editor.refresh_config(&old_config);
+
+        self.show_notification("Config reloaded".to_string(), NotificationSeverity::Info);
     }
 }

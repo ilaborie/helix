@@ -188,10 +188,7 @@ impl PickerMode {
 
     /// Whether this picker mode supports file preview.
     pub fn supports_preview(&self) -> bool {
-        !matches!(
-            self,
-            Self::Registers | Self::Commands | Self::Themes
-        )
+        !matches!(self, Self::Registers | Self::Commands | Self::Themes)
     }
 }
 

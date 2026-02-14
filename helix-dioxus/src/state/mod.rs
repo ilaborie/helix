@@ -211,6 +211,9 @@ pub struct EditorContext {
     // Application state - pub(crate) for operations access
     pub(crate) should_quit: bool,
 
+    /// Config store for runtime updates (`:config-reload`, `:set`).
+    pub(crate) config_store: Arc<arc_swap::ArcSwap<helix_view::editor::Config>>,
+
     /// Snapshot version counter, incremented on each snapshot creation.
     snapshot_version: u64,
 }
@@ -238,8 +241,9 @@ impl EditorContext {
 
         // Load editor configuration from config.toml [editor] section
         let editor_config = load_editor_config();
+        let config_store = Arc::new(arc_swap::ArcSwap::from_pointee(editor_config));
         let editor_config: Arc<dyn arc_swap::access::DynAccess<helix_view::editor::Config>> =
-            Arc::new(arc_swap::ArcSwap::from_pointee(editor_config));
+            Arc::clone(&config_store) as _;
 
         // Load theme name from config.toml
         let theme_name = load_theme_name();
@@ -370,6 +374,7 @@ impl EditorContext {
             dialog_search_mode: dhx_config.dialog.search_mode,
             picker_search_focused: false,
             should_quit: false,
+            config_store,
             snapshot_version: 0,
         })
     }
@@ -4040,7 +4045,7 @@ fn create_handlers() -> helix_view::handlers::Handlers {
 /// Load editor configuration from the user's `config.toml` `[editor]` section.
 ///
 /// Falls back to defaults if the file doesn't exist or can't be parsed.
-fn load_editor_config() -> helix_view::editor::Config {
+pub(crate) fn load_editor_config() -> helix_view::editor::Config {
     let config_path = helix_loader::config_file();
     let content = match std::fs::read_to_string(&config_path) {
         Ok(c) => c,
@@ -4068,7 +4073,7 @@ fn load_editor_config() -> helix_view::editor::Config {
 /// Load the theme name from the user's `config.toml`.
 ///
 /// Returns `None` if no theme is specified or the file can't be read.
-fn load_theme_name() -> Option<String> {
+pub(crate) fn load_theme_name() -> Option<String> {
     let config_path = helix_loader::config_file();
     let content = std::fs::read_to_string(config_path).ok()?;
     let toml_val: toml::Value = toml::from_str(&content).ok()?;

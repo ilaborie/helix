@@ -9,7 +9,7 @@ use crate::config::DialogSearchMode;
 use crate::keybindings::{
     handle_normal_mode, handle_picker_mode, handle_search_mode, handle_select_mode,
 };
-use crate::operations::{EditingOps, MovementOps, SearchOps};
+use crate::operations::{CliOps, EditingOps, MovementOps, SearchOps};
 use crate::state::{EditorCommand, PickerMode};
 use crate::test_helpers::{assert_state, assert_text, doc_view, key, special_key, test_context};
 
@@ -294,4 +294,32 @@ fn picker_vim_mode_esc_cancels_when_unfocused() {
         PickerMode::default(),
     );
     crate::assert_single_command!(cmds, EditorCommand::PickerCancel);
+}
+
+// --- Config reload tests ---
+
+#[test]
+fn config_reload_shows_notification() {
+    let _guard = crate::test_helpers::init();
+    let mut ctx = test_context("#[|h]#ello\n");
+    assert!(ctx.notifications.is_empty());
+
+    ctx.reload_config();
+
+    assert_eq!(ctx.notifications.len(), 1);
+    assert_eq!(ctx.notifications[0].message, "Config reloaded");
+}
+
+#[test]
+fn config_reload_via_command_mode() {
+    let _guard = crate::test_helpers::init();
+    let mut ctx = test_context("#[|h]#ello\n");
+    ctx.command_input = "config-reload".to_string();
+    ctx.execute_command();
+
+    assert!(!ctx.notifications.is_empty());
+    assert_eq!(ctx.notifications[0].message, "Config reloaded");
+    // Command mode should be cleared
+    assert!(!ctx.command_mode);
+    assert!(ctx.command_input.is_empty());
 }

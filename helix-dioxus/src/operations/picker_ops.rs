@@ -1330,11 +1330,7 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
         ),
         (EditorCommand::NextChange, "Next Change", Some("]g")),
         (EditorCommand::PrevChange, "Previous Change", Some("[g")),
-        (
-            EditorCommand::GotoFirstChange,
-            "First Change",
-            Some("[G"),
-        ),
+        (EditorCommand::GotoFirstChange, "First Change", Some("[G")),
         (EditorCommand::GotoLastChange, "Last Change", Some("]G")),
         // Text manipulation
         (
@@ -1352,6 +1348,11 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
             EditorCommand::CliCommand("config-open".to_string()),
             "Open Config File",
             Some(":config-open"),
+        ),
+        (
+            EditorCommand::CliCommand("config-reload".to_string()),
+            "Reload Config",
+            Some(":config-reload"),
         ),
         (
             EditorCommand::CliCommand("log-open".to_string()),
