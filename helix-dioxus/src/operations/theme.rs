@@ -138,7 +138,9 @@ impl ThemeOps for EditorContext {
         let mut names =
             helix_view::theme::Loader::read_names(&helix_loader::config_dir().join("themes"));
         for rt_dir in helix_loader::runtime_dirs() {
-            names.extend(helix_view::theme::Loader::read_names(&rt_dir.join("themes")));
+            names.extend(helix_view::theme::Loader::read_names(
+                &rt_dir.join("themes"),
+            ));
         }
         names.push("default".to_string());
         names.push("base16_default".to_string());
@@ -162,9 +164,7 @@ impl ThemeOps for EditorContext {
         let mut vars = Vec::new();
 
         // Detect light vs dark from background color
-        let bg_color = theme
-            .try_get("ui.background")
-            .and_then(|s| s.bg.clone());
+        let bg_color = theme.try_get("ui.background").and_then(|s| s.bg.clone());
         let is_light = bg_color.as_ref().is_some_and(|c| is_light_background(c));
         log::debug!(
             "theme_to_css_vars: theme='{}', bg_color={:?}, is_light={}",
@@ -274,9 +274,7 @@ impl ThemeOps for EditorContext {
         if let Some(style) = theme.try_get("ui.linenr") {
             if let Some(ref c) = style.fg {
                 if let Some((r, g, b)) = color_to_rgb(c) {
-                    vars.push(format!(
-                        "--scrollbar-thumb: rgba({r}, {g}, {b}, 0.5);"
-                    ));
+                    vars.push(format!("--scrollbar-thumb: rgba({r}, {g}, {b}, 0.5);"));
                     vars.push(format!(
                         "--scrollbar-thumb-hover: rgba({r}, {g}, {b}, 0.65);"
                     ));

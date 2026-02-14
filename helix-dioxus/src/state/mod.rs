@@ -1252,6 +1252,11 @@ impl EditorContext {
             EditorCommand::ReplayMacro => {
                 self.replay_macro();
             }
+
+            EditorCommand::CliCommand(cmd) => {
+                self.command_input = cmd;
+                self.execute_command();
+            }
         }
     }
 

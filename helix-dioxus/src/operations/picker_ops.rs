@@ -1160,6 +1160,39 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
             "Switch Theme",
             Some(":theme"),
         ),
+        // Text manipulation
+        (
+            EditorCommand::CliCommand("sort".to_string()),
+            "Sort Selections",
+            Some(":sort"),
+        ),
+        (
+            EditorCommand::CliCommand("reflow".to_string()),
+            "Reflow Text",
+            Some(":reflow"),
+        ),
+        // Configuration
+        (
+            EditorCommand::CliCommand("config-open".to_string()),
+            "Open Config File",
+            Some(":config-open"),
+        ),
+        (
+            EditorCommand::CliCommand("log-open".to_string()),
+            "Open Log File",
+            Some(":log-open"),
+        ),
+        // Document info
+        (
+            EditorCommand::CliCommand("encoding".to_string()),
+            "Show Encoding",
+            Some(":encoding"),
+        ),
+        (
+            EditorCommand::CliCommand("tree-sitter-scopes".to_string()),
+            "Tree-sitter Scopes",
+            Some(":tree-sitter-scopes"),
+        ),
     ]
 }
 

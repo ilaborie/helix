@@ -24,14 +24,14 @@ impl MacroOps for EditorContext {
     fn toggle_macro_recording(&mut self) {
         if let Some((reg, keys)) = self.editor.macro_recording.take() {
             // Stop recording: serialize keys and write to register
-            let key_string: String = keys
-                .iter()
-                .map(KeyEvent::key_sequence_format)
-                .collect();
+            let key_string: String = keys.iter().map(KeyEvent::key_sequence_format).collect();
 
             let _ = self.editor.registers.write(reg, vec![key_string]);
 
-            log::info!("Macro recording stopped, saved {} keys to register '{reg}'", keys.len());
+            log::info!(
+                "Macro recording stopped, saved {} keys to register '{reg}'",
+                keys.len()
+            );
         } else {
             // Start recording: use selected register or default '@'
             let reg = self.editor.selected_register.take().unwrap_or('@');
@@ -124,7 +124,9 @@ impl EditorContext {
             match self.editor.mode() {
                 Mode::Insert => {
                     // Handle C-r in insert mode
-                    if key.modifiers.contains(helix_view::input::KeyModifiers::CONTROL)
+                    if key
+                        .modifiers
+                        .contains(helix_view::input::KeyModifiers::CONTROL)
                         && key.code == KeyCode::Char('r')
                     {
                         // Skip C-r prefix — in replay we can't do multi-key sequences

@@ -75,8 +75,9 @@ helix-dioxus/src/
 │   ├── search.rs               # SearchOps: execute_search, search_next
 │   ├── picker_ops.rs           # PickerOps: show_*_picker, picker_confirm
 │   ├── buffer.rs               # BufferOps: switch_to_buffer, save_document
-│   ├── cli.rs                  # CliOps: execute_command
+│   ├── cli.rs                  # CliOps: execute_command (sort, reflow, config-open, encoding, etc.)
 │   ├── shell.rs                # ShellOps: execute_shell_command (pipe selections)
+│   ├── text_manipulation.rs    # TextManipulationOps: sort_selections, reflow_selections
 │   ├── theme.rs                # ThemeOps: list_themes, apply_theme, theme_to_css_vars
 │   └── word_jump.rs            # WordJumpOps: compute labels, filter, jump
 │
@@ -436,6 +437,7 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - **Window/Splits**: Not supported — helix-dioxus uses a single-view design. `C-w` prefix and `Space w` sub-menu will not be implemented.
 
 ### Recently Completed
+- [x] Missing `:` commands batch (7 commands) — `:sort` (sort multi-cursor selections), `:reflow [width]` (rewrap text), `:config-open` / `:log-open` (open config/log files), `:encoding [label]` (show/set encoding), `:set-line-ending [lf|crlf]` (show/set line endings with Transaction), `:tree-sitter-scopes` (show TS scopes at cursor), `TextManipulationOps` extension trait, `CliCommand(String)` variant for command panel passthrough, 6 command panel entries
 - [x] Macro recording/replay (`Q`/`q`) — `Q` toggles recording to register (`"aQ` records to `a`, default `@`), `q` replays from register, `MacroOps` extension trait, statusline `REC [@]` indicator with blink animation, help bar hints, prevents recursion during replay, works in normal and select modes
 - [x] Theme switching — `:theme <name>` applies theme directly, `:theme` (no args) opens theme picker with all available themes, current theme highlighted, live preview on navigation (arrows/filter update UI immediately, Escape restores original theme), dynamic CSS variable injection from theme scopes (ui.background, ui.text, diagnostics, etc.), command panel entry, `ThemeOps` extension trait
 - [x] Shell integration (`|`, `!`, `A-|`, `A-!`) — pipe selections through shell commands with interactive prompt, per-selection processing, CLI commands (`:pipe`, `:sh`, `:insert-output`, `:append-output`, `:pipe-to`, `:run`), help bar hints, command panel entries

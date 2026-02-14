@@ -2,7 +2,9 @@
 
 use std::path::PathBuf;
 
-use crate::operations::{BufferOps, EditingOps, PickerOps, ShellOps, ThemeOps};
+use crate::operations::{
+    BufferOps, EditingOps, PickerOps, ShellOps, TextManipulationOps, ThemeOps,
+};
 use crate::state::{EditorContext, NotificationSeverity, ShellBehavior};
 
 /// Extension trait for CLI command operations.
@@ -251,6 +253,117 @@ impl CliOps for EditorContext {
                         NotificationSeverity::Warning,
                     );
                 }
+            }
+
+            // Sort selections
+            "sort" => {
+                self.sort_selections();
+            }
+
+            // Reflow text
+            "reflow" => {
+                let width = args.and_then(|arg| arg.parse::<usize>().ok());
+                self.reflow_selections(width);
+            }
+
+            // Open config/log files
+            "config-open" => {
+                self.open_file(&helix_loader::config_file());
+            }
+            "log-open" => {
+                self.open_file(&helix_loader::log_file());
+            }
+
+            // Encoding
+            "encoding" => {
+                let (msg, severity) = {
+                    let (_view, doc) = helix_view::current!(self.editor);
+                    match args {
+                        Some(label) => {
+                            let result = doc.set_encoding(label);
+                            match result {
+                                Ok(()) => (
+                                    format!("Encoding set to {}", doc.encoding().name()),
+                                    NotificationSeverity::Info,
+                                ),
+                                Err(err) => (
+                                    format!("Invalid encoding: {err}"),
+                                    NotificationSeverity::Error,
+                                ),
+                            }
+                        }
+                        None => (
+                            doc.encoding().name().to_string(),
+                            NotificationSeverity::Info,
+                        ),
+                    }
+                };
+                self.show_notification(msg, severity);
+            }
+
+            // Line ending
+            "set-line-ending" | "line-ending" => {
+                use helix_core::LineEnding;
+
+                if let Some(arg) = args {
+                    let arg = arg.to_ascii_lowercase();
+                    let line_ending = match arg.as_str() {
+                        "crlf" => Some(LineEnding::Crlf),
+                        "lf" => Some(LineEnding::LF),
+                        _ => None,
+                    };
+                    if let Some(le) = line_ending {
+                        let (view, doc) = helix_view::current!(self.editor);
+                        doc.line_ending = le;
+
+                        let mut pos = 0;
+                        let transaction = helix_core::Transaction::change(
+                            doc.text(),
+                            doc.text().lines().filter_map(|line| {
+                                pos += line.len_chars();
+                                match helix_core::line_ending::get_line_ending(&line) {
+                                    Some(ending) if ending != le => {
+                                        let start = pos - ending.len_chars();
+                                        let end = pos;
+                                        Some((start, end, Some(le.as_str().into())))
+                                    }
+                                    _ => None,
+                                }
+                            }),
+                        );
+                        doc.apply(&transaction, view.id);
+                        doc.append_changes_to_history(view);
+                    } else {
+                        self.show_notification(
+                            "Invalid line ending. Use 'lf' or 'crlf'".to_string(),
+                            NotificationSeverity::Error,
+                        );
+                    }
+                } else {
+                    let msg = {
+                        let (_view, doc) = helix_view::current!(self.editor);
+                        match doc.line_ending {
+                            LineEnding::Crlf => "crlf",
+                            LineEnding::LF => "lf",
+                            #[allow(unreachable_patterns)]
+                            _ => "unknown",
+                        }
+                        .to_string()
+                    };
+                    self.show_notification(msg, NotificationSeverity::Info);
+                }
+            }
+
+            // Tree-sitter scopes
+            "tree-sitter-scopes" => {
+                let msg = {
+                    let (view, doc) = helix_view::current!(self.editor);
+                    let text = doc.text().slice(..);
+                    let pos = doc.selection(view.id).primary().cursor(text);
+                    let scopes = helix_core::indent::get_scopes(doc.syntax(), text, pos);
+                    format!("{scopes:?}")
+                };
+                self.show_notification(msg, NotificationSeverity::Info);
             }
 
             _ => {

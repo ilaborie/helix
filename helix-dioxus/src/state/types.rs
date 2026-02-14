@@ -933,6 +933,10 @@ pub enum EditorCommand {
     ToggleMacroRecording,
     /// Replay macro from register (q).
     ReplayMacro,
+
+    // CLI passthrough
+    /// Execute a CLI command by string (e.g., ":sort", ":reflow").
+    CliCommand(String),
 }
 
 /// Shell pipe behavior for the `|`, `!`, `A-|`, `A-!` commands.

@@ -28,7 +28,7 @@ static TEST_RUNTIME: std::sync::OnceLock<tokio::runtime::Runtime> = std::sync::O
 ///
 /// The Tokio runtime enter guard is returned so callers can keep it alive
 /// for the duration of the test.
-fn init() -> tokio::runtime::EnterGuard<'static> {
+pub(crate) fn init() -> tokio::runtime::EnterGuard<'static> {
     use std::sync::Once;
     static EVENTS_INIT: Once = Once::new();
     EVENTS_INIT.call_once(|| {
