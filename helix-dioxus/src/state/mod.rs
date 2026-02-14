@@ -1551,7 +1551,7 @@ impl EditorContext {
     }
 
     /// Restart a language server by name.
-    fn restart_lsp_server(&mut self, name: &str) {
+    pub(crate) fn restart_lsp_server(&mut self, name: &str) {
         log::info!("Restarting LSP server: {}", name);
 
         // Get the current document and its language config

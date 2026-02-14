@@ -406,6 +406,38 @@ impl CliOps for EditorContext {
                 }
             }
 
+            // Format document
+            "format" | "fmt" => {
+                let view_id = self.editor.tree.focus;
+                let doc_id = self.editor.tree.get(view_id).doc;
+                self.format_document(doc_id, view_id);
+            }
+
+            // LSP restart
+            "lsp-restart" => {
+                if let Some(server_name) = args {
+                    let name = server_name.to_string();
+                    self.restart_lsp_server(&name);
+                } else {
+                    // Restart all servers for the current document's language
+                    let server_names: Vec<String> = {
+                        let (_view, doc) = helix_view::current_ref!(self.editor);
+                        doc.language_config()
+                            .map(|config| {
+                                config
+                                    .language_servers
+                                    .iter()
+                                    .map(|ls| ls.name.clone())
+                                    .collect()
+                            })
+                            .unwrap_or_default()
+                    };
+                    for name in &server_names {
+                        self.restart_lsp_server(name);
+                    }
+                }
+            }
+
             // Tree-sitter scopes
             "tree-sitter-scopes" => {
                 let msg = {

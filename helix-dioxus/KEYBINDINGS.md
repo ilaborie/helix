@@ -395,13 +395,8 @@ Window/split management is not supported. helix-dioxus uses a single-view design
 | `:config-reload` | | Reload config (editor, languages, theme) |
 | `:set` | | Set config option (`:set <key> <value>`) |
 | `:toggle` | | Toggle config option (`:toggle <key> [val1 val2 ...]`) |
-
-### Missing Notable Commands
-
-| Command | Helix Action | Notes |
-|---------|-------------|-------|
-| `:format` | Format document | Available via command panel and `=` binding |
-| `:lsp-restart` | Restart LSP | Available via LSP status dialog |
+| `:format` | `:fmt` | Format document via LSP |
+| `:lsp-restart` | | Restart LSP server(s) for current document |
 
 ---
 
@@ -445,8 +440,8 @@ Window/split management is not supported. helix-dioxus uses a single-view design
 | Select Mode | 35+ bindings | 0 | 100% |
 | Insert Mode | 18 bindings | 0 | 100% |
 | Macros | 4 bindings | 0 | 100% |
-| Commands | 43 commands | 2 | 96% |
-| **Overall** | **~97%** | | |
+| Commands | 45 commands | 0 | 100% |
+| **Overall** | **~98%** | | |
 
 ### Design Decisions
 
