@@ -14,8 +14,8 @@ use crate::keybindings::{
     handle_bracket_next, handle_bracket_prev, handle_code_actions_mode, handle_command_mode,
     handle_completion_mode, handle_confirmation_mode, handle_g_prefix, handle_input_dialog_mode,
     handle_insert_mode, handle_location_picker_mode, handle_lsp_dialog_mode, handle_normal_mode,
-    handle_picker_mode, handle_regex_mode, handle_search_mode, handle_select_mode,
-    handle_space_leader, handle_view_prefix, translate_key_event,
+    handle_picker_mode, handle_regex_mode, handle_search_mode, handle_select_g_prefix,
+    handle_select_mode, handle_space_leader, handle_view_prefix, translate_key_event,
 };
 use crate::state::{EditorCommand, PendingKeySequence};
 use crate::AppState;
@@ -125,7 +125,11 @@ pub fn App() -> Element {
                 match current_pending {
                     PendingKeySequence::GPrefix => {
                         pending_key.set(PendingKeySequence::None);
-                        handle_g_prefix(&key_event)
+                        if snapshot.mode == "SELECT" {
+                            handle_select_g_prefix(&key_event)
+                        } else {
+                            handle_g_prefix(&key_event)
+                        }
                     }
                     PendingKeySequence::BracketNext => {
                         pending_key.set(PendingKeySequence::None);

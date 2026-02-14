@@ -23,7 +23,9 @@ pub fn handle_view_prefix(key: &KeyEvent) -> Vec<EditorCommand> {
 
     match key.code {
         // Alignment
-        KeyCode::Char('z') | KeyCode::Char('c') => vec![EditorCommand::AlignViewCenter],
+        KeyCode::Char('z') | KeyCode::Char('c') | KeyCode::Char('m') => {
+            vec![EditorCommand::AlignViewCenter]
+        }
         KeyCode::Char('t') => vec![EditorCommand::AlignViewTop],
         KeyCode::Char('b') => vec![EditorCommand::AlignViewBottom],
 
@@ -217,16 +219,24 @@ pub fn handle_g_prefix(key: &KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('b') => vec![EditorCommand::GotoWindowBottom],
         // gc - go to window center
         KeyCode::Char('c') => vec![EditorCommand::GotoWindowCenter],
+        // gD - go to declaration
+        KeyCode::Char('D') => vec![EditorCommand::GotoDeclaration],
         // gd - go to definition
         KeyCode::Char('d') => vec![EditorCommand::GotoDefinition],
         // ge - go to last line
         KeyCode::Char('e') => vec![EditorCommand::GotoLastLine],
+        // gf - open file under cursor
+        KeyCode::Char('f') => vec![EditorCommand::GotoFileUnderCursor],
         // gg - go to first line
         KeyCode::Char('g') => vec![EditorCommand::GotoFirstLine],
         // gh - go to line start
         KeyCode::Char('h') => vec![EditorCommand::MoveLineStart],
         // gi - go to implementation
         KeyCode::Char('i') => vec![EditorCommand::GotoImplementation],
+        // gj - move down (visual line, no soft-wrap = same as j)
+        KeyCode::Char('j') => vec![EditorCommand::MoveDown],
+        // gk - move up (visual line, no soft-wrap = same as k)
+        KeyCode::Char('k') => vec![EditorCommand::MoveUp],
         // gl - go to line end
         KeyCode::Char('l') => vec![EditorCommand::MoveLineEnd],
         // gm - go to last modified file
@@ -243,6 +253,8 @@ pub fn handle_g_prefix(key: &KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('t') => vec![EditorCommand::GotoWindowTop],
         // gy - go to type definition
         KeyCode::Char('y') => vec![EditorCommand::GotoTypeDefinition],
+        // g| - go to column 1
+        KeyCode::Char('|') => vec![EditorCommand::GotoColumn],
         _ => vec![],
     }
 }
@@ -314,6 +326,10 @@ pub fn handle_space_leader(key: &KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('D') => vec![EditorCommand::ShowWorkspaceDiagnostics],
         // Space f - file picker
         KeyCode::Char('f') => vec![EditorCommand::ShowFilePicker],
+        // Space F - file picker in buffer's directory
+        KeyCode::Char('F') => vec![EditorCommand::ShowFilePickerInBufferDir],
+        // Space h - select references to symbol (document highlights)
+        KeyCode::Char('h') => vec![EditorCommand::SelectReferencesToSymbol],
         // Space i - toggle inlay hints (custom extension)
         KeyCode::Char('i') => vec![EditorCommand::ToggleInlayHints],
         // Space k - hover
@@ -349,6 +365,15 @@ pub fn handle_space_leader(key: &KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('y') => {
             vec![EditorCommand::SetSelectedRegister('+'), EditorCommand::Yank]
         }
+        // Space Y - yank main selection to system clipboard
+        KeyCode::Char('Y') => {
+            vec![
+                EditorCommand::SetSelectedRegister('+'),
+                EditorCommand::YankMainSelectionToClipboard,
+            ]
+        }
+        // Space ' - resume last picker
+        KeyCode::Char('\'') => vec![EditorCommand::ShowLastPicker],
         _ => vec![],
     }
 }

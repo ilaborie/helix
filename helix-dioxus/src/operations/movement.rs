@@ -54,6 +54,7 @@ pub trait MovementOps {
     fn prev_parameter(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn next_comment(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn prev_comment(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn goto_column(&mut self, doc_id: DocumentId, view_id: ViewId);
 }
 
 impl MovementOps for EditorContext {
@@ -460,6 +461,17 @@ impl MovementOps for EditorContext {
             "comment",
             helix_core::movement::Direction::Backward,
         );
+    }
+
+    /// Move cursor to column 1 on the current line (g| in Helix).
+    fn goto_column(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+        let cursor = selection.primary().cursor(text);
+        let line = text.char_to_line(cursor);
+        let line_start = text.line_to_char(line);
+        doc.set_selection(view_id, helix_core::Selection::point(line_start));
     }
 }
 
@@ -1060,6 +1072,24 @@ mod tests {
     }
 
     // --- scroll_to_line ---
+
+    // --- goto_column ---
+
+    #[test]
+    fn goto_column_moves_to_line_start() {
+        let mut ctx = test_context("hel#[l|]#o\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.goto_column(doc_id, view_id);
+        assert_state(&ctx, "#[h|]#ello\n");
+    }
+
+    #[test]
+    fn goto_column_second_line() {
+        let mut ctx = test_context("hello\nwor#[l|]#d\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.goto_column(doc_id, view_id);
+        assert_state(&ctx, "hello\n#[w|]#orld\n");
+    }
 
     #[test]
     fn scroll_to_line_updates_view_offset() {

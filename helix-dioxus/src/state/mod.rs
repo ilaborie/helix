@@ -71,6 +71,8 @@ pub struct EditorContext {
     pub(crate) picker_selected: usize,
     pub(crate) picker_mode: PickerMode,
     pub(crate) picker_current_path: Option<PathBuf>,
+    /// Last picker mode used (for resume with Space ').
+    pub(crate) last_picker_mode: Option<PickerMode>,
 
     // Buffer bar state - pub(crate) for operations access
     pub(crate) buffer_bar_scroll: usize,
@@ -266,6 +268,7 @@ impl EditorContext {
             picker_selected: 0,
             picker_mode: PickerMode::default(),
             picker_current_path: None,
+            last_picker_mode: None,
             buffer_bar_scroll: 0,
             clipboard: String::new(),
             // LSP state
@@ -373,6 +376,9 @@ impl EditorContext {
             EditorCommand::HalfPageDown => self.half_page_down(doc_id, view_id),
             EditorCommand::GotoFirstNonWhitespace => {
                 self.goto_first_nonwhitespace(doc_id, view_id);
+            }
+            EditorCommand::GotoColumn => {
+                self.goto_column(doc_id, view_id);
             }
             EditorCommand::ScrollUp(lines) => self.scroll_up(doc_id, view_id, lines),
             EditorCommand::ScrollDown(lines) => self.scroll_down(doc_id, view_id, lines),
@@ -538,6 +544,12 @@ impl EditorContext {
             EditorCommand::ExtendTillCharBackward(ch) => {
                 self.extend_find_char(doc_id, view_id, ch, false, true);
             }
+            EditorCommand::ExtendToFirstLine => self.extend_to_first_line(doc_id, view_id),
+            EditorCommand::ExtendToLastLine => self.extend_to_last_line(doc_id, view_id),
+            EditorCommand::ExtendGotoFirstNonWhitespace => {
+                self.extend_goto_first_nonwhitespace(doc_id, view_id);
+            }
+            EditorCommand::ExtendGotoColumn => self.extend_goto_column(doc_id, view_id),
             EditorCommand::ExtendSearchNext => {
                 self.extend_search_next(doc_id, view_id);
             }
@@ -547,6 +559,9 @@ impl EditorContext {
 
             // Clipboard operations
             EditorCommand::Yank => self.yank(doc_id, view_id),
+            EditorCommand::YankMainSelectionToClipboard => {
+                self.yank_main_selection_to_clipboard(doc_id, view_id);
+            }
             EditorCommand::Paste => self.paste(doc_id, view_id, false),
             EditorCommand::PasteBefore => self.paste(doc_id, view_id, true),
             EditorCommand::DeleteSelection => self.delete_selection(doc_id, view_id),
@@ -664,6 +679,9 @@ impl EditorContext {
             EditorCommand::ShowBufferPicker => {
                 self.show_buffer_picker();
             }
+            EditorCommand::ShowLastPicker => {
+                self.show_last_picker();
+            }
             EditorCommand::PickerUp => {
                 if self.picker_selected > 0 {
                     self.picker_selected -= 1;
@@ -750,6 +768,12 @@ impl EditorContext {
             }
 
             // File operations
+            EditorCommand::GotoFileUnderCursor => {
+                self.goto_file_under_cursor();
+            }
+            EditorCommand::ShowFilePickerInBufferDir => {
+                self.show_file_picker_in_buffer_dir();
+            }
             EditorCommand::OpenFile(path) => {
                 self.open_file(&path);
             }
@@ -799,8 +823,14 @@ impl EditorContext {
             EditorCommand::GotoTypeDefinition => {
                 self.trigger_goto_type_definition();
             }
+            EditorCommand::GotoDeclaration => {
+                self.trigger_goto_declaration();
+            }
             EditorCommand::GotoImplementation => {
                 self.trigger_goto_implementation();
+            }
+            EditorCommand::SelectReferencesToSymbol => {
+                self.trigger_select_references();
             }
             EditorCommand::LocationUp => {
                 if self.location_selected > 0 {
@@ -1131,6 +1161,9 @@ impl EditorContext {
                     self.locations = locations;
                     self.show_references_picker();
                 }
+            }
+            LspResponse::DocumentHighlights(highlights) => {
+                self.apply_document_highlights(highlights);
             }
             LspResponse::CodeActions(actions) => {
                 self.code_actions = actions;
@@ -1934,6 +1967,10 @@ impl EditorContext {
     }
 
     /// Trigger goto definition at the current cursor position.
+    pub(crate) fn trigger_goto_declaration(&mut self) {
+        self.trigger_goto(LanguageServerFeature::GotoDeclaration, "Declaration");
+    }
+
     pub(crate) fn trigger_goto_definition(&mut self) {
         self.trigger_goto(LanguageServerFeature::GotoDefinition, "Definition");
     }
@@ -2005,6 +2042,11 @@ impl EditorContext {
         let title_string = title.to_string();
 
         match feature {
+            LanguageServerFeature::GotoDeclaration => {
+                if let Some(future) = ls.goto_declaration(doc_id_lsp, pos, None) {
+                    Self::spawn_goto_request(tx, future, offset_encoding, title_string);
+                }
+            }
             LanguageServerFeature::GotoDefinition => {
                 if let Some(future) = ls.goto_definition(doc_id_lsp, pos, None) {
                     Self::spawn_goto_request(tx, future, offset_encoding, title_string);
@@ -2073,6 +2115,163 @@ impl EditorContext {
                 }
                 Err(e) => {
                     log::error!("References request failed: {}", e);
+                }
+            }
+        });
+    }
+
+    /// Open the file path under the cursor (gf).
+    fn goto_file_under_cursor(&mut self) {
+        let view_id = self.editor.tree.focus;
+        let view = self.editor.tree.get(view_id);
+        let doc_id = view.doc;
+
+        let Some(doc) = self.editor.document(doc_id) else {
+            return;
+        };
+
+        let text = doc.text();
+        let selection = doc.selection(view_id);
+        let cursor = selection.primary().cursor(text.slice(..));
+
+        // Extract a file-path-like string around cursor
+        let mut start = cursor;
+        let mut end = cursor;
+
+        while start > 0 {
+            let ch = text.char(start - 1);
+            if ch.is_whitespace() || ch == '"' || ch == '\'' || ch == '<' || ch == '>' {
+                break;
+            }
+            start -= 1;
+        }
+
+        let len = text.len_chars();
+        while end < len {
+            let ch = text.char(end);
+            if ch.is_whitespace() || ch == '"' || ch == '\'' || ch == '<' || ch == '>' {
+                break;
+            }
+            end += 1;
+        }
+
+        if start == end {
+            self.editor.set_error("No file path under cursor");
+            return;
+        }
+
+        let path_str: String = text.slice(start..end).into();
+
+        // Try resolving relative to buffer's directory, then CWD
+        let buffer_dir = doc.path().and_then(|p| p.parent().map(|p| p.to_path_buf()));
+        let resolved = buffer_dir
+            .as_ref()
+            .map(|dir| dir.join(&path_str))
+            .filter(|p| p.exists())
+            .unwrap_or_else(|| PathBuf::from(&path_str));
+
+        if resolved.exists() {
+            self.open_file(&resolved);
+        } else {
+            self.editor
+                .set_error(format!("File not found: {}", path_str));
+        }
+    }
+
+    /// Apply document highlights as a multi-selection on the current document.
+    fn apply_document_highlights(&mut self, highlights: Vec<lsp::DocumentHighlight>) {
+        if highlights.is_empty() {
+            return;
+        }
+
+        let view_id = self.editor.tree.focus;
+        let view = self.editor.tree.get(view_id);
+        let doc_id = view.doc;
+
+        let Some(doc) = self.editor.document(doc_id) else {
+            return;
+        };
+
+        // Get offset encoding from the first language server
+        let offset_encoding = doc
+            .language_servers_with_feature(LanguageServerFeature::DocumentHighlight)
+            .next()
+            .map(|ls| ls.offset_encoding())
+            .unwrap_or(helix_lsp::OffsetEncoding::Utf16);
+
+        let ranges: Vec<helix_core::Range> = highlights
+            .iter()
+            .filter_map(|hl| {
+                let start = helix_lsp::util::lsp_pos_to_pos(
+                    doc.text(),
+                    hl.range.start,
+                    offset_encoding,
+                )?;
+                let end =
+                    helix_lsp::util::lsp_pos_to_pos(doc.text(), hl.range.end, offset_encoding)?;
+                Some(helix_core::Range::new(start, end))
+            })
+            .collect();
+
+        if ranges.is_empty() {
+            return;
+        }
+
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let selection = helix_core::Selection::new(ranges.into(), 0);
+        doc.set_selection(view_id, selection);
+
+        log::info!(
+            "Selected {} references via document highlights",
+            highlights.len()
+        );
+    }
+
+    /// Trigger document highlights (select references) at cursor.
+    pub(crate) fn trigger_select_references(&mut self) {
+        let view_id = self.editor.tree.focus;
+        let view = self.editor.tree.get(view_id);
+        let doc_id = view.doc;
+
+        let Some(doc) = self.editor.document(doc_id) else {
+            log::warn!("No document for document highlights");
+            return;
+        };
+
+        let ls = match doc
+            .language_servers_with_feature(LanguageServerFeature::DocumentHighlight)
+            .next()
+        {
+            Some(ls) => ls,
+            None => {
+                log::info!("No language server supports document highlights");
+                return;
+            }
+        };
+
+        let offset_encoding = ls.offset_encoding();
+        let pos = doc.position(view_id, offset_encoding);
+        let doc_id_lsp = doc.identifier();
+
+        let Some(future) = ls.text_document_document_highlight(doc_id_lsp, pos, None) else {
+            log::warn!("Failed to create document highlight request");
+            return;
+        };
+
+        let tx = self.command_tx.clone();
+        tokio::spawn(async move {
+            match future.await {
+                Ok(Some(highlights)) => {
+                    log::info!("Received {} document highlights", highlights.len());
+                    let _ = tx.send(EditorCommand::LspResponse(
+                        LspResponse::DocumentHighlights(highlights),
+                    ));
+                }
+                Ok(None) => {
+                    log::info!("No document highlights found");
+                }
+                Err(e) => {
+                    log::error!("Document highlight request failed: {}", e);
                 }
             }
         });
@@ -2894,6 +3093,7 @@ impl EditorContext {
 
         // Set up picker state
         self.picker_mode = PickerMode::DocumentSymbols;
+        self.last_picker_mode = Some(PickerMode::DocumentSymbols);
         self.picker_visible = true;
         self.picker_filter.clear();
         self.picker_selected = 0;
@@ -2951,6 +3151,7 @@ impl EditorContext {
 
         // Set up picker state - initially empty, will populate on filter input
         self.picker_mode = PickerMode::WorkspaceSymbols;
+        self.last_picker_mode = Some(PickerMode::WorkspaceSymbols);
         self.picker_visible = true;
         self.picker_filter.clear();
         self.picker_selected = 0;
@@ -3046,6 +3247,7 @@ impl EditorContext {
 
         // Set up picker state
         self.picker_mode = PickerMode::DocumentDiagnostics;
+        self.last_picker_mode = Some(PickerMode::DocumentDiagnostics);
         self.picker_visible = true;
         self.picker_filter.clear();
         self.picker_selected = 0;
@@ -3117,6 +3319,7 @@ impl EditorContext {
 
         // Set up picker state
         self.picker_mode = PickerMode::WorkspaceDiagnostics;
+        self.last_picker_mode = Some(PickerMode::WorkspaceDiagnostics);
         self.picker_visible = true;
         self.picker_filter.clear();
         self.picker_selected = 0;
@@ -3126,6 +3329,25 @@ impl EditorContext {
             "Showing {} workspace diagnostics",
             self.picker_diagnostics.len()
         );
+    }
+
+    /// Resume the last picker that was opened (Space ').
+    pub(crate) fn show_last_picker(&mut self) {
+        match self.last_picker_mode {
+            Some(PickerMode::DirectoryBrowser) => self.show_file_picker(),
+            Some(PickerMode::FilesRecursive) => self.show_files_recursive_picker(),
+            Some(PickerMode::Buffers) => self.show_buffer_picker(),
+            Some(PickerMode::Registers) => self.show_register_picker(),
+            Some(PickerMode::Commands) => self.show_command_panel(),
+            Some(PickerMode::GlobalSearch) => self.show_global_search_picker(),
+            Some(PickerMode::DocumentSymbols) => self.show_document_symbols(),
+            Some(PickerMode::WorkspaceSymbols) => self.show_workspace_symbols(),
+            Some(PickerMode::DocumentDiagnostics) => self.show_document_diagnostics_picker(),
+            Some(PickerMode::WorkspaceDiagnostics) => self.show_workspace_diagnostics_picker(),
+            Some(PickerMode::References) => self.show_references_picker(),
+            Some(PickerMode::Definitions) => self.show_definitions_picker(),
+            None => {}
+        }
     }
 
     /// Populate picker items from diagnostics.

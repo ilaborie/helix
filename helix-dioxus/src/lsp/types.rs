@@ -482,6 +482,8 @@ pub enum LspResponse {
     FormatResult {
         transaction: helix_core::Transaction,
     },
+    /// Document highlights received (for selecting references).
+    DocumentHighlights(Vec<helix_lsp::lsp::DocumentHighlight>),
     /// Workspace edit applied (from code action).
     WorkspaceEditApplied,
     /// Rename result received.

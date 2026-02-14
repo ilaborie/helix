@@ -8,6 +8,7 @@ use crate::state::EditorContext;
 /// Extension trait for clipboard operations.
 pub trait ClipboardOps {
     fn yank(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn yank_main_selection_to_clipboard(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn paste(&mut self, doc_id: DocumentId, view_id: ViewId, before: bool);
     fn delete_selection(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn delete_selection_noyank(&mut self, doc_id: DocumentId, view_id: ViewId);
@@ -43,6 +44,38 @@ impl ClipboardOps for EditorContext {
 
         log::info!(
             "Yanked {} characters to register '{}'",
+            selected_text.len(),
+            register
+        );
+    }
+
+    /// Yank only the primary selection to the selected register.
+    ///
+    /// Unlike `yank` which yanks whatever range is current, this explicitly
+    /// yanks only the primary selection text — useful with multi-cursor.
+    fn yank_main_selection_to_clipboard(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let register = self.take_register();
+
+        let doc = self.editor.document(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let primary = doc.selection(view_id).primary();
+
+        let selected_text: String = text.slice(primary.from()..primary.to()).into();
+
+        if let Err(e) = self
+            .editor
+            .registers
+            .write(register, vec![selected_text.clone()])
+        {
+            log::warn!("Failed to write to register '{}': {e}", register);
+        }
+
+        if register == '+' {
+            self.clipboard.clone_from(&selected_text);
+        }
+
+        log::info!(
+            "Yanked main selection ({} chars) to register '{}'",
             selected_text.len(),
             register
         );
@@ -367,5 +400,31 @@ mod tests {
         let (_view, doc) = helix_view::current_ref!(ctx.editor);
         let text: String = doc.text().slice(..).into();
         assert_eq!(text, "ello\n");
+    }
+
+    // --- yank_main_selection_to_clipboard ---
+
+    #[test]
+    fn yank_main_selection_to_clipboard_copies_primary() {
+        let mut ctx = test_context("#[hello|]# world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.editor.selected_register = Some('+');
+        ctx.yank_main_selection_to_clipboard(doc_id, view_id);
+        assert_eq!(ctx.clipboard, "hello");
+    }
+
+    #[test]
+    fn yank_main_selection_to_clipboard_to_named_register() {
+        let mut ctx = test_context("#[hello|]# world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.editor.selected_register = Some('a');
+        ctx.yank_main_selection_to_clipboard(doc_id, view_id);
+        let content = ctx
+            .editor
+            .registers
+            .read('a', &ctx.editor)
+            .and_then(|mut v| v.next().map(|s| s.into_owned()))
+            .unwrap_or_default();
+        assert_eq!(content, "hello");
     }
 }

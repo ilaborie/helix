@@ -304,6 +304,8 @@ pub enum EditorCommand {
     HalfPageDown,
     /// Move to first non-whitespace character on line (gs).
     GotoFirstNonWhitespace,
+    /// Move cursor to column 1 on current line (g|).
+    GotoColumn,
     /// Align view so cursor is centered vertically (zz / zc).
     AlignViewCenter,
     /// Align view so cursor is at the top (zt).
@@ -461,6 +463,14 @@ pub enum EditorCommand {
     ExtendTillCharForward(char),
     /// Extend selection till char backward (select mode).
     ExtendTillCharBackward(char),
+    /// Extend selection to first line (select mode gg).
+    ExtendToFirstLine,
+    /// Extend selection to last line (select mode ge/G).
+    ExtendToLastLine,
+    /// Extend selection to first non-whitespace on line (select mode gs).
+    ExtendGotoFirstNonWhitespace,
+    /// Extend selection to column 1 (select mode g|).
+    ExtendGotoColumn,
     /// Extend selection to next search match (select mode).
     ExtendSearchNext,
     /// Extend selection to previous search match (select mode).
@@ -480,6 +490,8 @@ pub enum EditorCommand {
 
     // Clipboard operations
     Yank,
+    /// Yank only the primary selection to the clipboard (Space Y).
+    YankMainSelectionToClipboard,
     Paste,
     PasteBefore,
 
@@ -522,6 +534,8 @@ pub enum EditorCommand {
     ShowFilePicker,
     ShowFilesRecursivePicker,
     ShowBufferPicker,
+    /// Resume last picker (Space ').
+    ShowLastPicker,
     PickerUp,
     PickerDown,
     PickerConfirm,
@@ -548,6 +562,10 @@ pub enum EditorCommand {
     PreviousBuffer,
 
     // File operations
+    /// Open the file path under the cursor (gf).
+    GotoFileUnderCursor,
+    /// Show file picker in the current buffer's directory (Space F).
+    ShowFilePickerInBufferDir,
     OpenFile(PathBuf),
     /// Save document to a specific path (used by Save As dialog).
     SaveDocumentToPath(PathBuf),
@@ -573,12 +591,16 @@ pub enum EditorCommand {
     // LSP - Goto
     /// Go to definition of symbol under cursor.
     GotoDefinition,
+    /// Go to declaration of symbol under cursor.
+    GotoDeclaration,
     /// Find references to symbol under cursor.
     GotoReferences,
     /// Go to type definition of symbol under cursor.
     GotoTypeDefinition,
     /// Go to implementation of symbol under cursor.
     GotoImplementation,
+    /// Select all references to symbol under cursor (document highlights).
+    SelectReferencesToSymbol,
     /// Confirm selected location in location picker.
     LocationConfirm,
     /// Cancel/close location picker.

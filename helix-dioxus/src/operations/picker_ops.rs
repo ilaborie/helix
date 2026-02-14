@@ -125,6 +125,7 @@ impl PickerOps for EditorContext {
         self.picker_selected = 0;
         self.picker_visible = true;
         self.picker_mode = PickerMode::DirectoryBrowser;
+        self.last_picker_mode = Some(PickerMode::DirectoryBrowser);
         self.picker_current_path = Some(cwd);
     }
 
@@ -183,6 +184,7 @@ impl PickerOps for EditorContext {
         self.picker_selected = 0;
         self.picker_visible = true;
         self.picker_mode = PickerMode::FilesRecursive;
+        self.last_picker_mode = Some(PickerMode::FilesRecursive);
         self.picker_current_path = Some(cwd);
     }
 
@@ -225,6 +227,7 @@ impl PickerOps for EditorContext {
         self.picker_selected = 0;
         self.picker_visible = true;
         self.picker_mode = PickerMode::Buffers;
+        self.last_picker_mode = Some(PickerMode::Buffers);
         self.picker_current_path = None;
     }
 
@@ -454,6 +457,29 @@ impl PickerOps for EditorContext {
 }
 
 impl EditorContext {
+    /// Show file picker in the current buffer's directory.
+    pub(crate) fn show_file_picker_in_buffer_dir(&mut self) {
+        let view_id = self.editor.tree.focus;
+        let view = self.editor.tree.get(view_id);
+        let doc_id = view.doc;
+
+        let buffer_dir = self
+            .editor
+            .document(doc_id)
+            .and_then(|doc| doc.path())
+            .and_then(|p| p.parent().map(|p| p.to_path_buf()));
+
+        if let Some(dir) = buffer_dir {
+            if std::env::set_current_dir(&dir).is_ok() {
+                self.show_file_picker();
+                return;
+            }
+        }
+
+        // Fallback: open regular file picker
+        self.show_file_picker();
+    }
+
     /// Show the register picker with all populated registers.
     pub(crate) fn show_register_picker(&mut self) {
         self.command_mode = false;
@@ -509,6 +535,7 @@ impl EditorContext {
         self.picker_selected = 0;
         self.picker_visible = true;
         self.picker_mode = PickerMode::Registers;
+        self.last_picker_mode = Some(PickerMode::Registers);
         self.picker_current_path = None;
     }
 
@@ -536,6 +563,7 @@ impl EditorContext {
         self.picker_selected = 0;
         self.picker_visible = true;
         self.picker_mode = PickerMode::Commands;
+        self.last_picker_mode = Some(PickerMode::Commands);
         self.picker_current_path = None;
     }
 
@@ -552,6 +580,7 @@ impl EditorContext {
         self.picker_selected = 0;
         self.picker_visible = true;
         self.picker_mode = PickerMode::GlobalSearch;
+        self.last_picker_mode = Some(PickerMode::GlobalSearch);
         self.picker_current_path = None;
         self.global_search_results.clear();
     }
@@ -685,6 +714,7 @@ impl EditorContext {
         self.picker_selected = 0;
         self.picker_visible = true;
         self.picker_mode = PickerMode::References;
+        self.last_picker_mode = Some(PickerMode::References);
         self.picker_current_path = None;
     }
 
@@ -724,8 +754,10 @@ impl EditorContext {
         self.picker_selected = 0;
         self.picker_visible = true;
         self.picker_mode = PickerMode::Definitions;
+        self.last_picker_mode = Some(PickerMode::Definitions);
         self.picker_current_path = None;
     }
+
 }
 
 /// Execute global search on a blocking thread.
@@ -912,6 +944,11 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
             EditorCommand::RenameSymbol,
             "Rename Symbol",
             Some("Space r"),
+        ),
+        (
+            EditorCommand::GotoDeclaration,
+            "Go to Declaration",
+            Some("gD"),
         ),
         (
             EditorCommand::GotoDefinition,

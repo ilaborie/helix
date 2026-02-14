@@ -32,6 +32,10 @@ pub trait SelectionOps {
     fn split_selection_on_newline(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn select_regex(&mut self, doc_id: DocumentId, view_id: ViewId, pattern: &str);
     fn split_selection(&mut self, doc_id: DocumentId, view_id: ViewId, pattern: &str);
+    fn extend_to_first_line(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn extend_to_last_line(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn extend_goto_first_nonwhitespace(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn extend_goto_column(&mut self, doc_id: DocumentId, view_id: ViewId);
 }
 
 impl SelectionOps for EditorContext {
@@ -492,6 +496,65 @@ impl SelectionOps for EditorContext {
         doc.set_selection(view_id, new_selection);
     }
 
+    /// Extend selection to first line (`gg` in select mode).
+    fn extend_to_first_line(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection.transform(|range| helix_core::Range::new(range.anchor, 0));
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    /// Extend selection to last line (`ge` in select mode).
+    fn extend_to_last_line(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+        let last_line = text.len_lines().saturating_sub(1);
+        let last_line_start = text.line_to_char(last_line);
+
+        let new_selection = selection
+            .transform(|range| helix_core::Range::new(range.anchor, last_line_start));
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    /// Extend selection to first non-whitespace on line (`gs` in select mode).
+    fn extend_goto_first_nonwhitespace(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection.transform(|range| {
+            let line = text.char_to_line(range.head);
+            let line_start = text.line_to_char(line);
+            let line_text = text.line(line);
+            let offset = line_text
+                .chars()
+                .take_while(|ch| ch.is_whitespace() && *ch != '\n')
+                .count();
+            helix_core::Range::new(range.anchor, line_start + offset)
+        });
+
+        doc.set_selection(view_id, new_selection);
+    }
+
+    /// Extend selection to column 1 (`g|` in select mode).
+    fn extend_goto_column(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone();
+
+        let new_selection = selection.transform(|range| {
+            let line = text.char_to_line(range.head);
+            let line_start = text.line_to_char(line);
+            helix_core::Range::new(range.anchor, line_start)
+        });
+
+        doc.set_selection(view_id, new_selection);
+    }
+
     /// Trim whitespace from selection edges (`_` in Helix).
     fn trim_selections(&mut self, doc_id: DocumentId, view_id: ViewId) {
         let doc = self.editor.document_mut(doc_id).expect("doc exists");
@@ -923,6 +986,72 @@ mod tests {
         let (_view, doc) = helix_view::current_ref!(ctx.editor);
         let sel = doc.selection(view_id);
         assert_eq!(sel.len(), 3, "should split into 3 parts on spaces");
+    }
+
+    // --- split_selection_on_newline ---
+
+    // --- extend_to_first_line ---
+
+    #[test]
+    fn extend_to_first_line_preserves_anchor() {
+        let mut ctx = test_context("hello\nwor#[l|]#d\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        // Set anchor at position 9, head at 10
+        let doc = ctx.editor.document_mut(doc_id).expect("doc");
+        doc.set_selection(view_id, helix_core::Selection::single(9, 10));
+        ctx.extend_to_first_line(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.anchor, 9, "anchor should be preserved");
+        assert_eq!(sel.head, 0, "head should move to position 0");
+    }
+
+    // --- extend_to_last_line ---
+
+    #[test]
+    fn extend_to_last_line_preserves_anchor() {
+        let mut ctx = test_context("#[h|]#ello\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        let doc = ctx.editor.document_mut(doc_id).expect("doc");
+        doc.set_selection(view_id, helix_core::Selection::single(0, 1));
+        ctx.extend_to_last_line(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.anchor, 0, "anchor should be preserved");
+        let text = doc.text().slice(..);
+        let last_line = text.len_lines().saturating_sub(1);
+        let last_line_start = text.line_to_char(last_line);
+        assert_eq!(sel.head, last_line_start, "head should move to last line start");
+    }
+
+    // --- extend_goto_first_nonwhitespace ---
+
+    #[test]
+    fn extend_goto_first_nonwhitespace_preserves_anchor() {
+        let mut ctx = test_context("  #[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        let doc = ctx.editor.document_mut(doc_id).expect("doc");
+        doc.set_selection(view_id, helix_core::Selection::single(4, 3));
+        ctx.extend_goto_first_nonwhitespace(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.anchor, 4, "anchor should be preserved");
+        assert_eq!(sel.head, 2, "head should move to first non-whitespace");
+    }
+
+    // --- extend_goto_column ---
+
+    #[test]
+    fn extend_goto_column_preserves_anchor() {
+        let mut ctx = test_context("hel#[l|]#o\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        let doc = ctx.editor.document_mut(doc_id).expect("doc");
+        doc.set_selection(view_id, helix_core::Selection::single(4, 3));
+        ctx.extend_goto_column(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.anchor, 4, "anchor should be preserved");
+        assert_eq!(sel.head, 0, "head should move to column 1 (line start)");
     }
 
     // --- split_selection_on_newline ---
