@@ -153,6 +153,10 @@ pub fn handle_select_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('|') => vec![EditorCommand::EnterShellMode(ShellBehavior::Replace)],
         KeyCode::Char('!') => vec![EditorCommand::EnterShellMode(ShellBehavior::Insert)],
 
+        // Macro recording/replay
+        KeyCode::Char('Q') => vec![EditorCommand::ToggleMacroRecording],
+        KeyCode::Char('q') => vec![EditorCommand::ReplayMacro],
+
         _ => vec![],
     }
 }
@@ -242,5 +246,17 @@ mod tests {
     fn select_alt_i_shrinks_selection() {
         let cmds = handle_select_mode(&alt_key('i'));
         assert_single_command!(cmds, EditorCommand::ShrinkSelection);
+    }
+
+    #[test]
+    fn select_q_replays_macro() {
+        let cmds = handle_select_mode(&key('q'));
+        assert_single_command!(cmds, EditorCommand::ReplayMacro);
+    }
+
+    #[test]
+    fn select_upper_q_toggles_macro_recording() {
+        let cmds = handle_select_mode(&key('Q'));
+        assert_single_command!(cmds, EditorCommand::ToggleMacroRecording);
     }
 }

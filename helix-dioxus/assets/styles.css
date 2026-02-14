@@ -320,6 +320,18 @@ body {
     font-size: 12px;
 }
 
+.statusline-recording {
+    padding: 0 8px;
+    color: var(--error);
+    font-weight: 600;
+    animation: rec-blink 1s ease-in-out infinite;
+}
+
+@keyframes rec-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
 /* ───── Picker styles ───── */
 .picker-overlay {
     position: absolute;

@@ -98,6 +98,9 @@ pub fn App() -> Element {
                 pending_key()
             );
 
+            // Record key for macro recording (before dispatch)
+            app_state_for_handler.record_key(&key_event);
+
             // Handle input based on UI state first, then editor mode
             // Confirmation dialog takes highest precedence, then input dialog
             let commands = if snapshot.confirmation_dialog_visible {

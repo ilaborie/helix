@@ -216,6 +216,19 @@ impl AppState {
         });
     }
 
+    /// Record a key event for macro recording (if active).
+    /// Must be called before dispatching the key.
+    pub fn record_key(&self, key: &helix_view::input::KeyEvent) {
+        use crate::operations::MacroOps;
+        EDITOR_CTX.with(|ctx| {
+            if let Some(ref editor_ctx) = *ctx.borrow() {
+                if let Ok(mut editor) = editor_ctx.try_borrow_mut() {
+                    editor.maybe_record_key(key);
+                }
+            }
+        });
+    }
+
     /// Get the current snapshot.
     pub fn get_snapshot(&self) -> EditorSnapshot {
         self.snapshot.lock().clone()

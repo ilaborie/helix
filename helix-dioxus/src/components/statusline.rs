@@ -103,6 +103,7 @@ pub fn StatusLine(version: ReadSignal<usize>, on_change: EventHandler<()>) -> El
     let warning_count = snapshot.warning_count;
     let lsp_servers = snapshot.lsp_servers.clone();
     let selected_register = snapshot.selected_register;
+    let macro_recording = snapshot.macro_recording;
 
     // Mode-specific colors (from CSS custom properties)
     let (mode_bg, mode_fg) = match mode.as_str() {
@@ -183,6 +184,14 @@ pub fn StatusLine(version: ReadSignal<usize>, on_change: EventHandler<()>) -> El
             // Spacer
             div {
                 class: "statusline-spacer",
+            }
+
+            // Macro recording indicator
+            if let Some(reg) = macro_recording {
+                div {
+                    class: "statusline-recording",
+                    "REC [@{reg}]"
+                }
             }
 
             // Selected register indicator

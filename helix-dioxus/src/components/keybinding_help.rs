@@ -144,6 +144,8 @@ fn hints_for_context(mode: &str, pending: PendingKeySequence) -> Vec<(&'static s
                 ("S", "split"),
                 ("C", "copy line"),
                 ("\"", "register"),
+                ("Q", "rec"),
+                ("q", "play"),
             ],
             _ => vec![
                 ("i", "insert"),
@@ -155,6 +157,8 @@ fn hints_for_context(mode: &str, pending: PendingKeySequence) -> Vec<(&'static s
                 ("/", "search"),
                 (":", "command"),
                 ("\"", "register"),
+                ("Q", "rec"),
+                ("q", "play"),
                 ("g..", "goto"),
                 ("Spc..", "leader"),
             ],

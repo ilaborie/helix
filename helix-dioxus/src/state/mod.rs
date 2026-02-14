@@ -40,7 +40,7 @@ use crate::lsp::{
 };
 use crate::operations::{
     collect_search_match_lines, BufferOps, CliOps, ClipboardOps, EditingOps, JumpOps, LspOps,
-    MovementOps, PickerOps, SearchOps, SelectionOps, ShellOps, ThemeOps, WordJumpOps,
+    MacroOps, MovementOps, PickerOps, SearchOps, SelectionOps, ShellOps, ThemeOps, WordJumpOps,
 };
 
 use lsp_events::LspEventOps;
@@ -393,7 +393,7 @@ impl EditorContext {
     }
 
     /// Handle a single command using operation traits.
-    fn handle_command(&mut self, cmd: EditorCommand) {
+    pub(crate) fn handle_command(&mut self, cmd: EditorCommand) {
         let view_id = self.editor.tree.focus;
         let view = self.editor.tree.get(view_id);
         let doc_id = view.doc;
@@ -1244,6 +1244,14 @@ impl EditorContext {
             EditorCommand::CancelWordJump => {
                 self.cancel_word_jump();
             }
+
+            // Macro recording/replay (implemented in MacroOps)
+            EditorCommand::ToggleMacroRecording => {
+                self.toggle_macro_recording();
+            }
+            EditorCommand::ReplayMacro => {
+                self.replay_macro();
+            }
         }
     }
 
@@ -1807,6 +1815,7 @@ impl EditorContext {
             word_jump_first_char: self.word_jump_first_idx,
             registers: self.collect_register_snapshots(),
             selected_register: self.editor.selected_register,
+            macro_recording: self.editor.macro_recording.as_ref().map(|(reg, _)| *reg),
             current_theme: self.current_theme_name().to_string(),
             theme_css_vars: self.theme_to_css_vars(),
             should_quit: self.should_quit,

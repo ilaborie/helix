@@ -328,6 +328,8 @@ pub struct EditorSnapshot {
     pub registers: Vec<RegisterSnapshot>,
     /// Currently selected register for the next operation (e.g., `"a`).
     pub selected_register: Option<char>,
+    /// Register currently being recorded to (None if not recording).
+    pub macro_recording: Option<char>,
 
     // Theme state
     /// Current theme name.
@@ -925,6 +927,12 @@ pub enum EditorCommand {
     WordJumpSecondChar(char),
     /// Cancel word jump.
     CancelWordJump,
+
+    // Macro recording/replay
+    /// Toggle macro recording (Q). Starts/stops recording to a register.
+    ToggleMacroRecording,
+    /// Replay macro from register (q).
+    ReplayMacro,
 }
 
 /// Shell pipe behavior for the `|`, `!`, `A-|`, `A-!` commands.

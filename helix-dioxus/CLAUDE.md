@@ -71,6 +71,7 @@ helix-dioxus/src/
 │   ├── editing.rs              # EditingOps: insert_*, delete_*, undo/redo
 │   ├── selection.rs            # SelectionOps: extend_*, select_line
 │   ├── clipboard.rs            # ClipboardOps: yank, paste, delete_selection
+│   ├── macro_ops.rs            # MacroOps: toggle_macro_recording, maybe_record_key, replay_macro
 │   ├── search.rs               # SearchOps: execute_search, search_next
 │   ├── picker_ops.rs           # PickerOps: show_*_picker, picker_confirm
 │   ├── buffer.rs               # BufferOps: switch_to_buffer, save_document
@@ -435,6 +436,7 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - **Window/Splits**: Not supported — helix-dioxus uses a single-view design. `C-w` prefix and `Space w` sub-menu will not be implemented.
 
 ### Recently Completed
+- [x] Macro recording/replay (`Q`/`q`) — `Q` toggles recording to register (`"aQ` records to `a`, default `@`), `q` replays from register, `MacroOps` extension trait, statusline `REC [@]` indicator with blink animation, help bar hints, prevents recursion during replay, works in normal and select modes
 - [x] Theme switching — `:theme <name>` applies theme directly, `:theme` (no args) opens theme picker with all available themes, current theme highlighted, live preview on navigation (arrows/filter update UI immediately, Escape restores original theme), dynamic CSS variable injection from theme scopes (ui.background, ui.text, diagnostics, etc.), command panel entry, `ThemeOps` extension trait
 - [x] Shell integration (`|`, `!`, `A-|`, `A-!`) — pipe selections through shell commands with interactive prompt, per-selection processing, CLI commands (`:pipe`, `:sh`, `:insert-output`, `:append-output`, `:pipe-to`, `:run`), help bar hints, command panel entries
 - [x] Word jump (`gw`) — EasyMotion-style two-char label navigation, `gw` in normal mode jumps to word, `gw` in select mode extends selection, labels rendered as overlay spans, dimming on first char filter, Esc to cancel
