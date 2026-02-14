@@ -306,4 +306,171 @@ mod tests {
         ctx.search_word_under_cursor(doc_id, view_id);
         assert_eq!(ctx.last_search, "hello");
     }
+
+    // --- do_search ---
+
+    #[test]
+    fn do_search_forward() {
+        use super::SearchOps;
+        let mut ctx = test_context("#[|h]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.do_search(doc_id, view_id, "world", false);
+        assert_state(&ctx, "hello #[world|]#\n");
+    }
+
+    #[test]
+    fn do_search_backward() {
+        use super::SearchOps;
+        let mut ctx = test_context("hello #[|w]#orld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.do_search(doc_id, view_id, "hello", true);
+        assert_state(&ctx, "#[hello|]# world\n");
+    }
+
+    #[test]
+    fn do_search_wraps_forward() {
+        use super::SearchOps;
+        let mut ctx = test_context("hello #[|w]#orld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        // Search forward for "hello" — past cursor, should wrap
+        ctx.do_search(doc_id, view_id, "hello", false);
+        assert_state(&ctx, "#[hello|]# world\n");
+    }
+
+    #[test]
+    fn do_search_not_found() {
+        use super::SearchOps;
+        let mut ctx = test_context("#[|h]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.do_search(doc_id, view_id, "xyz", false);
+        // Cursor should not move
+        assert_state(&ctx, "#[|h]#ello\n");
+    }
+
+    // --- execute_search ---
+
+    #[test]
+    fn execute_search_uses_input() {
+        use super::SearchOps;
+        let mut ctx = test_context("#[|h]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.search_mode = true;
+        ctx.search_input = "world".to_string();
+        ctx.execute_search(doc_id, view_id);
+        assert_state(&ctx, "hello #[world|]#\n");
+        assert!(!ctx.search_mode, "search mode should be exited");
+        assert!(ctx.search_input.is_empty(), "search input should be cleared");
+        assert_eq!(ctx.last_search, "world", "last_search should be saved");
+    }
+
+    #[test]
+    fn execute_search_empty_input_exits() {
+        use super::SearchOps;
+        let mut ctx = test_context("#[|h]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.search_mode = true;
+        ctx.search_input.clear();
+        ctx.execute_search(doc_id, view_id);
+        assert!(!ctx.search_mode, "search mode should be exited");
+    }
+
+    // --- search_next ---
+
+    #[test]
+    fn search_next_finds_next_occurrence() {
+        use super::SearchOps;
+        let mut ctx = test_context("#[|h]#ello world hello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.last_search = "hello".to_string();
+        ctx.search_backwards = false;
+        ctx.search_next(doc_id, view_id, false);
+        assert_state(&ctx, "hello world #[hello|]#\n");
+    }
+
+    #[test]
+    fn search_next_reverse() {
+        use super::SearchOps;
+        let mut ctx = test_context("hello world #[|h]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.last_search = "hello".to_string();
+        ctx.search_backwards = false;
+        // reverse = true should search backwards
+        ctx.search_next(doc_id, view_id, true);
+        assert_state(&ctx, "#[hello|]# world hello\n");
+    }
+
+    // --- collect_search_match_lines ---
+
+    #[test]
+    fn collect_search_match_lines_basic() {
+        use helix_core::ropey::Rope;
+        let text = Rope::from("hello world\nhello foo\nbar\n");
+        let lines = super::collect_search_match_lines(&text, "hello");
+        assert_eq!(lines, vec![0, 1], "should find 'hello' on lines 0 and 1");
+    }
+
+    #[test]
+    fn collect_search_match_lines_case_insensitive() {
+        use helix_core::ropey::Rope;
+        let text = Rope::from("Hello world\nhELLO foo\n");
+        let lines = super::collect_search_match_lines(&text, "hello");
+        assert_eq!(lines, vec![0, 1], "should be case-insensitive");
+    }
+
+    #[test]
+    fn collect_search_match_lines_empty_pattern() {
+        use helix_core::ropey::Rope;
+        let text = Rope::from("hello\n");
+        let lines = super::collect_search_match_lines(&text, "");
+        assert!(lines.is_empty(), "empty pattern should return no matches");
+    }
+
+    #[test]
+    fn collect_search_match_lines_no_matches() {
+        use helix_core::ropey::Rope;
+        let text = Rope::from("hello world\n");
+        let lines = super::collect_search_match_lines(&text, "xyz");
+        assert!(lines.is_empty(), "should return empty for no matches");
+    }
+
+    #[test]
+    fn collect_search_match_lines_deduplicates() {
+        use helix_core::ropey::Rope;
+        let text = Rope::from("aaa aaa aaa\n");
+        let lines = super::collect_search_match_lines(&text, "aaa");
+        assert_eq!(lines, vec![0], "multiple matches on same line should deduplicate");
+    }
+
+    // --- extend_search_next / extend_search_prev ---
+
+    #[test]
+    fn extend_search_next_extends_selection() {
+        use super::SearchOps;
+        let mut ctx = test_context("#[|h]#ello world hello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.last_search = "hello".to_string();
+        ctx.search_backwards = false;
+        ctx.extend_search_next(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        // Anchor should be preserved from original, head at end of second "hello"
+        assert_eq!(sel.anchor, 1, "anchor should be preserved");
+        // "hello world hello" → second hello starts at 12, ends at 17
+        assert_eq!(sel.head, 17, "head should extend to end of match");
+    }
+
+    #[test]
+    fn extend_search_prev_extends_backwards() {
+        use super::SearchOps;
+        let mut ctx = test_context("hello world #[|h]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.last_search = "hello".to_string();
+        ctx.search_backwards = false;
+        ctx.extend_search_prev(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        // Should extend backwards to the first "hello"
+        assert_eq!(sel.anchor, 13, "anchor should be preserved");
+        assert_eq!(sel.head, 0, "head should extend to start of first match");
+    }
 }

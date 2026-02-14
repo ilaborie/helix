@@ -712,4 +712,228 @@ mod tests {
         assert_eq!(sel.from(), 0, "should include '['");
         assert_eq!(sel.to(), 7, "should include past ']'");
     }
+
+    // --- extend_selection ---
+
+    #[test]
+    fn extend_selection_right() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.extend_selection(doc_id, view_id, Direction::Right);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.anchor, 0, "anchor should stay at 0");
+        assert_eq!(sel.head, 2, "head should move right to 2");
+    }
+
+    #[test]
+    fn extend_selection_left() {
+        let mut ctx = test_context("he#[l|]#lo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        // First set an explicit selection so anchor != head
+        let doc = ctx.editor.document_mut(doc_id).expect("doc");
+        doc.set_selection(view_id, helix_core::Selection::single(3, 2));
+        ctx.extend_selection(doc_id, view_id, Direction::Left);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.anchor, 3, "anchor should stay at 3");
+        assert_eq!(sel.head, 1, "head should move left to 1");
+    }
+
+    #[test]
+    fn extend_selection_down() {
+        let mut ctx = test_context("#[h|]#ello\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.extend_selection(doc_id, view_id, Direction::Down);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.anchor, 0, "anchor should stay at 0");
+        // Head should move to second line, same column
+        let text = doc.text().slice(..);
+        let head_line = text.char_to_line(sel.head);
+        assert_eq!(head_line, 1, "head should be on second line");
+    }
+
+    #[test]
+    fn extend_selection_up_at_first_line_noop() {
+        let mut ctx = test_context("hel#[l|]#o\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        let doc = ctx.editor.document_mut(doc_id).expect("doc");
+        doc.set_selection(view_id, helix_core::Selection::single(0, 3));
+        ctx.extend_selection(doc_id, view_id, Direction::Up);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        // At first line, range returned unchanged
+        assert_eq!(sel.anchor, 0, "anchor should stay");
+        assert_eq!(sel.head, 3, "head should stay (first line, can't go up)");
+    }
+
+    // --- extend_word_forward ---
+
+    #[test]
+    fn extend_word_forward_basic() {
+        let mut ctx = test_context("#[|h]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.extend_word_forward(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.anchor, 1, "anchor should stay at 1");
+        assert!(sel.head >= 6, "head should move to 'w' or further");
+    }
+
+    // --- extend_word_backward ---
+
+    #[test]
+    fn extend_word_backward_basic() {
+        let mut ctx = test_context("hello #[|w]#orld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.extend_word_backward(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.anchor, 7, "anchor should stay at 7");
+        assert_eq!(sel.head, 0, "head should move to start of 'hello'");
+    }
+
+    // --- extend_line_start ---
+
+    #[test]
+    fn extend_line_start_basic() {
+        let mut ctx = test_context("hel#[l|]#o\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        let doc = ctx.editor.document_mut(doc_id).expect("doc");
+        doc.set_selection(view_id, helix_core::Selection::single(4, 3));
+        ctx.extend_line_start(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.anchor, 4, "anchor should stay at 4");
+        assert_eq!(sel.head, 0, "head should move to line start");
+    }
+
+    // --- extend_line_end ---
+
+    #[test]
+    fn extend_line_end_basic() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        let doc = ctx.editor.document_mut(doc_id).expect("doc");
+        doc.set_selection(view_id, helix_core::Selection::single(0, 1));
+        ctx.extend_line_end(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.anchor, 0, "anchor should stay at 0");
+        assert_eq!(sel.head, 5, "head should move to line end (newline char)");
+    }
+
+    // --- select_all ---
+
+    #[test]
+    fn select_all_selects_entire_buffer() {
+        let mut ctx = test_context("#[h|]#ello\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.select_all(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.from(), 0, "should start at 0");
+        assert_eq!(sel.to(), doc.text().len_chars(), "should end at buffer end");
+    }
+
+    // --- flip_selections ---
+
+    #[test]
+    fn flip_selections_swaps_anchor_and_head() {
+        let mut ctx = test_context("#[hello|]#\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        let doc = ctx.editor.document(doc_id).expect("doc");
+        let before = doc.selection(view_id).primary();
+        let (before_anchor, before_head) = (before.anchor, before.head);
+        ctx.flip_selections(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.anchor, before_head, "anchor should become old head");
+        assert_eq!(sel.head, before_anchor, "head should become old anchor");
+    }
+
+    // --- extend_to_line_bounds ---
+
+    #[test]
+    fn extend_to_line_bounds_single_line() {
+        let mut ctx = test_context("he#[l|]#lo\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.extend_to_line_bounds(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.from(), 0, "should extend to line start");
+        // Should include the newline (start of next line)
+        assert_eq!(sel.to(), 6, "should extend to start of next line");
+    }
+
+    // --- shrink_to_line_bounds ---
+
+    #[test]
+    fn shrink_to_line_bounds_single_line_noop() {
+        let mut ctx = test_context("he#[l|]#lo\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.shrink_to_line_bounds(doc_id, view_id);
+        // Single line selection should not change
+        assert_state(&ctx, "he#[l|]#lo\nworld\n");
+    }
+
+    // --- trim_selections ---
+
+    #[test]
+    fn trim_selections_removes_whitespace() {
+        let mut ctx = test_context("#[  hello  |]#\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.trim_selections(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        let text = doc.text().slice(..);
+        let selected: String = text.slice(sel.from()..sel.to()).into();
+        assert_eq!(selected, "hello", "whitespace should be trimmed");
+    }
+
+    // --- select_regex ---
+
+    #[test]
+    fn select_regex_finds_matches() {
+        let mut ctx = test_context("#[hello world hello|]#\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.select_regex(doc_id, view_id, "hello");
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id);
+        assert_eq!(sel.len(), 2, "should find 2 matches for 'hello'");
+    }
+
+    #[test]
+    fn select_regex_invalid_pattern_noop() {
+        let mut ctx = test_context("#[hello|]#\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.select_regex(doc_id, view_id, "[invalid");
+        // Should not crash or change selection
+        assert_state(&ctx, "#[hello|]#\n");
+    }
+
+    // --- split_selection ---
+
+    #[test]
+    fn split_selection_on_pattern() {
+        let mut ctx = test_context("#[hello world hello|]#\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.split_selection(doc_id, view_id, " ");
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id);
+        assert_eq!(sel.len(), 3, "should split into 3 parts on spaces");
+    }
+
+    // --- split_selection_on_newline ---
+
+    #[test]
+    fn split_selection_on_newline_basic() {
+        let mut ctx = test_context("#[hello\nworld\nfoo|]#\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.split_selection_on_newline(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id);
+        assert!(sel.len() >= 3, "should split on newlines into at least 3 parts");
+    }
 }

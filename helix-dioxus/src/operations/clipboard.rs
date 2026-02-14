@@ -336,4 +336,36 @@ mod tests {
         let text: String = doc.text().slice(..).into();
         assert_eq!(text, "hello world\n");
     }
+
+    // --- delete_selection_noyank ---
+
+    #[test]
+    fn delete_selection_noyank_deletes_without_register() {
+        let mut ctx = test_context("#[hello|]# world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.delete_selection_noyank(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, " world\n");
+        // Verify nothing was yanked to default register
+        let content = ctx
+            .editor
+            .registers
+            .read('"', &ctx.editor)
+            .and_then(|mut v| v.next().map(|s| s.into_owned()));
+        assert!(
+            content.is_none(),
+            "should not have written to default register"
+        );
+    }
+
+    #[test]
+    fn delete_selection_noyank_point_selection() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.delete_selection_noyank(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "ello\n");
+    }
 }

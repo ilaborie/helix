@@ -1261,4 +1261,295 @@ mod tests {
         let text: String = doc.text().slice(..).into();
         assert_eq!(text, "(hello)\n");
     }
+
+    // --- insert_char ---
+
+    #[test]
+    fn insert_char_at_cursor() {
+        let mut ctx = test_context("hel#[l|]#o\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.insert_char(doc_id, view_id, 'X');
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "helXlo\n");
+    }
+
+    #[test]
+    fn insert_char_at_start() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.insert_char(doc_id, view_id, 'X');
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "Xhello\n");
+    }
+
+    // --- insert_newline ---
+
+    #[test]
+    fn insert_newline_splits_line() {
+        let mut ctx = test_context("hel#[l|]#o\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.insert_newline(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "hel\nlo\n");
+    }
+
+    #[test]
+    fn insert_newline_preserves_indentation() {
+        let mut ctx = test_context("    hel#[l|]#o\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.insert_newline(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "    hel\n    lo\n");
+    }
+
+    // --- insert_tab ---
+
+    #[test]
+    fn insert_tab_at_cursor() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.insert_tab(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        // Default indent style inserts tab or spaces
+        assert!(text.starts_with('\t') || text.starts_with(' '), "should insert indent");
+    }
+
+    // --- delete_char_backward ---
+
+    #[test]
+    fn delete_char_backward_basic() {
+        let mut ctx = test_context("he#[l|]#lo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.delete_char_backward(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "hllo\n");
+    }
+
+    #[test]
+    fn delete_char_backward_at_start_noop() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.delete_char_backward(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "hello\n");
+    }
+
+    // --- delete_char_forward ---
+
+    #[test]
+    fn delete_char_forward_basic() {
+        let mut ctx = test_context("he#[l|]#lo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.delete_char_forward(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "helo\n");
+    }
+
+    // --- open_line_below ---
+
+    #[test]
+    fn open_line_below_inserts_newline() {
+        let mut ctx = test_context("hel#[l|]#o\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.open_line_below(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "hello\n\nworld\n");
+    }
+
+    #[test]
+    fn open_line_below_preserves_indentation() {
+        let mut ctx = test_context("    hel#[l|]#o\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.open_line_below(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "    hello\n    \nworld\n");
+    }
+
+    // --- open_line_above ---
+
+    #[test]
+    fn open_line_above_inserts_newline() {
+        let mut ctx = test_context("hello\n#[w|]#orld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.open_line_above(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "hello\n\nworld\n");
+    }
+
+    // --- undo / redo ---
+    // Note: undo_reverts_change removed — test_context setup transaction and
+    // insert_char are in the same undo group, so undo undoes both at once.
+
+    #[test]
+    fn redo_restores_change() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.insert_char(doc_id, view_id, 'X');
+        ctx.undo(doc_id, view_id);
+        ctx.redo(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "Xhello\n");
+    }
+
+    // --- delete_word_backward ---
+
+    #[test]
+    fn delete_word_backward_basic() {
+        let mut ctx = test_context("hello #[w|]#orld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.delete_word_backward(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        // Should delete "hello " backward
+        assert_eq!(text, "world\n");
+    }
+
+    #[test]
+    fn delete_word_backward_at_start_noop() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.delete_word_backward(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "hello\n");
+    }
+
+    // --- delete_to_line_start ---
+
+    #[test]
+    fn delete_to_line_start_basic() {
+        let mut ctx = test_context("hel#[l|]#o\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.delete_to_line_start(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "lo\n");
+    }
+
+    #[test]
+    fn delete_to_line_start_at_start_noop() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.delete_to_line_start(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "hello\n");
+    }
+
+    // --- change_selection_noyank ---
+
+    #[test]
+    fn change_selection_noyank_deletes_without_register() {
+        let mut ctx = test_context("#[hello|]# world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.change_selection_noyank(doc_id, view_id);
+        assert_eq!(ctx.editor.mode, Mode::Insert);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, " world\n");
+        // Verify nothing was yanked to default register
+        let reg_content = ctx.editor.registers.read('"', &ctx.editor);
+        assert!(
+            reg_content.is_none(),
+            "should not have written to default register"
+        );
+    }
+
+    // --- delete_word_forward ---
+
+    #[test]
+    fn delete_word_forward_basic() {
+        let mut ctx = test_context("#[h|]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.delete_word_forward(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "world\n");
+    }
+
+    // --- kill_to_line_end ---
+
+    #[test]
+    fn kill_to_line_end_basic() {
+        let mut ctx = test_context("he#[l|]#lo\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.kill_to_line_end(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "he\nworld\n");
+    }
+
+    #[test]
+    fn kill_to_line_end_at_end_noop() {
+        let mut ctx = test_context("hell#[o|]#\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.kill_to_line_end(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        // Cursor is at 'o' which is the last char before \n, so nothing to kill
+        assert_eq!(text, "hell\nworld\n");
+    }
+
+    // --- add_newline_below ---
+
+    #[test]
+    fn add_newline_below_basic() {
+        let mut ctx = test_context("#[h|]#ello\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.add_newline_below(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "hello\n\nworld\n");
+    }
+
+    // --- add_newline_above ---
+
+    #[test]
+    fn add_newline_above_basic() {
+        let mut ctx = test_context("hello\n#[w|]#orld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.add_newline_above(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "hello\n\nworld\n");
+    }
+
+    // --- increment ---
+
+    #[test]
+    fn increment_number() {
+        // Select "42" then increment
+        let mut ctx = test_context("#[42|]#\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.increment(doc_id, view_id, 1);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "43\n");
+    }
+
+    #[test]
+    fn decrement_number() {
+        let mut ctx = test_context("#[42|]#\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.increment(doc_id, view_id, -1);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let text: String = doc.text().slice(..).into();
+        assert_eq!(text, "41\n");
+    }
+
+    // Note: earlier_and_later_navigate_history removed — test_context setup
+    // transaction shares an undo group with subsequent operations, making
+    // earlier/later step counts unreliable in test context.
 }

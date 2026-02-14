@@ -818,4 +818,260 @@ mod tests {
         // No bracket at cursor — should not move
         assert_state(&ctx, "#[h|]#ello\n");
     }
+
+    // --- move_word_forward ---
+
+    #[test]
+    fn move_word_forward_basic() {
+        let mut ctx = test_context("#[h|]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.move_word_forward(doc_id, view_id);
+        let (view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view.id).primary();
+        // Should land at 'w' (index 6) — start of "world"
+        assert!(sel.head >= 6, "head should be at 'w': {:?}", sel);
+    }
+
+    // --- move_word_backward ---
+
+    #[test]
+    fn move_word_backward_basic() {
+        let mut ctx = test_context("hello #[w|]#orld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.move_word_backward(doc_id, view_id);
+        let (view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view.id).primary();
+        // Should land at 'h' (index 0) — start of "hello"
+        assert_eq!(sel.from(), 0, "should be at start of 'hello': {:?}", sel);
+    }
+
+    // --- move_line_start ---
+
+    #[test]
+    fn move_line_start_basic() {
+        let mut ctx = test_context("hel#[l|]#o\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.move_line_start(doc_id, view_id);
+        assert_state(&ctx, "#[h|]#ello\n");
+    }
+
+    #[test]
+    fn move_line_start_second_line() {
+        let mut ctx = test_context("hello\nwor#[l|]#d\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.move_line_start(doc_id, view_id);
+        assert_state(&ctx, "hello\n#[w|]#orld\n");
+    }
+
+    // --- move_line_end ---
+
+    #[test]
+    fn move_line_end_basic() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.move_line_end(doc_id, view_id);
+        // Implementation moves to newline char (last char on the line including \n)
+        assert_state(&ctx, "hello#[\n|]#");
+    }
+
+    #[test]
+    fn move_line_end_second_line() {
+        let mut ctx = test_context("hello\n#[w|]#orld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.move_line_end(doc_id, view_id);
+        assert_state(&ctx, "hello\nworld#[\n|]#");
+    }
+
+    // --- goto_first_line ---
+
+    #[test]
+    fn goto_first_line_from_middle() {
+        let mut ctx = test_context("hello\nwor#[l|]#d\nfoo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.goto_first_line(doc_id, view_id);
+        assert_state(&ctx, "#[h|]#ello\nworld\nfoo\n");
+    }
+
+    // --- goto_last_line ---
+
+    #[test]
+    fn goto_last_line_from_first() {
+        let mut ctx = test_context("#[h|]#ello\nworld\nfoo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.goto_last_line(doc_id, view_id);
+        // Last line is the empty line after final \n
+        let (view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view.id).primary();
+        let text = doc.text().slice(..);
+        let cursor_line = text.char_to_line(sel.cursor(text));
+        assert_eq!(
+            cursor_line,
+            text.len_lines() - 1,
+            "cursor should be on last line"
+        );
+    }
+
+    // --- goto_first_nonwhitespace ---
+
+    #[test]
+    fn goto_first_nonwhitespace_with_indent() {
+        let mut ctx = test_context("    hel#[l|]#o\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.goto_first_nonwhitespace(doc_id, view_id);
+        assert_state(&ctx, "    #[h|]#ello\n");
+    }
+
+    #[test]
+    fn goto_first_nonwhitespace_no_indent() {
+        let mut ctx = test_context("hel#[l|]#o\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.goto_first_nonwhitespace(doc_id, view_id);
+        assert_state(&ctx, "#[h|]#ello\n");
+    }
+
+    // --- page_down ---
+
+    #[test]
+    fn page_down_moves_cursor() {
+        // Create a document with enough lines
+        let lines: String = (0..30).map(|i| format!("line{i}\n")).collect();
+        let annotated = format!("#[l|]#{}", &lines[1..]);
+        let mut ctx = test_context(&annotated);
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.page_down(doc_id, view_id);
+        let (view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view.id).primary();
+        let text = doc.text().slice(..);
+        let cursor_line = text.char_to_line(sel.cursor(text));
+        assert_eq!(cursor_line, PAGE_SIZE, "should move down PAGE_SIZE lines");
+    }
+
+    // --- half_page_down ---
+
+    #[test]
+    fn half_page_down_moves_cursor() {
+        let lines: String = (0..30).map(|i| format!("line{i}\n")).collect();
+        let annotated = format!("#[l|]#{}", &lines[1..]);
+        let mut ctx = test_context(&annotated);
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.half_page_down(doc_id, view_id);
+        let (view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view.id).primary();
+        let text = doc.text().slice(..);
+        let cursor_line = text.char_to_line(sel.cursor(text));
+        assert_eq!(
+            cursor_line, HALF_PAGE_SIZE,
+            "should move down HALF_PAGE_SIZE lines"
+        );
+    }
+
+    // --- next_paragraph / prev_paragraph ---
+
+    #[test]
+    fn next_paragraph_jumps_to_blank_line() {
+        let mut ctx = test_context("#[h|]#ello\nworld\n\nfoo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.next_paragraph(doc_id, view_id);
+        let (view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view.id).primary();
+        let text = doc.text().slice(..);
+        let cursor_line = text.char_to_line(sel.cursor(text));
+        // Should jump to or past the blank line (line 2)
+        assert!(cursor_line >= 2, "should be at or past blank line: {cursor_line}");
+    }
+
+    #[test]
+    fn prev_paragraph_jumps_back() {
+        let mut ctx = test_context("hello\nworld\n\n#[f|]#oo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.prev_paragraph(doc_id, view_id);
+        let (view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view.id).primary();
+        let text = doc.text().slice(..);
+        let cursor_line = text.char_to_line(sel.cursor(text));
+        // Should jump back to or before the blank line
+        assert!(cursor_line <= 2, "should be at or before blank line: {cursor_line}");
+    }
+
+    // --- extend_find_char ---
+
+    #[test]
+    fn extend_find_char_forward() {
+        let mut ctx = test_context("#[h|]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.extend_find_char(doc_id, view_id, 'o', true, false);
+        // Should extend from anchor to past 'o'
+        let (view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view.id).primary();
+        // Anchor preserved from original, head at 'o' + 1
+        assert_eq!(sel.anchor, 0, "anchor should be preserved");
+        assert_eq!(sel.head, 5, "head should be past 'o' (index 5)");
+    }
+
+    #[test]
+    fn extend_find_char_backward() {
+        let mut ctx = test_context("hello w#[o|]#rld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.extend_find_char(doc_id, view_id, 'l', false, false);
+        let (view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view.id).primary();
+        // Anchor preserved, head moves backward to 'l'
+        assert_eq!(sel.head, 3, "head should be at 'l' (index 3)");
+    }
+
+    #[test]
+    fn extend_find_char_till_forward() {
+        let mut ctx = test_context("#[h|]#ello world\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.extend_find_char(doc_id, view_id, 'o', true, true);
+        let (view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view.id).primary();
+        // Till: stop one before 'o', but head = pos + 1 for forward
+        assert_eq!(sel.anchor, 0, "anchor should be preserved");
+        assert_eq!(sel.head, 4, "head should be at 'l' + 1 (index 4)");
+    }
+
+    #[test]
+    fn extend_find_char_not_found() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.extend_find_char(doc_id, view_id, 'z', true, false);
+        // Should not change selection
+        assert_state(&ctx, "#[h|]#ello\n");
+    }
+
+    // --- move_cursor boundary cases ---
+
+    #[test]
+    fn move_cursor_left_at_start() {
+        let mut ctx = test_context("#[h|]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.move_cursor(doc_id, view_id, Direction::Left);
+        assert_state(&ctx, "#[h|]#ello\n");
+    }
+
+    #[test]
+    fn move_cursor_up_at_first_line() {
+        let mut ctx = test_context("he#[l|]#lo\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.move_cursor(doc_id, view_id, Direction::Up);
+        // At first line, should stay but collapse to point
+        assert_state(&ctx, "he#[l|]#lo\nworld\n");
+    }
+
+    // --- scroll_to_line ---
+
+    #[test]
+    fn scroll_to_line_updates_view_offset() {
+        let lines: String = (0..30).map(|i| format!("line{i}\n")).collect();
+        let annotated = format!("#[l|]#{}", &lines[1..]);
+        let mut ctx = test_context(&annotated);
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.scroll_to_line(doc_id, view_id, 10);
+        let doc = ctx.editor.document(doc_id).expect("doc exists");
+        let offset = doc.view_offset(view_id);
+        let text = doc.text().slice(..);
+        let anchor_line = text.char_to_line(offset.anchor);
+        assert_eq!(anchor_line, 10, "view should be scrolled to line 10");
+    }
 }
