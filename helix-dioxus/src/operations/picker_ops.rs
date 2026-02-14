@@ -1086,6 +1086,29 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
             "Print Working Directory",
             Some(":pwd"),
         ),
+        // Shell integration
+        (
+            EditorCommand::EnterShellMode(crate::state::ShellBehavior::Replace),
+            "Shell Pipe (Replace)",
+            Some("|"),
+        ),
+        (
+            EditorCommand::EnterShellMode(crate::state::ShellBehavior::Insert),
+            "Shell Insert Output",
+            Some("!"),
+        ),
+        (
+            EditorCommand::EnterShellMode(crate::state::ShellBehavior::Ignore),
+            "Shell Pipe-To (Discard)",
+            Some("A-|"),
+        ),
+        (
+            EditorCommand::EnterShellMode(crate::state::ShellBehavior::Append),
+            "Shell Append Output",
+            Some("A-!"),
+        ),
+        // Word jump
+        (EditorCommand::GotoWord, "Goto Word (Jump)", Some("gw")),
     ]
 }
 

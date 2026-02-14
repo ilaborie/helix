@@ -54,6 +54,30 @@ pub fn RegexPrompt(input: String, split: bool) -> Element {
     }
 }
 
+/// Shell prompt component that displays the shell command input.
+#[component]
+pub fn ShellPrompt(input: String, prompt: String) -> Element {
+    rsx! {
+        div {
+            class: "prompt",
+
+            // Shell prompt prefix (e.g., "pipe:", "insert-output:")
+            span {
+                style: "color: var(--orange);",
+                "{prompt}"
+            }
+
+            // Input text
+            span { "{input}" }
+
+            // Cursor
+            span {
+                class: "prompt-cursor prompt-cursor-shell",
+            }
+        }
+    }
+}
+
 /// Search prompt component that displays the search input.
 #[component]
 pub fn SearchPrompt(input: String, backwards: bool) -> Element {

@@ -74,7 +74,9 @@ helix-dioxus/src/
 │   ├── search.rs               # SearchOps: execute_search, search_next
 │   ├── picker_ops.rs           # PickerOps: show_*_picker, picker_confirm
 │   ├── buffer.rs               # BufferOps: switch_to_buffer, save_document
-│   └── cli.rs                  # CliOps: execute_command
+│   ├── cli.rs                  # CliOps: execute_command
+│   ├── shell.rs                # ShellOps: execute_shell_command (pipe selections)
+│   └── word_jump.rs            # WordJumpOps: compute labels, filter, jump
 │
 └── keybindings/                # Key Handling
     ├── mod.rs                  # Re-exports + shared helpers (direction_from_key, handle_move_keys, etc.)
@@ -88,7 +90,8 @@ helix-dioxus/src/
     ├── regex.rs                # handle_regex_mode (select/split regex prompt)
     ├── search.rs               # handle_search_mode
     ├── confirmation.rs         # handle_confirmation_mode
-    └── input_dialog.rs         # handle_input_dialog_mode
+    ├── input_dialog.rs         # handle_input_dialog_mode
+    └── shell.rs                # handle_shell_mode
 
 helix-dioxus/assets/
 ├── styles.css                  # Main stylesheet (loaded via document::Stylesheet)
@@ -425,6 +428,8 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - **Window/Splits**: Not supported — helix-dioxus uses a single-view design. `C-w` prefix and `Space w` sub-menu will not be implemented.
 
 ### Recently Completed
+- [x] Shell integration (`|`, `!`, `A-|`, `A-!`) — pipe selections through shell commands with interactive prompt, per-selection processing, CLI commands (`:pipe`, `:sh`, `:insert-output`, `:append-output`, `:pipe-to`, `:run`), help bar hints, command panel entries
+- [x] Word jump (`gw`) — EasyMotion-style two-char label navigation, `gw` in normal mode jumps to word, `gw` in select mode extends selection, labels rendered as overlay spans, dimming on first char filter, Esc to cancel
 - [x] Picker file preview panel — side-by-side two-column layout (40% list / 60% preview) with syntax-highlighted file content, focus line indicator, search match highlighting for GlobalSearch; supports all file-based picker modes (DirectoryBrowser, FilesRecursive, Buffers, Symbols, Diagnostics, GlobalSearch, References, Definitions, JumpList); single-column preserved for Registers/Commands; `compute_tokens_for_rope` extracted as reusable helper for both editor view and preview
 - [x] Jump list gutter markers — orange Bookmark icon in indicator gutter for lines with jump list entries, `jump_lines` in `EditorSnapshot`, cache key updated for re-renders
 - [x] Fix Alt+key bindings on macOS — Option key composed special characters (ø, ˆ, ç) instead of intended keys; now uses physical key code (`evt.code()`) for Alt normalization in `translate.rs`

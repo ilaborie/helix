@@ -35,7 +35,7 @@ pub use statusline::StatusLine;
 
 pub use dialog::{
     CommandPrompt, ConfirmationDialog, InputDialog, LspStatusDialog, NotificationContainer,
-    RegexPrompt, SearchPrompt,
+    RegexPrompt, SearchPrompt, ShellPrompt,
 };
 pub use lsp::{CodeActionsMenu, CompletionPopup, HoverPopup, LocationPicker, SignatureHelpPopup};
 pub use picker::GenericPicker;

@@ -3,7 +3,7 @@
 use helix_view::input::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::handle_move_keys;
-use crate::state::EditorCommand;
+use crate::state::{EditorCommand, ShellBehavior};
 
 /// Handle view mode sub-keys (after `z` or `Z` prefix).
 ///
@@ -74,6 +74,14 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
             KeyCode::Char('o') => vec![EditorCommand::ExpandSelection],
             // Alt+i = shrink selection to child syntax node
             KeyCode::Char('i') => vec![EditorCommand::ShrinkSelection],
+            // Alt+| = pipe selection to shell, discard output
+            KeyCode::Char('|') => {
+                vec![EditorCommand::EnterShellMode(ShellBehavior::Ignore)]
+            }
+            // Alt+! = append shell output after selection
+            KeyCode::Char('!') => {
+                vec![EditorCommand::EnterShellMode(ShellBehavior::Append)]
+            }
             _ => vec![],
         };
     }
@@ -211,6 +219,10 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         // LSP - Hover (K for documentation like vim)
         KeyCode::Char('K') => vec![EditorCommand::TriggerHover],
 
+        // Shell integration
+        KeyCode::Char('|') => vec![EditorCommand::EnterShellMode(ShellBehavior::Replace)],
+        KeyCode::Char('!') => vec![EditorCommand::EnterShellMode(ShellBehavior::Insert)],
+
         _ => vec![],
     }
 }
@@ -258,6 +270,8 @@ pub fn handle_g_prefix(key: &KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('s') => vec![EditorCommand::GotoFirstNonWhitespace],
         // gt - go to window top
         KeyCode::Char('t') => vec![EditorCommand::GotoWindowTop],
+        // gw - word jump (EasyMotion-style)
+        KeyCode::Char('w') => vec![EditorCommand::GotoWord],
         // gy - go to type definition
         KeyCode::Char('y') => vec![EditorCommand::GotoTypeDefinition],
         // g| - go to column 1

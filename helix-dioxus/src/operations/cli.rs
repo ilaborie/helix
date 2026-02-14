@@ -2,8 +2,8 @@
 
 use std::path::PathBuf;
 
-use crate::operations::{BufferOps, EditingOps, PickerOps};
-use crate::state::{EditorContext, NotificationSeverity};
+use crate::operations::{BufferOps, EditingOps, PickerOps, ShellOps};
+use crate::state::{EditorContext, NotificationSeverity, ShellBehavior};
 
 /// Extension trait for CLI command operations.
 pub trait CliOps {
@@ -158,6 +158,83 @@ impl CliOps for EditorContext {
             "later" => {
                 let steps = args.and_then(|a| a.parse().ok()).unwrap_or(1);
                 self.later(steps);
+            }
+
+            // Shell commands
+            "pipe" | "sh" => {
+                if let Some(shell_cmd) = args {
+                    self.shell_input = shell_cmd.to_string();
+                    self.shell_behavior = ShellBehavior::Replace;
+                    let view_id = self.editor.tree.focus;
+                    let doc_id = self.editor.tree.get(view_id).doc;
+                    self.execute_shell_command(doc_id, view_id);
+                    self.shell_input.clear();
+                } else {
+                    self.show_notification(
+                        "Usage: :pipe <command>".to_string(),
+                        NotificationSeverity::Warning,
+                    );
+                }
+            }
+            "insert-output" => {
+                if let Some(shell_cmd) = args {
+                    self.shell_input = shell_cmd.to_string();
+                    self.shell_behavior = ShellBehavior::Insert;
+                    let view_id = self.editor.tree.focus;
+                    let doc_id = self.editor.tree.get(view_id).doc;
+                    self.execute_shell_command(doc_id, view_id);
+                    self.shell_input.clear();
+                } else {
+                    self.show_notification(
+                        "Usage: :insert-output <command>".to_string(),
+                        NotificationSeverity::Warning,
+                    );
+                }
+            }
+            "append-output" => {
+                if let Some(shell_cmd) = args {
+                    self.shell_input = shell_cmd.to_string();
+                    self.shell_behavior = ShellBehavior::Append;
+                    let view_id = self.editor.tree.focus;
+                    let doc_id = self.editor.tree.get(view_id).doc;
+                    self.execute_shell_command(doc_id, view_id);
+                    self.shell_input.clear();
+                } else {
+                    self.show_notification(
+                        "Usage: :append-output <command>".to_string(),
+                        NotificationSeverity::Warning,
+                    );
+                }
+            }
+            "pipe-to" => {
+                if let Some(shell_cmd) = args {
+                    self.shell_input = shell_cmd.to_string();
+                    self.shell_behavior = ShellBehavior::Ignore;
+                    let view_id = self.editor.tree.focus;
+                    let doc_id = self.editor.tree.get(view_id).doc;
+                    self.execute_shell_command(doc_id, view_id);
+                    self.shell_input.clear();
+                } else {
+                    self.show_notification(
+                        "Usage: :pipe-to <command>".to_string(),
+                        NotificationSeverity::Warning,
+                    );
+                }
+            }
+            "run-shell-command" | "run" => {
+                if let Some(shell_cmd) = args {
+                    self.shell_input = shell_cmd.to_string();
+                    self.shell_behavior = ShellBehavior::Insert;
+                    let view_id = self.editor.tree.focus;
+                    let doc_id = self.editor.tree.get(view_id).doc;
+                    self.execute_shell_command(doc_id, view_id);
+                    self.shell_input.clear();
+                } else {
+                    self.show_notification(
+                        "Usage: :run-shell-command <command>".to_string(),
+                        NotificationSeverity::Warning,
+                    );
+                }
             }
 
             _ => {

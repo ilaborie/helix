@@ -3,7 +3,7 @@
 use helix_view::input::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::handle_extend_keys;
-use crate::state::EditorCommand;
+use crate::state::{EditorCommand, ShellBehavior};
 
 /// Handle two-key sequences starting with 'g' in select mode.
 ///
@@ -26,6 +26,9 @@ pub fn handle_select_g_prefix(key: &KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('i') => vec![EditorCommand::GotoImplementation],
         KeyCode::Char('r') => vec![EditorCommand::GotoReferences],
         KeyCode::Char('f') => vec![EditorCommand::GotoFileUnderCursor],
+
+        // gw - word jump (extends selection)
+        KeyCode::Char('w') => vec![EditorCommand::ExtendToWord],
 
         // Window / buffer navigation (same as normal mode)
         KeyCode::Char('t') => vec![EditorCommand::GotoWindowTop],
@@ -56,6 +59,14 @@ pub fn handle_select_mode(key: &KeyEvent) -> Vec<EditorCommand> {
             KeyCode::Char('o') => vec![EditorCommand::ExpandSelection],
             // Alt+i = shrink selection to child syntax node
             KeyCode::Char('i') => vec![EditorCommand::ShrinkSelection],
+            // Alt+| = pipe selection to shell, discard output
+            KeyCode::Char('|') => {
+                vec![EditorCommand::EnterShellMode(ShellBehavior::Ignore)]
+            }
+            // Alt+! = append shell output after selection
+            KeyCode::Char('!') => {
+                vec![EditorCommand::EnterShellMode(ShellBehavior::Append)]
+            }
             _ => vec![],
         };
     }
@@ -137,6 +148,10 @@ pub fn handle_select_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         // Rotate selections
         KeyCode::Char(')') => vec![EditorCommand::RotateSelectionsForward],
         KeyCode::Char('(') => vec![EditorCommand::RotateSelectionsBackward],
+
+        // Shell integration
+        KeyCode::Char('|') => vec![EditorCommand::EnterShellMode(ShellBehavior::Replace)],
+        KeyCode::Char('!') => vec![EditorCommand::EnterShellMode(ShellBehavior::Insert)],
 
         _ => vec![],
     }

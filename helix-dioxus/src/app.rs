@@ -8,14 +8,15 @@ use helix_view::input::{KeyCode, KeyModifiers};
 use crate::components::{
     BufferBar, CodeActionsMenu, CommandPrompt, CompletionPopup, ConfirmationDialog, EditorView,
     GenericPicker, HoverPopup, InputDialog, KeybindingHelpBar, LocationPicker, LspStatusDialog,
-    NotificationContainer, RegexPrompt, SearchPrompt, SignatureHelpPopup, StatusLine,
+    NotificationContainer, RegexPrompt, SearchPrompt, ShellPrompt, SignatureHelpPopup, StatusLine,
 };
 use crate::keybindings::{
     handle_bracket_next, handle_bracket_prev, handle_code_actions_mode, handle_command_mode,
     handle_completion_mode, handle_confirmation_mode, handle_g_prefix, handle_input_dialog_mode,
     handle_insert_mode, handle_location_picker_mode, handle_lsp_dialog_mode, handle_normal_mode,
     handle_picker_mode, handle_regex_mode, handle_search_mode, handle_select_g_prefix,
-    handle_select_mode, handle_space_leader, handle_view_prefix, translate_key_event,
+    handle_select_mode, handle_shell_mode, handle_space_leader, handle_view_prefix,
+    translate_key_event,
 };
 use crate::state::{EditorCommand, PendingKeySequence};
 use crate::AppState;
@@ -119,6 +120,8 @@ pub fn App() -> Element {
                 handle_search_mode(&key_event)
             } else if snapshot.regex_mode {
                 handle_regex_mode(&key_event)
+            } else if snapshot.shell_mode {
+                handle_shell_mode(&key_event)
             } else if snapshot.mode == "NORMAL" || snapshot.mode == "SELECT" {
                 // Handle multi-key sequences in normal/select mode
                 let current_pending = pending_key();
@@ -285,6 +288,29 @@ pub fn App() -> Element {
                             vec![]
                         }
                     }
+                    PendingKeySequence::WordJumpFirstChar => {
+                        match key_event.code {
+                            KeyCode::Esc => {
+                                pending_key.set(PendingKeySequence::None);
+                                vec![EditorCommand::CancelWordJump]
+                            }
+                            KeyCode::Char(ch) => {
+                                // Will be updated to WordJumpSecondChar or None
+                                // after processing based on word_jump_active
+                                pending_key.set(PendingKeySequence::None);
+                                vec![EditorCommand::WordJumpFirstChar(ch)]
+                            }
+                            _ => vec![],
+                        }
+                    }
+                    PendingKeySequence::WordJumpSecondChar => {
+                        pending_key.set(PendingKeySequence::None);
+                        match key_event.code {
+                            KeyCode::Esc => vec![EditorCommand::CancelWordJump],
+                            KeyCode::Char(ch) => vec![EditorCommand::WordJumpSecondChar(ch)],
+                            _ => vec![],
+                        }
+                    }
                     PendingKeySequence::ViewPrefix => {
                         pending_key.set(PendingKeySequence::None);
                         handle_view_prefix(&key_event)
@@ -392,6 +418,26 @@ pub fn App() -> Element {
             // Process commands synchronously and update snapshot before triggering re-render
             app_state_for_handler.process_commands_sync();
 
+            // Sync word jump pending state with EditorContext
+            let post_snapshot = app_state_for_handler.get_snapshot();
+            if post_snapshot.word_jump_active && pending_key() == PendingKeySequence::None {
+                // word_jump_first_idx determines which phase we're in
+                if post_snapshot.word_jump_labels.iter().any(|l| !l.dimmed) {
+                    // Labels with first char filtered → waiting for second char
+                    // Check if any label is not dimmed AND first_idx is set
+                    // After first char: some labels are dimmed, some aren't
+                    // After GotoWord: all labels are not dimmed → first char
+                    let all_undimmed = post_snapshot.word_jump_labels.iter().all(|l| !l.dimmed);
+                    if all_undimmed {
+                        pending_key.set(PendingKeySequence::WordJumpFirstChar);
+                    } else {
+                        pending_key.set(PendingKeySequence::WordJumpSecondChar);
+                    }
+                } else {
+                    pending_key.set(PendingKeySequence::WordJumpFirstChar);
+                }
+            }
+
             // Trigger re-render with updated snapshot
             version += 1;
 
@@ -449,6 +495,14 @@ pub fn App() -> Element {
                 RegexPrompt {
                     input: snapshot.regex_input.clone(),
                     split: snapshot.regex_split,
+                }
+            }
+
+            // Shell prompt (shown when in shell mode)
+            if snapshot.shell_mode {
+                ShellPrompt {
+                    input: snapshot.shell_input.clone(),
+                    prompt: snapshot.shell_prompt.clone(),
                 }
             }
 

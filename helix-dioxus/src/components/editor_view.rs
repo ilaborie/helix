@@ -10,7 +10,7 @@ use crate::components::{
     DiagnosticUnderline, ErrorLens, Scrollbar,
 };
 use crate::lsp::DiagnosticSnapshot;
-use crate::state::{LineSnapshot, TokenSpan};
+use crate::state::{LineSnapshot, TokenSpan, WordJumpLabel};
 use crate::AppState;
 
 /// Editor view component that renders the document content.
@@ -146,7 +146,15 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                         // and the next line is empty with a diagnostic
                         let error_lens_diag = primary_diag.or(next_line_diag);
 
-                        let key = format!("{}-{}-{}", line_num, version, has_sel);
+                        // Collect word jump labels for this line
+                        let line_jump_labels: Vec<WordJumpLabel> = snapshot.word_jump_labels
+                            .iter()
+                            .filter(|l| l.line == line_num)
+                            .cloned()
+                            .collect();
+
+                        let has_jump_labels = !line_jump_labels.is_empty();
+                        let key = format!("{}-{}-{}-{}", line_num, version, has_sel, has_jump_labels);
                         rsx! {
                             Line {
                                 key: "{key}",
@@ -154,6 +162,7 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                                 mode: mode.clone(),
                                 diagnostics: line_diags,
                                 error_lens_diagnostic: error_lens_diag,
+                                jump_labels: line_jump_labels,
                             }
                         }
                     }
@@ -182,6 +191,7 @@ fn Line(
     mode: String,
     diagnostics: Vec<DiagnosticSnapshot>,
     error_lens_diagnostic: Option<DiagnosticSnapshot>,
+    #[props(default)] jump_labels: Vec<WordJumpLabel>,
 ) -> Element {
     // Remove trailing newline for display
     let display_content = line.content.trim_end_matches('\n');
@@ -237,6 +247,23 @@ fn Line(
             if show_error_lens {
                 if let Some(diag) = error_lens_diagnostic {
                     ErrorLens { diagnostic: diag }
+                }
+            }
+            // Word jump labels overlay
+            for label in jump_labels.iter() {
+                {
+                    let left_ch = label.col;
+                    let label_text = format!("{}{}", label.label[0], label.label[1]);
+                    let class = if label.dimmed { "jump-label-dimmed" } else { "jump-label" };
+                    // Position using ch units relative to content start
+                    let style = format!("position: absolute; left: {left_ch}ch; z-index: 10;");
+                    rsx! {
+                        span {
+                            class: "{class}",
+                            style: "{style}",
+                            "{label_text}"
+                        }
+                    }
                 }
             }
         }

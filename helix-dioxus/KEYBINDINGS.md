@@ -43,12 +43,6 @@ Reference: `helix-term/src/keymap/default.rs`
 | `0` | (not bound) | `goto_line_start` | Vim-style convenience, Helix uses `gh` |
 | `$` | `shell_keep_pipe` | `goto_line_end` | Vim-style convenience, Helix uses `gl` |
 
-### Movement — Missing
-
-| Key | Helix Action | Notes |
-|-----|-------------|-------|
-| (none) | All basic movement keys are now covered | |
-
 ### Editing — Matches Helix
 
 | Key | Action | Status |
@@ -83,6 +77,17 @@ Reference: `helix-term/src/keymap/default.rs`
 | `(` | Rotate selections backward | Matches |
 | `A-o` | Expand selection (tree-sitter) | Matches |
 | `A-i` | Shrink selection (tree-sitter) | Matches |
+| `;` | Collapse selection | Matches |
+| `,` | Keep primary selection | Matches |
+| `*` | Search word under cursor | Matches |
+| `n/N` | Search next/prev | Matches |
+| `C-i` | Jump forward | Matches |
+| `C-o` | Jump backward | Matches |
+| `C-s` | Save selection to jump list | Matches |
+| `\|` | Pipe selection through shell | Matches |
+| `!` | Insert shell output | Matches |
+| `A-\|` | Pipe to shell (discard output) | Matches |
+| `A-!` | Append shell output | Matches |
 
 ### Editing — Deviations
 
@@ -97,11 +102,6 @@ Reference: `helix-term/src/keymap/default.rs`
 | Key | Helix Action | Notes |
 |-----|-------------|-------|
 | `q/Q` | `replay_macro` / `record_macro` | Macro support |
-| `\|` | `shell_pipe` | Pipe selection through shell |
-| `!` | `shell_insert_output` | Insert shell output |
-| `C-i/Tab` | `jump_forward` | Jump list forward |
-| `C-o` | `jump_backward` | Jump list backward |
-| `C-s` | `save_selection` | Save selection to jump list |
 
 ### Custom Bindings (not in Helix)
 
@@ -122,9 +122,13 @@ Reference: `helix-term/src/keymap/default.rs`
 |-----|--------|
 | `gg` | Go to file start |
 | `gd` | Go to definition |
+| `gD` | Go to declaration |
 | `ge` | Go to last line |
+| `gf` | Go to file under cursor |
 | `gh` | Go to line start |
 | `gi` | Go to implementation |
+| `gj` | Move down (visual line) |
+| `gk` | Move up (visual line) |
 | `gl` | Go to line end |
 | `gn` | Next buffer |
 | `gp` | Previous buffer |
@@ -137,16 +141,8 @@ Reference: `helix-term/src/keymap/default.rs`
 | `ga` | Go to last accessed file |
 | `gm` | Go to last modified file |
 | `g.` | Go to last modification |
-
-### Missing
-
-| Key | Helix Action | Notes |
-|-----|-------------|-------|
-| `gf` | `goto_file` | Open file under cursor |
-| `gD` | `goto_declaration` | Go to declaration |
-| `g\|` | `goto_column` | Go to column |
-| `gk/gj` | `move_line_up/down` | Move line up/down |
-| `gw` | `goto_word` | Word jump |
+| `g\|` | Go to column 1 |
+| `gw` | Word jump (EasyMotion-style) |
 
 ---
 
@@ -158,6 +154,7 @@ Reference: `helix-term/src/keymap/default.rs`
 |-----|--------|
 | `Space /` | Global search |
 | `Space ?` | Command palette |
+| `Space '` | Resume last picker |
 | `Space a` | Code actions |
 | `Space b` | Buffer picker |
 | `Space c` | Toggle comments |
@@ -165,6 +162,9 @@ Reference: `helix-term/src/keymap/default.rs`
 | `Space d` | Document diagnostics |
 | `Space D` | Workspace diagnostics |
 | `Space f` | File picker |
+| `Space F` | File picker in buffer's directory |
+| `Space h` | Select references to symbol |
+| `Space j` | Jump list picker |
 | `Space k` | Hover |
 | `Space p` | Paste from clipboard |
 | `Space P` | Paste clipboard before |
@@ -173,6 +173,7 @@ Reference: `helix-term/src/keymap/default.rs`
 | `Space s` | Document symbols |
 | `Space S` | Workspace symbols |
 | `Space y` | Yank to clipboard |
+| `Space Y` | Yank main selection to clipboard |
 
 ### Custom Bindings (not in Helix)
 
@@ -184,16 +185,10 @@ Reference: `helix-term/src/keymap/default.rs`
 
 | Key | Helix Action | Notes |
 |-----|-------------|-------|
-| `Space F` | `file_picker_in_current_directory` | File picker in buffer's directory |
-| `Space e` | `file_explorer` | File explorer |
+| `Space e` | `file_explorer` | File explorer (requires tree UI) |
 | `Space E` | `file_explorer_in_current_buffer_directory` | File explorer in buffer dir |
-| `Space j` | `jumplist_picker` | Jump list picker |
 | `Space g` | `changed_file_picker` | Changed files (VCS) |
-| `Space h` | `select_references_to_symbol_under_cursor` | Select references |
-| `Space Y` | `yank_main_selection_to_clipboard` | Yank main selection to clipboard |
-| `Space '` | `last_picker` | Resume last picker |
 | `Space w` | Window sub-menu | Not supported (single-view design) |
-| `Space A-c` | `toggle_line_comments` | Toggle line comments specifically |
 | `Space G` | Debug sub-menu | DAP integration |
 
 ---
@@ -259,14 +254,34 @@ Reference: `helix-term/src/keymap/default.rs`
 | `f/F/t/T` + char | Extend to find/till character |
 | `r` + char | Replace character |
 | `n/N` | Extend search next/prev |
+| `s/S` | Regex select/split |
+| `C` | Copy selection to next line |
+| `A-C` | Copy selection to prev line |
+| `A-s` | Split selection on newlines |
+| `(/)` | Rotate selections |
+| `A-;` | Flip selections |
+| `A-o/A-i` | Expand/shrink selection |
 | `m` prefix | Match/surround (same as normal) |
 | `"` prefix | Register selection |
+| `C-i/C-o` | Jump forward/backward |
+| `C-s` | Save selection to jump list |
+| `g` prefix | Goto sub-menu (extend variants) |
 
-### Missing
+### Select Mode g-prefix
 
-| Key | Helix Action | Notes |
-|-----|-------------|-------|
-| `g` | Goto sub-menu (extend variants) | `gg` extends to file start, etc. |
+| Key | Action |
+|-----|--------|
+| `gg` | Extend to file start |
+| `ge` | Extend to last line |
+| `gh` | Extend to line start |
+| `gl` | Extend to line end |
+| `gs` | Extend to first non-whitespace |
+| `g\|` | Extend to column |
+| `gd/gD/gy/gi/gr/gf` | LSP goto (jump, no extend) |
+| `gn/gp` | Next/prev buffer |
+| `gt/gc/gb` | Window top/center/bottom |
+| `ga/gm/g.` | Last accessed/modified file |
+| `gw` | Extend to word (EasyMotion-style) |
 
 ---
 
@@ -303,11 +318,11 @@ Reference: `helix-term/src/keymap/default.rs`
 
 | Key | Helix Action | Notes |
 |-----|-------------|-------|
-| `C-x` | `completion` | Helix completion trigger |
+| `C-x` | `completion` | Helix completion trigger (use `C-Space` instead) |
 | `C-r` | `insert_register` | Insert from register |
 | `C-s` | `commit_undo_checkpoint` | Manual undo checkpoint |
-| `S-Tab` | `insert_tab` | Literal tab insert |
-| `A-Backspace` | `delete_word_backward` | Alt backspace |
+| `S-Tab` | `unindent` | Unindent |
+| `A-Backspace` | `delete_word_backward` | Alt backspace (use `C-w` instead) |
 
 ---
 
@@ -317,7 +332,7 @@ Reference: `helix-term/src/keymap/default.rs`
 
 | Key | Action |
 |-----|--------|
-| `zz` / `zc` | Align view center |
+| `zz` / `zc` / `zm` | Align view center |
 | `zt` | Align view top |
 | `zb` | Align view bottom |
 | `zk/zj` | Scroll up/down |
@@ -325,15 +340,11 @@ Reference: `helix-term/src/keymap/default.rs`
 | `z C-f / z PageDown` | Page down |
 | `z C-u` | Half page up |
 | `z C-d` | Half page down |
+| `z Space` | Half page down |
+| `z Backspace` | Half page up |
 | `z/`, `z?` | Search forward/backward |
 | `zn/zN` | Search next/prev |
 | `Z` prefix | Sticky view mode (same keys, stays until Esc) |
-
-### Missing
-
-| Key | Helix Action | Notes |
-|-----|-------------|-------|
-| `zm` | Align view middle | Cursor at middle column |
 
 ---
 
@@ -352,40 +363,50 @@ Window/split management is not supported. helix-dioxus uses a single-view design
 | `:open` | `:o` | Open file / file picker |
 | `:quit` | `:q` | Quit |
 | `:quit!` | `:q!` | Force quit |
-| `:write` | `:w` | Save |
+| `:write` | `:w` | Save (shows Save As dialog for scratch buffers) |
 | `:write!` | `:w!` | Force save |
 | `:wq` | `:x` | Save and quit |
+| `:wq!` | `:x!` | Force save and quit |
 | `:new` | `:n` | New scratch buffer |
 | `:buffer` | `:b` | Buffer picker |
 | `:bnext` | `:bn` | Next buffer |
 | `:bprev` | `:bp` | Previous buffer |
 | `:bdelete` | `:bd` | Close buffer |
+| `:bdelete!` | `:bd!` | Force close buffer |
 | `:reload` | `:rl` | Reload from disk |
 | `:write-all` | `:wa` | Save all |
 | `:quit-all` | `:qa` | Quit all |
+| `:quit-all!` | `:qa!` | Force quit all |
 | `:buffer-close-all` | `:bca` | Close all buffers |
+| `:buffer-close-all!` | `:bca!` | Force close all |
 | `:buffer-close-others` | `:bco` | Close other buffers |
-| `:cd` | | Change directory |
+| `:cd` | `:change-current-directory` | Change directory |
 | `:pwd` | | Print working directory |
 | `:registers` | `:reg` | Register picker |
 | `:commands` | `:cmd` | Command panel |
-| `:earlier` | | Undo history |
-| `:later` | | Redo history |
+| `:earlier` | | Undo history (`:earlier N`) |
+| `:later` | | Redo history (`:later N`) |
+| `:pipe` | `:sh` | Pipe selection through shell (replace) |
+| `:insert-output` | | Insert shell command output |
+| `:append-output` | | Append shell command output |
+| `:pipe-to` | | Pipe to shell (discard output) |
+| `:run-shell-command` | `:run` | Run shell command |
 
 ### Missing Notable Commands
 
-| Command | Helix Action |
-|---------|-------------|
-| `:theme` | Change color theme |
-| `:config-reload` | Reload configuration |
-| `:lsp-restart` | Restart LSP (available via LSP dialog) |
-| `:set` | Change editor settings |
-| `:sort` | Sort selection |
-| `:reflow` | Reflow text |
-| `:pipe` | Pipe through shell |
-| `:run-shell-command` | Run shell command |
-| `:encoding` | Set file encoding |
-| `:line-ending` | Set line ending |
+| Command | Helix Action | Notes |
+|---------|-------------|-------|
+| `:theme` | Change color theme | |
+| `:config-reload` | Reload configuration | |
+| `:config-open` | Open config file | |
+| `:set` | Change editor settings | |
+| `:sort` | Sort selection | |
+| `:reflow` | Reflow text | |
+| `:encoding` | Set file encoding | |
+| `:line-ending` | Set line ending | |
+| `:lsp-restart` | Restart LSP | Available via LSP status dialog |
+| `:log-open` | Open log file | |
+| `:tree-sitter-scopes` | Show syntax scopes | |
 
 ---
 
@@ -404,16 +425,28 @@ Window/split management is not supported. helix-dioxus uses a single-view design
 
 ## Summary
 
+### Coverage Statistics
+
+| Category | Implemented | Missing | Coverage |
+|----------|-------------|---------|----------|
+| Normal Mode | 60+ bindings | 1 (`q/Q`) | ~98% |
+| Goto (g-prefix) | 23 bindings | 0 | 100% |
+| Space Leader | 23 bindings | 4 (`e/E`, `g`, `G`) | 85% |
+| Bracket Sequences | 16 bindings | 2 (`]g/[g`) | 89% |
+| View Mode (z/Z) | 13 bindings | 0 | 100% |
+| Match (m-prefix) | 6 bindings | 0 | 100% |
+| Select Mode | 35+ bindings | 0 | 100% |
+| Insert Mode | 15 bindings | 3 (`C-r`, `C-s`, `S-Tab`) | 83% |
+| Commands | 32 commands | 11 | 74% |
+| **Overall** | **~93%** | | |
+
 ### Design Decisions
 
 - **Window/Splits**: Not supported — helix-dioxus uses a single-view design. `C-w` prefix and `Space w` sub-menu will not be implemented.
 
-### Feature Categories Not Yet Implemented
+### Remaining Feature Categories
 
-1. **Multi-cursor** — `C`, `A-C`, selections rotation `(/)`, `s`/`S` regex selection
-2. **Jump list** — `C-i`/`C-o`, `Space j`, `Space '`
-3. **Tree-sitter expand/shrink** — `A-o`/`A-i`, `gw` word jump
-4. **Macros** — `q/Q` record/replay
-5. **Shell integration** — `|`, `!`, `$` pipe/insert/keep
-6. **VCS integration** — `]g/[g` change navigation, `Space g` changed files
-7. **DAP/Debug** — `Space G` sub-menu
+1. **Macros** — `q/Q` record/replay
+2. **VCS integration** — `]g/[g` change navigation, `Space g` changed files
+3. **DAP/Debug** — `Space G` sub-menu
+4. **File explorer** — `Space e/E`

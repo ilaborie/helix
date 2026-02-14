@@ -13,4 +13,4 @@ pub use confirmation::ConfirmationDialog;
 pub use input::InputDialog;
 pub use lsp_status::LspStatusDialog;
 pub use notification::NotificationContainer;
-pub use prompt::{CommandPrompt, RegexPrompt, SearchPrompt};
+pub use prompt::{CommandPrompt, RegexPrompt, SearchPrompt, ShellPrompt};

@@ -13,6 +13,8 @@ mod movement;
 mod picker_ops;
 mod search;
 mod selection;
+mod shell;
+mod word_jump;
 
 pub use buffer::BufferOps;
 pub use cli::CliOps;
@@ -24,3 +26,5 @@ pub use movement::MovementOps;
 pub use picker_ops::PickerOps;
 pub use search::{collect_search_match_lines, SearchOps};
 pub use selection::SelectionOps;
+pub use shell::ShellOps;
+pub use word_jump::WordJumpOps;

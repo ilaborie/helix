@@ -18,7 +18,7 @@ pub use types::{
     EditorCommand, EditorSnapshot, GlobalSearchResult, InputDialogKind, InputDialogSnapshot,
     LineSnapshot, NotificationSeverity, NotificationSnapshot, PendingKeySequence, PickerIcon,
     PickerItem, PickerMode, PickerPreview, PreviewLine, RegisterSnapshot, ScrollbarDiagnostic,
-    StartupAction, TokenSpan,
+    ShellBehavior, StartupAction, TokenSpan, WordJumpLabel,
 };
 
 use std::path::PathBuf;
@@ -40,7 +40,7 @@ use crate::lsp::{
 };
 use crate::operations::{
     collect_search_match_lines, BufferOps, CliOps, ClipboardOps, EditingOps, JumpOps, LspOps,
-    MovementOps, PickerOps, SearchOps, SelectionOps,
+    MovementOps, PickerOps, SearchOps, SelectionOps, ShellOps, WordJumpOps,
 };
 
 use lsp_events::LspEventOps;
@@ -179,6 +179,18 @@ pub struct EditorContext {
     // Jump list picker state - pub(crate) for operations access
     /// Jump list entries stored for picker confirm (indexed by picker item ID).
     pub(crate) jumplist_entries: Vec<(helix_view::DocumentId, helix_core::Selection)>,
+
+    // Shell mode state - pub(crate) for operations access
+    pub(crate) shell_mode: bool,
+    pub(crate) shell_input: String,
+    pub(crate) shell_behavior: ShellBehavior,
+
+    // Word jump state - pub(crate) for operations access
+    pub(crate) word_jump_active: bool,
+    pub(crate) word_jump_labels: Vec<WordJumpLabel>,
+    pub(crate) word_jump_ranges: Vec<usize>,
+    pub(crate) word_jump_extend: bool,
+    pub(crate) word_jump_first_idx: Option<char>,
 
     // Application state - pub(crate) for operations access
     pub(crate) should_quit: bool,
@@ -324,6 +336,16 @@ impl EditorContext {
             // Command panel state
             command_panel_commands: Vec::new(),
             jumplist_entries: Vec::new(),
+            // Shell mode state
+            shell_mode: false,
+            shell_input: String::new(),
+            shell_behavior: ShellBehavior::Replace,
+            // Word jump state
+            word_jump_active: false,
+            word_jump_labels: Vec::new(),
+            word_jump_ranges: Vec::new(),
+            word_jump_extend: false,
+            word_jump_first_idx: None,
             should_quit: false,
             snapshot_version: 0,
         })
@@ -1128,6 +1150,53 @@ impl EditorContext {
                 }
                 _ => {}
             },
+
+            // Shell integration
+            EditorCommand::EnterShellMode(behavior) => {
+                self.shell_mode = true;
+                self.shell_input.clear();
+                self.shell_behavior = behavior;
+            }
+            EditorCommand::ExitShellMode => {
+                self.shell_mode = false;
+                self.shell_input.clear();
+            }
+            EditorCommand::ShellInput(ch) => {
+                self.shell_input.push(ch);
+            }
+            EditorCommand::ShellBackspace => {
+                if self.shell_input.is_empty() {
+                    self.shell_mode = false;
+                } else {
+                    self.shell_input.pop();
+                }
+            }
+            EditorCommand::ShellExecute => {
+                if !self.shell_input.is_empty() {
+                    self.execute_shell_command(doc_id, view_id);
+                }
+                self.shell_mode = false;
+                self.shell_input.clear();
+            }
+
+            // Word jump
+            EditorCommand::GotoWord => {
+                self.word_jump_extend = false;
+                self.compute_word_jump_labels(doc_id, view_id);
+            }
+            EditorCommand::ExtendToWord => {
+                self.word_jump_extend = true;
+                self.compute_word_jump_labels(doc_id, view_id);
+            }
+            EditorCommand::WordJumpFirstChar(ch) => {
+                self.filter_word_jump_first_char(ch);
+            }
+            EditorCommand::WordJumpSecondChar(ch) => {
+                self.execute_word_jump(ch);
+            }
+            EditorCommand::CancelWordJump => {
+                self.cancel_word_jump();
+            }
         }
     }
 
@@ -1676,6 +1745,18 @@ impl EditorContext {
             // Confirmation dialog state
             confirmation_dialog_visible: self.confirmation_dialog_visible,
             confirmation_dialog: self.confirmation_dialog.clone(),
+            // Shell mode state
+            shell_mode: self.shell_mode,
+            shell_input: self.shell_input.clone(),
+            shell_prompt: match self.shell_behavior {
+                ShellBehavior::Replace => "pipe:".to_string(),
+                ShellBehavior::Insert => "insert-output:".to_string(),
+                ShellBehavior::Ignore => "pipe-to:".to_string(),
+                ShellBehavior::Append => "append-output:".to_string(),
+            },
+            // Word jump state
+            word_jump_active: self.word_jump_active,
+            word_jump_labels: self.word_jump_labels.clone(),
             registers: self.collect_register_snapshots(),
             selected_register: self.editor.selected_register,
             should_quit: self.should_quit,

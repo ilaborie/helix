@@ -31,6 +31,7 @@ fn hints_for_context(mode: &str, pending: PendingKeySequence) -> Vec<(&'static s
             ("r", "references"),
             ("s", "first ws"),
             ("t", "win top"),
+            ("w", "word jump"),
             ("y", "type def"),
         ],
         PendingKeySequence::SpaceLeader => vec![
@@ -111,6 +112,9 @@ fn hints_for_context(mode: &str, pending: PendingKeySequence) -> Vec<(&'static s
             ("/", "search"),
             ("n/N", "next/prev"),
         ],
+        PendingKeySequence::WordJumpFirstChar | PendingKeySequence::WordJumpSecondChar => {
+            vec![("a-z", "type label char")]
+        }
         PendingKeySequence::ReplacePrefix
         | PendingKeySequence::FindForward
         | PendingKeySequence::FindBackward
@@ -177,6 +181,8 @@ fn pending_prefix(pending: PendingKeySequence) -> Option<&'static str> {
         PendingKeySequence::MatchReplaceSurroundTo(_) => Some("mr"),
         PendingKeySequence::ViewPrefix => Some("z"),
         PendingKeySequence::ViewPrefixSticky => Some("Z"),
+        PendingKeySequence::WordJumpFirstChar => Some("gw"),
+        PendingKeySequence::WordJumpSecondChar => Some("gw"),
         PendingKeySequence::None => None,
     }
 }
@@ -196,6 +202,8 @@ fn is_char_prompt(pending: PendingKeySequence) -> bool {
             | PendingKeySequence::MatchDeleteSurround
             | PendingKeySequence::MatchReplaceSurroundFrom
             | PendingKeySequence::MatchReplaceSurroundTo(_)
+            | PendingKeySequence::WordJumpFirstChar
+            | PendingKeySequence::WordJumpSecondChar
     )
 }
 

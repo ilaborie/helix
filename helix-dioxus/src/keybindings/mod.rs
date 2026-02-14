@@ -13,6 +13,7 @@ mod picker;
 mod regex;
 mod search;
 mod select;
+mod shell;
 mod translate;
 
 use helix_view::input::KeyCode;
@@ -35,6 +36,7 @@ pub use picker::handle_picker_mode;
 pub use regex::handle_regex_mode;
 pub use search::handle_search_mode;
 pub use select::{handle_select_g_prefix, handle_select_mode};
+pub use shell::handle_shell_mode;
 pub use translate::translate_key_event;
 
 /// Map direction keys (hjkl + arrows) to a `Direction`.

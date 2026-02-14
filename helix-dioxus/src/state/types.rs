@@ -303,6 +303,20 @@ pub struct EditorSnapshot {
     /// Confirmation dialog content.
     pub confirmation_dialog: ConfirmationDialogSnapshot,
 
+    // Shell mode state
+    /// Whether the shell prompt is active.
+    pub shell_mode: bool,
+    /// Current shell input text.
+    pub shell_input: String,
+    /// Shell prompt prefix (e.g., "pipe:", "insert-output:").
+    pub shell_prompt: String,
+
+    // Word jump state
+    /// Whether word jump labels are active.
+    pub word_jump_active: bool,
+    /// Word jump labels to render over the editor content.
+    pub word_jump_labels: Vec<WordJumpLabel>,
+
     // Register state
     /// Register snapshots for display in the help bar.
     pub registers: Vec<RegisterSnapshot>,
@@ -865,6 +879,56 @@ pub enum EditorCommand {
     SaveSelection,
     /// Show the jump list picker (Space j).
     ShowJumpListPicker,
+
+    // Shell integration
+    /// Enter shell prompt mode with the given behavior.
+    EnterShellMode(ShellBehavior),
+    /// Exit shell prompt mode.
+    ExitShellMode,
+    /// Add a character to the shell input.
+    ShellInput(char),
+    /// Remove the last character from the shell input.
+    ShellBackspace,
+    /// Execute the shell command.
+    ShellExecute,
+
+    // Word jump (EasyMotion-style)
+    /// Initiate word jump from normal mode (gw).
+    GotoWord,
+    /// Initiate word jump from select mode (gw) — extends selection.
+    ExtendToWord,
+    /// First character typed during word jump label matching.
+    WordJumpFirstChar(char),
+    /// Second character typed during word jump label matching.
+    WordJumpSecondChar(char),
+    /// Cancel word jump.
+    CancelWordJump,
+}
+
+/// Shell pipe behavior for the `|`, `!`, `A-|`, `A-!` commands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShellBehavior {
+    /// Pipe selection through command, replace with stdout (`|`).
+    Replace,
+    /// Insert command stdout before selection (`!`).
+    Insert,
+    /// Pipe selection through command, discard stdout (`A-|`).
+    Ignore,
+    /// Append command stdout after selection (`A-!`).
+    Append,
+}
+
+/// A label for word jump (EasyMotion-style) overlay.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WordJumpLabel {
+    /// Line number (1-indexed, matching LineSnapshot).
+    pub line: usize,
+    /// Column offset (0-indexed character position in the line).
+    pub col: usize,
+    /// Two-character label for this word.
+    pub label: [char; 2],
+    /// Whether this label is dimmed (doesn't match first char typed so far).
+    pub dimmed: bool,
 }
 
 /// Direction for cursor movement.
@@ -1002,6 +1066,10 @@ pub enum PendingKeySequence {
     ViewPrefix,
     /// Waiting for sub-key after 'Z' (sticky view mode — stays until Esc)
     ViewPrefixSticky,
+    /// Waiting for first label character after word jump labels appear.
+    WordJumpFirstChar,
+    /// Waiting for second label character during word jump.
+    WordJumpSecondChar,
 }
 
 /// A single register's state for display in the help bar.

@@ -520,6 +520,24 @@ kbd {
     background-color: var(--purple);
 }
 
+.prompt-cursor-shell {
+    background-color: var(--orange);
+}
+
+/* ───── Word jump labels ───── */
+.jump-label {
+    background: var(--warning);
+    color: var(--bg-primary);
+    font-weight: bold;
+    border-radius: 2px;
+}
+
+.jump-label-dimmed {
+    background: var(--bg-highlight);
+    color: var(--text-dimmer);
+    border-radius: 2px;
+}
+
 /* ───── Highlight styles ───── */
 .highlight-text {
     font-size: 14px;
