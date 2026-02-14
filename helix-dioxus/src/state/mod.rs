@@ -728,10 +728,12 @@ impl EditorContext {
             EditorCommand::EnterCommandMode => {
                 self.command_mode = true;
                 self.command_input.clear();
+                self.command_completion_selected = 0;
             }
             EditorCommand::ExitCommandMode => {
                 self.command_mode = false;
                 self.command_input.clear();
+                self.command_completion_selected = 0;
             }
             EditorCommand::CommandInput(c) => {
                 self.command_input.push(c);
@@ -750,8 +752,10 @@ impl EditorContext {
                 }
             }
             EditorCommand::CommandCompletionDown => {
-                // Upper bound is checked in snapshot() where we know the count.
-                self.command_completion_selected += 1;
+                let count = self.compute_command_completions().len();
+                if count > 0 && self.command_completion_selected + 1 < count {
+                    self.command_completion_selected += 1;
+                }
             }
             EditorCommand::CommandCompletionAccept => {
                 // Replace the command portion of input with the selected completion.
@@ -1473,7 +1477,6 @@ impl EditorContext {
             .collect()
     }
 
-    /// Collect register snapshots for display in the help bar.
     /// Compute filtered command completions for the current command input.
     fn compute_command_completions(&self) -> Vec<CommandCompletionItem> {
         use crate::operations::{command_completions, fuzzy_match_with_indices};
@@ -1528,6 +1531,7 @@ impl EditorContext {
         scored.into_iter().map(|(_, item)| item).collect()
     }
 
+    /// Collect register snapshots for display in the help bar.
     fn collect_register_snapshots(&self) -> Vec<RegisterSnapshot> {
         // On macOS there's no X11 primary selection, so * falls back to clipboard.
         // On Linux/X11, * shows the current primary selection text.
@@ -1906,13 +1910,7 @@ impl EditorContext {
             command_mode: self.command_mode,
             command_input: self.command_input.clone(),
             command_completions: if self.command_mode {
-                let completions = self.compute_command_completions();
-                // Clamp selected index to valid range.
-                let count = completions.len();
-                if count > 0 && self.command_completion_selected >= count {
-                    self.command_completion_selected = count - 1;
-                }
-                completions
+                self.compute_command_completions()
             } else {
                 Vec::new()
             },

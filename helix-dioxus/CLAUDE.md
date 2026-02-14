@@ -45,6 +45,7 @@ helix-dioxus/src/
 │   │   └── location_picker.rs  # Location picker for LSP references/definitions
 │   ├── dialog/                 # Dialogs and prompts
 │   │   ├── mod.rs              # Re-exports
+│   │   ├── command_completion.rs # Command completion popup (fuzzy-filtered above : prompt)
 │   │   ├── confirmation.rs     # Confirmation dialog (quit with unsaved changes)
 │   │   ├── input.rs            # Input dialog (rename symbol, etc.)
 │   │   ├── lsp_status.rs       # LSP server status dialog
@@ -171,6 +172,7 @@ Functions defined in `script.js`:
 - `.inline-dialog`, `.inline-dialog-list`, `.inline-dialog-item` (cursor-positioned popups)
 - `.notification-*` (toast notifications)
 - `.confirmation-*` (modal confirmation dialogs)
+- `.command-completion-*` (command mode autocompletion popup)
 - `.editor-scrollbar`, `.scrollbar-*` (custom scrollbar with markers)
 
 **Dynamic Styles**: Styles requiring Rust variables remain inline:
@@ -438,6 +440,7 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - **Window/Splits**: Not supported — helix-dioxus uses a single-view design. `C-w` prefix and `Space w` sub-menu will not be implemented.
 
 ### Recently Completed
+- [x] Command mode autocompletion — fuzzy-matching popup above `:` prompt showing all ~45 commands with aliases and descriptions, Tab to accept, Up/Down to navigate, `CommandCompletion` struct as single source of truth, `CommandCompletionPopup` component, `compute_command_completions()` reuses `fuzzy_match_with_indices`, CSS `.command-completion-*` classes
 - [x] File explorer picker (`Space e` / `Space E`) — tree-style file explorer with expandable/collapsible directories (Enter/Left/Right/h/l), `FolderOpen` icon, `depth`-based indentation, hidden files shown, flat fuzzy filtering when typing (restores tree on clear), file preview panel, `rebuild_explorer_items()` with dirs-first sorting, `explorer_expanded` state, `collect_all_files()` via `ignore::WalkBuilder`, command panel entries, help bar hint
 - [x] Planned enhancements batch (7 items) — cursor-in-selection glow animation, `:jumplist-clear` command with `JumpList::clear()`, `*` register macOS clipboard fallback, register dialog line/byte count info, integration tests for key operations (normal/insert/search/select/command/picker modes), `use_editor_snapshot()` hook for DRY component state, dialog search mode setting (`vim-style` in `dhx.toml` with j/k navigation and `/` search focus toggle)
 - [x] Missing `:` commands batch (7 commands) — `:sort` (sort multi-cursor selections), `:reflow [width]` (rewrap text), `:config-open` / `:log-open` (open config/log files), `:encoding [label]` (show/set encoding), `:set-line-ending [lf|crlf]` (show/set line endings with Transaction), `:tree-sitter-scopes` (show TS scopes at cursor), `TextManipulationOps` extension trait, `CliCommand(String)` variant for command panel passthrough, 6 command panel entries

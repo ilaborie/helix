@@ -347,6 +347,10 @@ Window/split management is not supported. helix-dioxus uses a single-view design
 
 ## Command Mode (`:` commands)
 
+### Command Completion
+
+When typing `:` commands, a completion popup appears above the prompt showing filtered commands with fuzzy matching. Navigation: `Up`/`Down` to select, `Tab` to accept, `Enter` to execute, `Esc` to cancel. This is a **Custom** helix-dioxus feature (Helix uses a different tab-completion mechanism).
+
 ### Implemented
 
 | Command | Aliases | Notes |
