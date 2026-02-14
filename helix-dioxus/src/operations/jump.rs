@@ -75,10 +75,7 @@ impl JumpOps for EditorContext {
     fn clear_jumplist(&mut self) {
         let view = self.editor.tree.get_mut(self.editor.tree.focus);
         view.jumps.clear();
-        self.show_notification(
-            "Jump list cleared".to_string(),
-            NotificationSeverity::Info,
-        );
+        self.show_notification("Jump list cleared".to_string(), NotificationSeverity::Info);
     }
 
     fn show_jumplist_picker(&mut self) {
@@ -138,6 +135,7 @@ impl JumpOps for EditorContext {
                     icon: PickerIcon::JumpEntry,
                     match_indices: vec![],
                     secondary: Some(content.clone()),
+                    depth: 0,
                 },
             )
             .collect();

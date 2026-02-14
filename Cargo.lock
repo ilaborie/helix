@@ -3082,6 +3082,7 @@ dependencies = [
  "parking_lot",
  "rfd 0.15.4",
  "serde",
+ "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "toml 0.8.2",

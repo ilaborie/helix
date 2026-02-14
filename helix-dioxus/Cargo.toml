@@ -72,6 +72,9 @@ grep-matcher = "0.1"
 # Native file dialogs
 rfd = "0.15"
 
+[dev-dependencies]
+tempfile = "3"
+
 [build-dependencies]
 helix-loader = { path = "../helix-loader" }
 

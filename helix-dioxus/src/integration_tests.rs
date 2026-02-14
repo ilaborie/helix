@@ -10,7 +10,7 @@ use crate::keybindings::{
     handle_normal_mode, handle_picker_mode, handle_search_mode, handle_select_mode,
 };
 use crate::operations::{EditingOps, MovementOps, SearchOps};
-use crate::state::EditorCommand;
+use crate::state::{EditorCommand, PickerMode};
 use crate::test_helpers::{assert_state, assert_text, doc_view, key, special_key, test_context};
 
 /// Dispatch a sequence of editor commands on the context.
@@ -24,9 +24,7 @@ fn dispatch_commands(ctx: &mut crate::state::EditorContext, commands: &[EditorCo
             EditorCommand::MoveRight => {
                 ctx.move_cursor(doc_id, view_id, crate::state::Direction::Right)
             }
-            EditorCommand::MoveUp => {
-                ctx.move_cursor(doc_id, view_id, crate::state::Direction::Up)
-            }
+            EditorCommand::MoveUp => ctx.move_cursor(doc_id, view_id, crate::state::Direction::Up),
             EditorCommand::MoveDown => {
                 ctx.move_cursor(doc_id, view_id, crate::state::Direction::Down)
             }
@@ -36,18 +34,10 @@ fn dispatch_commands(ctx: &mut crate::state::EditorContext, commands: &[EditorCo
             EditorCommand::GotoLastLine => ctx.goto_last_line(doc_id, view_id),
             EditorCommand::InsertChar(ch) => ctx.insert_char(doc_id, view_id, *ch),
             EditorCommand::DeleteCharBackward => ctx.delete_char_backward(doc_id, view_id),
-            EditorCommand::EnterInsertMode => {
-                ctx.editor.mode = helix_view::document::Mode::Insert
-            }
-            EditorCommand::ExitInsertMode => {
-                ctx.editor.mode = helix_view::document::Mode::Normal
-            }
-            EditorCommand::EnterSelectMode => {
-                ctx.editor.mode = helix_view::document::Mode::Select
-            }
-            EditorCommand::ExitSelectMode => {
-                ctx.editor.mode = helix_view::document::Mode::Normal
-            }
+            EditorCommand::EnterInsertMode => ctx.editor.mode = helix_view::document::Mode::Insert,
+            EditorCommand::ExitInsertMode => ctx.editor.mode = helix_view::document::Mode::Normal,
+            EditorCommand::EnterSelectMode => ctx.editor.mode = helix_view::document::Mode::Select,
+            EditorCommand::ExitSelectMode => ctx.editor.mode = helix_view::document::Mode::Normal,
             EditorCommand::EnterSearchMode { backwards } => {
                 ctx.search_mode = true;
                 ctx.search_backwards = *backwards;
@@ -234,39 +224,74 @@ fn select_mode_entry_and_exit() {
 
 #[test]
 fn picker_direct_mode_typing_filters() {
-    let cmds = handle_picker_mode(&key('a'), DialogSearchMode::Direct, false);
+    let cmds = handle_picker_mode(
+        &key('a'),
+        DialogSearchMode::Direct,
+        false,
+        PickerMode::default(),
+    );
     crate::assert_single_command!(cmds, EditorCommand::PickerInput('a'));
 }
 
 #[test]
 fn picker_vim_mode_jk_navigates() {
-    let cmds = handle_picker_mode(&key('j'), DialogSearchMode::VimStyle, false);
+    let cmds = handle_picker_mode(
+        &key('j'),
+        DialogSearchMode::VimStyle,
+        false,
+        PickerMode::default(),
+    );
     crate::assert_single_command!(cmds, EditorCommand::PickerDown);
 
-    let cmds = handle_picker_mode(&key('k'), DialogSearchMode::VimStyle, false);
+    let cmds = handle_picker_mode(
+        &key('k'),
+        DialogSearchMode::VimStyle,
+        false,
+        PickerMode::default(),
+    );
     crate::assert_single_command!(cmds, EditorCommand::PickerUp);
 }
 
 #[test]
 fn picker_vim_mode_slash_focuses_search() {
-    let cmds = handle_picker_mode(&key('/'), DialogSearchMode::VimStyle, false);
+    let cmds = handle_picker_mode(
+        &key('/'),
+        DialogSearchMode::VimStyle,
+        false,
+        PickerMode::default(),
+    );
     crate::assert_single_command!(cmds, EditorCommand::PickerFocusSearch);
 }
 
 #[test]
 fn picker_vim_mode_typing_filters_when_focused() {
-    let cmds = handle_picker_mode(&key('a'), DialogSearchMode::VimStyle, true);
+    let cmds = handle_picker_mode(
+        &key('a'),
+        DialogSearchMode::VimStyle,
+        true,
+        PickerMode::default(),
+    );
     crate::assert_single_command!(cmds, EditorCommand::PickerInput('a'));
 }
 
 #[test]
 fn picker_vim_mode_esc_unfocuses_search() {
-    let cmds = handle_picker_mode(&special_key(KeyCode::Esc), DialogSearchMode::VimStyle, true);
+    let cmds = handle_picker_mode(
+        &special_key(KeyCode::Esc),
+        DialogSearchMode::VimStyle,
+        true,
+        PickerMode::default(),
+    );
     crate::assert_single_command!(cmds, EditorCommand::PickerUnfocusSearch);
 }
 
 #[test]
 fn picker_vim_mode_esc_cancels_when_unfocused() {
-    let cmds = handle_picker_mode(&special_key(KeyCode::Esc), DialogSearchMode::VimStyle, false);
+    let cmds = handle_picker_mode(
+        &special_key(KeyCode::Esc),
+        DialogSearchMode::VimStyle,
+        false,
+        PickerMode::default(),
+    );
     crate::assert_single_command!(cmds, EditorCommand::PickerCancel);
 }

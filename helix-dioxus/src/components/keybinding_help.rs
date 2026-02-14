@@ -41,6 +41,7 @@ fn hints_for_context(mode: &str, pending: PendingKeySequence) -> Vec<(&'static s
             ("b", "buffers"),
             ("c", "comment"),
             ("d", "diag"),
+            ("e", "explorer"),
             ("f", "files"),
             ("j", "jumplist"),
             ("k", "hover"),

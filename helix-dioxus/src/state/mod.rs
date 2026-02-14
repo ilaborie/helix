@@ -182,6 +182,14 @@ pub struct EditorContext {
     /// Jump list entries stored for picker confirm (indexed by picker item ID).
     pub(crate) jumplist_entries: Vec<(helix_view::DocumentId, helix_core::Selection)>,
 
+    // File explorer state - pub(crate) for operations access
+    /// Expanded directories in the file explorer (absolute paths).
+    pub(crate) explorer_expanded: std::collections::HashSet<PathBuf>,
+    /// Root directory of the current file explorer session.
+    pub(crate) explorer_root: Option<PathBuf>,
+    /// All files collected recursively for flat filtering in the explorer.
+    pub(crate) explorer_all_files: Vec<PickerItem>,
+
     // Shell mode state - pub(crate) for operations access
     pub(crate) shell_mode: bool,
     pub(crate) shell_input: String,
@@ -344,6 +352,10 @@ impl EditorContext {
             // Command panel state
             command_panel_commands: Vec::new(),
             jumplist_entries: Vec::new(),
+            // File explorer state
+            explorer_expanded: std::collections::HashSet::new(),
+            explorer_root: None,
+            explorer_all_files: Vec::new(),
             // Shell mode state
             shell_mode: false,
             shell_input: String::new(),
@@ -775,6 +787,10 @@ impl EditorContext {
                 self.picker_current_path = None;
                 self.picker_search_focused = false;
                 self.command_panel_commands.clear();
+                // Explorer cleanup
+                self.explorer_expanded.clear();
+                self.explorer_root = None;
+                self.explorer_all_files.clear();
             }
             EditorCommand::PickerInput(c) => {
                 self.picker_filter.push(c);
@@ -784,6 +800,10 @@ impl EditorContext {
             EditorCommand::PickerBackspace => {
                 self.picker_filter.pop();
                 self.picker_selected = 0;
+                // When filter becomes empty in FileExplorer, restore tree view
+                if self.picker_filter.is_empty() && self.picker_mode == PickerMode::FileExplorer {
+                    self.rebuild_explorer_items();
+                }
                 self.preview_selected_theme();
             }
             EditorCommand::PickerFocusSearch => {
@@ -851,6 +871,18 @@ impl EditorContext {
             }
             EditorCommand::ShowFilePickerInBufferDir => {
                 self.show_file_picker_in_buffer_dir();
+            }
+            EditorCommand::ShowFileExplorer => {
+                self.show_file_explorer();
+            }
+            EditorCommand::ShowFileExplorerInBufferDir => {
+                self.show_file_explorer_in_buffer_dir();
+            }
+            EditorCommand::ExplorerExpand => {
+                self.explorer_expand_selected();
+            }
+            EditorCommand::ExplorerCollapseOrParent => {
+                self.explorer_collapse_or_parent();
             }
             EditorCommand::OpenFile(path) => {
                 self.open_file(&path);
@@ -1948,9 +1980,9 @@ impl EditorContext {
         let clamped_idx = |len: usize| -> usize { self.picker_selected.min(len.saturating_sub(1)) };
 
         match self.picker_mode {
-            PickerMode::DirectoryBrowser | PickerMode::FilesRecursive => {
-                Some((PathBuf::from(&selected_item.id), None))
-            }
+            PickerMode::DirectoryBrowser
+            | PickerMode::FileExplorer
+            | PickerMode::FilesRecursive => Some((PathBuf::from(&selected_item.id), None)),
             PickerMode::Buffers => {
                 let doc_id = self.parse_document_id(&selected_item.id)?;
                 let doc = self.editor.document(doc_id)?;
@@ -2019,8 +2051,11 @@ impl EditorContext {
         let filtered = self.filtered_picker_items();
         let selected_item = filtered.get(self.picker_selected)?;
 
-        // Skip folders in directory browser
-        if selected_item.icon == PickerIcon::Folder {
+        // Skip folders in directory browser / file explorer
+        if matches!(
+            selected_item.icon,
+            PickerIcon::Folder | PickerIcon::FolderOpen
+        ) {
             return None;
         }
 
@@ -3644,6 +3679,7 @@ impl EditorContext {
     pub(crate) fn show_last_picker(&mut self) {
         match self.last_picker_mode {
             Some(PickerMode::DirectoryBrowser) => self.show_file_picker(),
+            Some(PickerMode::FileExplorer) => self.show_file_explorer(),
             Some(PickerMode::FilesRecursive) => self.show_files_recursive_picker(),
             Some(PickerMode::Buffers) => self.show_buffer_picker(),
             Some(PickerMode::Registers) => self.show_register_picker(),
@@ -3715,6 +3751,7 @@ impl EditorContext {
                     icon,
                     match_indices: vec![],
                     secondary,
+                    depth: 0,
                 }
             })
             .collect();
@@ -3743,6 +3780,7 @@ impl EditorContext {
                     icon,
                     match_indices: vec![],
                     secondary,
+                    depth: 0,
                 }
             })
             .collect();

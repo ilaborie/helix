@@ -9,8 +9,8 @@ use crate::components::{
     diagnostics_for_line, first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker,
     DiagnosticUnderline, ErrorLens, Scrollbar,
 };
-use crate::lsp::DiagnosticSnapshot;
 use crate::hooks::use_editor_snapshot;
+use crate::lsp::DiagnosticSnapshot;
 use crate::state::{LineSnapshot, TokenSpan, WordJumpLabel};
 
 /// Editor view component that renders the document content.

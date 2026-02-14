@@ -347,6 +347,10 @@ pub fn handle_space_leader(key: &KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('b') => vec![EditorCommand::ShowBufferPicker],
         // Space d - document diagnostics
         KeyCode::Char('d') => vec![EditorCommand::ShowDocumentDiagnostics],
+        // Space e - file explorer
+        KeyCode::Char('e') => vec![EditorCommand::ShowFileExplorer],
+        // Space E - file explorer in buffer's directory
+        KeyCode::Char('E') => vec![EditorCommand::ShowFileExplorerInBufferDir],
         // Space D - workspace diagnostics
         KeyCode::Char('D') => vec![EditorCommand::ShowWorkspaceDiagnostics],
         // Space f - file picker
@@ -458,5 +462,17 @@ mod tests {
     fn upper_q_toggles_macro_recording() {
         let cmds = handle_normal_mode(&key('Q'));
         assert_single_command!(cmds, EditorCommand::ToggleMacroRecording);
+    }
+
+    #[test]
+    fn space_e_shows_file_explorer() {
+        let cmds = handle_space_leader(&key('e'));
+        assert_single_command!(cmds, EditorCommand::ShowFileExplorer);
+    }
+
+    #[test]
+    fn space_upper_e_shows_file_explorer_in_buffer_dir() {
+        let cmds = handle_space_leader(&key('E'));
+        assert_single_command!(cmds, EditorCommand::ShowFileExplorerInBufferDir);
     }
 }

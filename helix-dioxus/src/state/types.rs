@@ -56,6 +56,7 @@ pub enum PickerIcon {
     #[default]
     File,
     Folder,
+    FolderOpen,
     Buffer,
     BufferModified,
     // Symbol icons
@@ -98,6 +99,8 @@ pub struct PickerItem {
     pub icon: PickerIcon,
     pub match_indices: Vec<usize>,
     pub secondary: Option<String>,
+    /// Nesting depth for tree-style pickers (0 = top level).
+    pub depth: u16,
 }
 
 /// Picker mode.
@@ -105,6 +108,7 @@ pub struct PickerItem {
 pub enum PickerMode {
     #[default]
     DirectoryBrowser,
+    FileExplorer,
     FilesRecursive,
     Buffers,
     DocumentSymbols,
@@ -125,6 +129,7 @@ impl PickerMode {
     pub fn title(&self) -> &'static str {
         match self {
             Self::DirectoryBrowser => "Open File",
+            Self::FileExplorer => "File Explorer",
             Self::FilesRecursive => "Find Files",
             Self::Buffers => "Switch Buffer",
             Self::DocumentSymbols => "Document Symbols",
@@ -145,6 +150,7 @@ impl PickerMode {
     pub fn enter_hint(&self) -> &'static str {
         match self {
             Self::DirectoryBrowser => " open/enter \u{2022} ",
+            Self::FileExplorer => " open/toggle \u{2022} ",
             Self::GlobalSearch => " search/open \u{2022} ",
             _ => " select \u{2022} ",
         }
@@ -659,6 +665,14 @@ pub enum EditorCommand {
     // File picker
     ShowFilePicker,
     ShowFilesRecursivePicker,
+    /// Show file explorer at CWD (Space e).
+    ShowFileExplorer,
+    /// Show file explorer in buffer's directory (Space E).
+    ShowFileExplorerInBufferDir,
+    /// Expand the selected directory in the file explorer.
+    ExplorerExpand,
+    /// Collapse the selected directory or navigate to parent in the file explorer.
+    ExplorerCollapseOrParent,
     ShowBufferPicker,
     /// Resume last picker (Space ').
     ShowLastPicker,
@@ -1183,6 +1197,7 @@ mod tests {
     fn picker_mode_title_all_variants() {
         let modes = [
             PickerMode::DirectoryBrowser,
+            PickerMode::FileExplorer,
             PickerMode::FilesRecursive,
             PickerMode::Buffers,
             PickerMode::DocumentSymbols,
@@ -1231,6 +1246,7 @@ mod tests {
     fn supports_preview_file_modes() {
         let file_modes = [
             PickerMode::DirectoryBrowser,
+            PickerMode::FileExplorer,
             PickerMode::FilesRecursive,
             PickerMode::Buffers,
             PickerMode::DocumentSymbols,
@@ -1261,6 +1277,29 @@ mod tests {
             !PickerMode::Themes.supports_preview(),
             "Themes should not support preview"
         );
+    }
+
+    #[test]
+    fn file_explorer_title() {
+        assert_eq!(PickerMode::FileExplorer.title(), "File Explorer");
+    }
+
+    #[test]
+    fn file_explorer_enter_hint() {
+        assert!(PickerMode::FileExplorer
+            .enter_hint()
+            .contains("open/toggle"));
+    }
+
+    #[test]
+    fn file_explorer_supports_preview() {
+        assert!(PickerMode::FileExplorer.supports_preview());
+    }
+
+    #[test]
+    fn picker_item_default_depth_is_zero() {
+        let item = PickerItem::default();
+        assert_eq!(item.depth, 0);
     }
 
     #[test]

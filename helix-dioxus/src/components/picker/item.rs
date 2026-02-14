@@ -3,8 +3,8 @@
 use dioxus::prelude::*;
 use lucide_dioxus::{
     Blocks, Bookmark, Braces, ChevronRight, CircleX, Code, Component, File, FileCode, FileText,
-    Folder, Hash, Info, Layers, Lightbulb, Link2, Package, Palette, SquareFunction, Terminal,
-    TextSearch, TriangleAlert, Variable,
+    Folder, FolderOpen, Hash, Info, Layers, Lightbulb, Link2, Package, Palette, SquareFunction,
+    Terminal, TextSearch, TriangleAlert, Variable,
 };
 
 use crate::state::{PickerIcon, PickerItem};
@@ -26,7 +26,7 @@ pub fn PickerItemRow(
 
     // Icon color based on type (using CSS variables)
     let icon_color = match item.icon {
-        PickerIcon::Folder => "var(--accent)",
+        PickerIcon::Folder | PickerIcon::FolderOpen => "var(--accent)",
         PickerIcon::BufferModified => "var(--warning)",
         // Symbol colors
         PickerIcon::SymbolFunction | PickerIcon::SymbolMethod => "var(--accent)",
@@ -68,6 +68,7 @@ pub fn PickerItemRow(
     };
 
     let indicator_opacity = if is_selected { "1" } else { "0" };
+    let indent_px = u32::from(item.depth) * 16;
 
     rsx! {
         div {
@@ -77,6 +78,13 @@ pub fn PickerItemRow(
                     handler.call(evt);
                 }
             },
+
+            // Depth indentation
+            if indent_px > 0 {
+                span {
+                    style: "width: {indent_px}px; flex-shrink: 0;",
+                }
+            }
 
             // Selection indicator
             span {
@@ -91,6 +99,7 @@ pub fn PickerItemRow(
                 style: "width: 16px; height: 16px; margin-right: 8px; flex-shrink: 0; color: {icon_color};",
                 {match item.icon {
                     PickerIcon::Folder => rsx! { Folder { size: 16, color: "currentColor" } },
+                    PickerIcon::FolderOpen => rsx! { FolderOpen { size: 16, color: "currentColor" } },
                     PickerIcon::File => rsx! { File { size: 16, color: "currentColor" } },
                     PickerIcon::Buffer | PickerIcon::BufferModified => rsx! { FileText { size: 16, color: "currentColor" } },
                     // Symbol icons

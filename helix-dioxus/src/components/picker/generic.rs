@@ -110,9 +110,9 @@ pub fn GenericPicker(
                         }
                     }
 
-                    // Current path (for directory browser)
+                    // Current path (for directory browser / file explorer)
                     if let Some(ref path) = current_path {
-                        if mode == PickerMode::DirectoryBrowser {
+                        if matches!(mode, PickerMode::DirectoryBrowser | PickerMode::FileExplorer) {
                             div {
                                 class: "picker-path",
                                 "{path}"

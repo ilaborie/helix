@@ -116,7 +116,12 @@ pub fn App() -> Element {
             } else if snapshot.completion_visible {
                 handle_completion_mode(&key_event)
             } else if snapshot.picker_visible {
-                handle_picker_mode(&key_event, snapshot.dialog_search_mode, snapshot.picker_search_focused)
+                handle_picker_mode(
+                    &key_event,
+                    snapshot.dialog_search_mode,
+                    snapshot.picker_search_focused,
+                    snapshot.picker_mode,
+                )
             } else if snapshot.command_mode {
                 handle_command_mode(&key_event)
             } else if snapshot.search_mode {

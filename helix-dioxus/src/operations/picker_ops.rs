@@ -72,6 +72,7 @@ impl PickerOps for EditorContext {
                 icon: PickerIcon::Folder,
                 match_indices: vec![],
                 secondary: Some("Parent directory".to_string()),
+                depth: 0,
             });
         }
 
@@ -105,6 +106,7 @@ impl PickerOps for EditorContext {
                     },
                     match_indices: vec![],
                     secondary: None,
+                    depth: 0,
                 });
             }
         }
@@ -173,6 +175,7 @@ impl PickerOps for EditorContext {
                 icon: PickerIcon::File,
                 match_indices: vec![],
                 secondary: Some(relative),
+                depth: 0,
             });
         }
 
@@ -218,6 +221,7 @@ impl PickerOps for EditorContext {
                     } else {
                         None
                     },
+                    depth: 0,
                 }
             })
             .collect();
@@ -237,8 +241,14 @@ impl PickerOps for EditorContext {
             return self.picker_items.clone();
         }
 
-        let mut results: Vec<(u16, PickerItem)> = self
-            .picker_items
+        // FileExplorer: filter against all files (flat search) when filter is non-empty
+        let source = if self.picker_mode == PickerMode::FileExplorer {
+            &self.explorer_all_files
+        } else {
+            &self.picker_items
+        };
+
+        let mut results: Vec<(u16, PickerItem)> = source
             .iter()
             .filter_map(|item| {
                 // Match against display name (primary) or secondary path
@@ -433,6 +443,22 @@ impl PickerOps for EditorContext {
                         }
                     }
                 }
+                PickerMode::FileExplorer => {
+                    // Directory: toggle expand/collapse
+                    if matches!(selected.icon, PickerIcon::Folder | PickerIcon::FolderOpen) {
+                        let path = PathBuf::from(&selected.id);
+                        if selected.icon == PickerIcon::FolderOpen {
+                            self.explorer_expanded.remove(&path);
+                        } else {
+                            self.explorer_expanded.insert(path);
+                        }
+                        self.rebuild_explorer_items();
+                        return;
+                    }
+                    // File: open it
+                    let path = PathBuf::from(&selected.id);
+                    self.open_file(&path);
+                }
                 PickerMode::Themes => {
                     // Theme is already applied by live preview — just clear the rollback
                     self.theme_before_preview = None;
@@ -475,6 +501,10 @@ impl PickerOps for EditorContext {
         self.command_panel_commands.clear();
         self.jumplist_entries.clear();
         self.cancel_global_search();
+        // Explorer cleanup
+        self.explorer_expanded.clear();
+        self.explorer_root = None;
+        self.explorer_all_files.clear();
     }
 }
 
@@ -500,6 +530,111 @@ impl EditorContext {
 
         // Fallback: open regular file picker
         self.show_file_picker();
+    }
+
+    /// Show the file explorer rooted at the given directory.
+    pub(crate) fn show_file_explorer_at(&mut self, root: PathBuf) {
+        self.command_mode = false;
+        self.command_input.clear();
+
+        self.explorer_expanded.clear();
+        self.explorer_root = Some(root.clone());
+
+        // Collect all files recursively for flat filtering
+        self.explorer_all_files = collect_all_files(&root);
+
+        self.rebuild_explorer_items();
+        self.picker_filter.clear();
+        self.picker_selected = 0;
+        self.picker_visible = true;
+        self.picker_mode = PickerMode::FileExplorer;
+        self.last_picker_mode = Some(PickerMode::FileExplorer);
+        self.picker_current_path = Some(root);
+    }
+
+    /// Show file explorer at the current working directory (Space e).
+    pub(crate) fn show_file_explorer(&mut self) {
+        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        self.show_file_explorer_at(cwd);
+    }
+
+    /// Show file explorer in the current buffer's directory (Space E).
+    pub(crate) fn show_file_explorer_in_buffer_dir(&mut self) {
+        let view_id = self.editor.tree.focus;
+        let view = self.editor.tree.get(view_id);
+        let doc_id = view.doc;
+
+        let buffer_dir = self
+            .editor
+            .document(doc_id)
+            .and_then(|doc| doc.path())
+            .and_then(|p| p.parent().map(|p| p.to_path_buf()));
+
+        let root = buffer_dir
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+        self.show_file_explorer_at(root);
+    }
+
+    /// Rebuild the tree-view picker items from the explorer root and expanded set.
+    pub(crate) fn rebuild_explorer_items(&mut self) {
+        let Some(root) = self.explorer_root.clone() else {
+            return;
+        };
+        let mut items = Vec::new();
+        build_tree_items(&root, &self.explorer_expanded, 0, &mut items);
+        self.picker_items = items;
+    }
+
+    /// Expand the selected directory in the file explorer.
+    pub(crate) fn explorer_expand_selected(&mut self) {
+        if self.picker_mode != PickerMode::FileExplorer {
+            return;
+        }
+        let filtered = self.filtered_picker_items();
+        let Some(selected) = filtered.get(self.picker_selected) else {
+            return;
+        };
+        if selected.icon != PickerIcon::Folder {
+            return;
+        }
+        let path = PathBuf::from(&selected.id);
+        self.explorer_expanded.insert(path);
+        let sel_id = selected.id.clone();
+        self.rebuild_explorer_items();
+        // Restore selection position
+        if let Some(pos) = self.picker_items.iter().position(|i| i.id == sel_id) {
+            self.picker_selected = pos;
+        }
+    }
+
+    /// Collapse the selected directory or navigate to its parent in the file explorer.
+    pub(crate) fn explorer_collapse_or_parent(&mut self) {
+        if self.picker_mode != PickerMode::FileExplorer {
+            return;
+        }
+        let filtered = self.filtered_picker_items();
+        let Some(selected) = filtered.get(self.picker_selected) else {
+            return;
+        };
+        if selected.icon == PickerIcon::FolderOpen {
+            // Collapse this directory
+            let path = PathBuf::from(&selected.id);
+            self.explorer_expanded.remove(&path);
+            let sel_id = selected.id.clone();
+            self.rebuild_explorer_items();
+            if let Some(pos) = self.picker_items.iter().position(|i| i.id == sel_id) {
+                self.picker_selected = pos;
+            }
+        } else {
+            // Navigate to parent directory in the item list
+            let sel_path = PathBuf::from(&selected.id);
+            if let Some(parent) = sel_path.parent() {
+                let parent_str = parent.to_string_lossy().to_string();
+                if let Some(pos) = self.picker_items.iter().position(|i| i.id == parent_str) {
+                    self.picker_selected = pos;
+                }
+            }
+        }
     }
 
     /// Show the register picker with all populated registers.
@@ -533,6 +668,7 @@ impl EditorContext {
                     icon: PickerIcon::Register,
                     match_indices: vec![],
                     secondary: Some(content),
+                    depth: 0,
                 }
             })
             .collect();
@@ -576,6 +712,7 @@ impl EditorContext {
                 icon: PickerIcon::Command,
                 match_indices: vec![],
                 secondary: hint.map(|h| h.to_string()),
+                depth: 0,
             })
             .collect();
 
@@ -612,6 +749,7 @@ impl EditorContext {
                 } else {
                     None
                 },
+                depth: 0,
             })
             .collect();
 
@@ -736,6 +874,7 @@ impl EditorContext {
                     icon: PickerIcon::SearchResult,
                     match_indices: vec![],
                     secondary: Some(result.line_content.clone()),
+                    depth: 0,
                 }
             })
             .collect();
@@ -765,6 +904,7 @@ impl EditorContext {
                     icon: PickerIcon::Reference,
                     match_indices: vec![],
                     secondary,
+                    depth: 0,
                 }
             })
             .collect();
@@ -805,6 +945,7 @@ impl EditorContext {
                     icon: PickerIcon::Definition,
                     match_indices: vec![],
                     secondary,
+                    depth: 0,
                 }
             })
             .collect();
@@ -1157,6 +1298,17 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
             "Shell Append Output",
             Some("A-!"),
         ),
+        // File explorer
+        (
+            EditorCommand::ShowFileExplorer,
+            "File Explorer",
+            Some("Space e"),
+        ),
+        (
+            EditorCommand::ShowFileExplorerInBufferDir,
+            "File Explorer (Buffer Dir)",
+            Some("Space E"),
+        ),
         // Word jump
         (EditorCommand::GotoWord, "Goto Word (Jump)", Some("gw")),
         // Theme
@@ -1250,5 +1402,192 @@ fn fuzzy_match_with_indices(text: &str, pattern: &str) -> Option<(u16, Vec<usize
         Some((score, match_indices))
     } else {
         None
+    }
+}
+
+/// Build tree-view items from a root directory, recursing into expanded dirs.
+fn build_tree_items(
+    dir: &std::path::Path,
+    expanded: &std::collections::HashSet<PathBuf>,
+    depth: u16,
+    items: &mut Vec<PickerItem>,
+) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+
+    let mut dirs = Vec::new();
+    let mut files = Vec::new();
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+
+        if path.is_dir() {
+            dirs.push((path, name));
+        } else {
+            files.push((path, name));
+        }
+    }
+
+    // Sort case-insensitive
+    dirs.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
+    files.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
+
+    // Directories first
+    for (path, name) in dirs {
+        let is_expanded = expanded.contains(&path);
+        items.push(PickerItem {
+            id: path.to_string_lossy().to_string(),
+            display: format!("{name}/"),
+            icon: if is_expanded {
+                PickerIcon::FolderOpen
+            } else {
+                PickerIcon::Folder
+            },
+            match_indices: vec![],
+            secondary: None,
+            depth,
+        });
+        if is_expanded {
+            build_tree_items(&path, expanded, depth + 1, items);
+        }
+    }
+
+    // Then files
+    for (path, name) in files {
+        items.push(PickerItem {
+            id: path.to_string_lossy().to_string(),
+            display: name,
+            icon: PickerIcon::File,
+            match_indices: vec![],
+            secondary: None,
+            depth,
+        });
+    }
+}
+
+/// Collect all files recursively from a root directory (for flat filtering).
+fn collect_all_files(root: &std::path::Path) -> Vec<PickerItem> {
+    let mut items = Vec::new();
+    let walker = WalkBuilder::new(root)
+        .hidden(false)
+        .git_ignore(true)
+        .git_global(true)
+        .git_exclude(true)
+        .build();
+
+    for entry in walker.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            continue;
+        }
+        let relative = path
+            .strip_prefix(root)
+            .unwrap_or(path)
+            .to_string_lossy()
+            .to_string();
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+
+        items.push(PickerItem {
+            id: path.to_string_lossy().to_string(),
+            display: name,
+            icon: PickerIcon::File,
+            match_indices: vec![],
+            secondary: Some(relative),
+            depth: 0,
+        });
+    }
+    items
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn build_tree_items_sorts_dirs_first() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::write(dir.path().join("zebra.txt"), "").expect("write");
+        fs::write(dir.path().join("apple.txt"), "").expect("write");
+        fs::create_dir(dir.path().join("beta_dir")).expect("mkdir");
+        fs::create_dir(dir.path().join("alpha_dir")).expect("mkdir");
+
+        let expanded = std::collections::HashSet::new();
+        let mut items = Vec::new();
+        build_tree_items(dir.path(), &expanded, 0, &mut items);
+
+        // Dirs first (alpha_dir, beta_dir), then files (apple.txt, zebra.txt)
+        assert_eq!(items.len(), 4);
+        assert_eq!(items[0].display, "alpha_dir/");
+        assert_eq!(items[0].icon, PickerIcon::Folder);
+        assert_eq!(items[1].display, "beta_dir/");
+        assert_eq!(items[1].icon, PickerIcon::Folder);
+        assert_eq!(items[2].display, "apple.txt");
+        assert_eq!(items[2].icon, PickerIcon::File);
+        assert_eq!(items[3].display, "zebra.txt");
+    }
+
+    #[test]
+    fn build_tree_items_shows_hidden_files() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::write(dir.path().join(".hidden"), "").expect("write");
+        fs::write(dir.path().join("visible.txt"), "").expect("write");
+
+        let expanded = std::collections::HashSet::new();
+        let mut items = Vec::new();
+        build_tree_items(dir.path(), &expanded, 0, &mut items);
+
+        let names: Vec<&str> = items.iter().map(|i| i.display.as_str()).collect();
+        assert!(names.contains(&".hidden"), "hidden files should appear");
+        assert!(names.contains(&"visible.txt"));
+    }
+
+    #[test]
+    fn build_tree_items_depth_increments_on_expand() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let sub = dir.path().join("subdir");
+        fs::create_dir(&sub).expect("mkdir");
+        fs::write(sub.join("inner.txt"), "").expect("write");
+
+        let mut expanded = std::collections::HashSet::new();
+        expanded.insert(sub.clone());
+
+        let mut items = Vec::new();
+        build_tree_items(dir.path(), &expanded, 0, &mut items);
+
+        // subdir/ (depth 0, FolderOpen), inner.txt (depth 1)
+        assert!(items.len() >= 2);
+        let subdir_item = items
+            .iter()
+            .find(|i| i.display == "subdir/")
+            .expect("subdir");
+        assert_eq!(subdir_item.depth, 0);
+        assert_eq!(subdir_item.icon, PickerIcon::FolderOpen);
+
+        let inner_item = items
+            .iter()
+            .find(|i| i.display == "inner.txt")
+            .expect("inner");
+        assert_eq!(inner_item.depth, 1);
+    }
+
+    #[test]
+    fn collect_all_files_skips_directories() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::create_dir(dir.path().join("subdir")).expect("mkdir");
+        fs::write(dir.path().join("file.txt"), "").expect("write");
+        fs::write(dir.path().join("subdir/nested.txt"), "").expect("write");
+
+        let items = collect_all_files(dir.path());
+        assert!(items.iter().all(|i| i.icon == PickerIcon::File));
+        assert!(items.len() >= 2);
     }
 }
