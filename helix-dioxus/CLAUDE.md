@@ -28,31 +28,36 @@ helix-dioxus/src/
 │   └── tracing_setup.rs        # Tracing subscriber init from LoggingConfig
 │
 ├── components/                 # UI Components
-│   ├── mod.rs                  # Re-exports
+│   ├── mod.rs                  # Re-exports all components
 │   ├── editor_view.rs          # Document rendering with syntax highlighting
 │   ├── buffer_bar.rs           # Tab bar with scroll buttons
 │   ├── statusline.rs           # Mode, filename, position display
+│   ├── keybinding_help.rs      # Context-aware keybinding help bar
+│   ├── scrollbar.rs            # Custom scrollbar with diagnostic markers
+│   ├── diagnostics.rs          # Diagnostic rendering helpers
+│   ├── lsp/                    # LSP-related popups
+│   │   ├── mod.rs              # Re-exports
+│   │   ├── code_actions.rs     # Code actions menu (uses InlineListDialog)
+│   │   ├── completion.rs       # Completion popup (uses InlineListDialog)
+│   │   ├── hover.rs            # Hover popup (uses InlineDialogContainer)
+│   │   ├── signature_help.rs   # Signature help (uses InlineDialogContainer)
+│   │   └── location_picker.rs  # Location picker for LSP references/definitions
+│   ├── dialog/                 # Dialogs and prompts
+│   │   ├── mod.rs              # Re-exports
+│   │   ├── confirmation.rs     # Confirmation dialog (quit with unsaved changes)
+│   │   ├── input.rs            # Input dialog (rename symbol, etc.)
+│   │   ├── lsp_status.rs       # LSP server status dialog
+│   │   ├── notification.rs     # Notification toast container
+│   │   └── prompt.rs           # Command/search prompts
 │   ├── picker/                 # Picker components (overlay dialogs)
 │   │   ├── mod.rs              # Re-exports GenericPicker
 │   │   ├── generic.rs          # Main picker container
 │   │   ├── item.rs             # PickerItemRow component
 │   │   └── highlight.rs        # HighlightedText for fuzzy matches
-│   ├── inline_dialog/          # Inline dialog components (cursor-positioned)
-│   │   ├── mod.rs              # Re-exports InlineDialogContainer, InlineListDialog
-│   │   ├── container.rs        # Base container with positioning logic
-│   │   └── list.rs             # List dialog with selection support
-│   ├── code_actions.rs         # Code actions menu (uses InlineListDialog)
-│   ├── completion.rs           # Completion popup (uses InlineListDialog)
-│   ├── confirmation_dialog.rs  # Confirmation dialog (quit with unsaved changes)
-│   ├── diagnostics.rs          # Diagnostic rendering helpers
-│   ├── hover.rs                # Hover popup (uses InlineDialogContainer)
-│   ├── input_dialog.rs         # Input dialog (rename symbol, etc.)
-│   ├── location_picker.rs      # Location picker for LSP references/definitions
-│   ├── lsp_dialog.rs           # LSP server status dialog
-│   ├── notification.rs         # Notification toast container
-│   ├── scrollbar.rs            # Custom scrollbar with diagnostic markers
-│   ├── signature_help.rs       # Signature help (uses InlineDialogContainer)
-│   └── prompt.rs               # Command/search prompts
+│   └── inline_dialog/          # Inline dialog primitives (cursor-positioned)
+│       ├── mod.rs              # Re-exports InlineDialogContainer, InlineListDialog
+│       ├── container.rs        # Base container with positioning logic
+│       └── list.rs             # List dialog with selection support
 │
 ├── state/                      # State Management
 │   ├── mod.rs                  # EditorContext, command dispatch, config loading
