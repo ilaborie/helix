@@ -134,6 +134,8 @@ fn handle_list_navigation_keys(
 
 #[cfg(test)]
 mod tests {
+    use crate::assert_single_command;
+
     use super::*;
 
     // --- direction_from_key ---
@@ -231,8 +233,7 @@ mod tests {
     #[test]
     fn handle_move_keys_returns_command_for_hjkl() {
         let cmds = handle_move_keys(KeyCode::Char('h')).expect("should match 'h'");
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::MoveLeft));
+        assert_single_command!(cmds, EditorCommand::MoveLeft);
     }
 
     #[test]
@@ -246,8 +247,7 @@ mod tests {
     #[test]
     fn handle_extend_keys_returns_command_for_arrows() {
         let cmds = handle_extend_keys(KeyCode::Right).expect("should match Right");
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::ExtendRight));
+        assert_single_command!(cmds, EditorCommand::ExtendRight);
     }
 
     #[test]
@@ -266,8 +266,7 @@ mod tests {
             EditorCommand::SearchBackspace,
             EditorCommand::SearchInput,
         );
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::ExitSearchMode));
+        assert_single_command!(cmds, EditorCommand::ExitSearchMode);
     }
 
     #[test]
@@ -279,8 +278,7 @@ mod tests {
             EditorCommand::SearchBackspace,
             EditorCommand::SearchInput,
         );
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::SearchExecute));
+        assert_single_command!(cmds, EditorCommand::SearchExecute);
     }
 
     #[test]
@@ -292,8 +290,7 @@ mod tests {
             EditorCommand::SearchBackspace,
             EditorCommand::SearchInput,
         );
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::SearchBackspace));
+        assert_single_command!(cmds, EditorCommand::SearchBackspace);
     }
 
     #[test]
@@ -305,8 +302,7 @@ mod tests {
             EditorCommand::SearchBackspace,
             |ch| EditorCommand::SearchInput(ch),
         );
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::SearchInput('x')));
+        assert_single_command!(cmds, EditorCommand::SearchInput('x'));
     }
 
     #[test]
@@ -334,8 +330,7 @@ mod tests {
             None,
             None,
         );
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::LocationCancel));
+        assert_single_command!(cmds, EditorCommand::LocationCancel);
     }
 
     #[test]
@@ -349,8 +344,7 @@ mod tests {
             None,
             None,
         );
-        assert_eq!(up.len(), 1);
-        assert!(matches!(up[0], EditorCommand::LocationUp));
+        assert_single_command!(up, EditorCommand::LocationUp);
 
         let down = handle_list_navigation_keys(
             KeyCode::Down,
@@ -361,8 +355,7 @@ mod tests {
             None,
             None,
         );
-        assert_eq!(down.len(), 1);
-        assert!(matches!(down[0], EditorCommand::LocationDown));
+        assert_single_command!(down, EditorCommand::LocationDown);
     }
 
     #[test]
@@ -376,8 +369,7 @@ mod tests {
             None,
             None,
         );
-        assert_eq!(k.len(), 1);
-        assert!(matches!(k[0], EditorCommand::LocationUp));
+        assert_single_command!(k, EditorCommand::LocationUp);
 
         let j = handle_list_navigation_keys(
             KeyCode::Char('j'),
@@ -388,8 +380,7 @@ mod tests {
             None,
             None,
         );
-        assert_eq!(j.len(), 1);
-        assert!(matches!(j[0], EditorCommand::LocationDown));
+        assert_single_command!(j, EditorCommand::LocationDown);
     }
 
     #[test]
@@ -404,8 +395,7 @@ mod tests {
             Some(EditorCommand::CodeActionFilterBackspace),
             Some(&filter_fn),
         );
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::CodeActionFilterChar('x')));
+        assert_single_command!(cmds, EditorCommand::CodeActionFilterChar('x'));
     }
 
     #[test]
@@ -419,7 +409,6 @@ mod tests {
             None,
             None,
         );
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::LocationConfirm));
+        assert_single_command!(cmds, EditorCommand::LocationConfirm);
     }
 }

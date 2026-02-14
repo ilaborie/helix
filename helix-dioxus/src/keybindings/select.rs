@@ -144,69 +144,53 @@ pub fn handle_select_mode(key: &KeyEvent) -> Vec<EditorCommand> {
 
 #[cfg(test)]
 mod tests {
-    use helix_view::input::KeyEvent;
+    use crate::assert_single_command;
+    use crate::test_helpers::{alt_key, ctrl_key, key};
 
     use super::*;
-
-    fn key(ch: char) -> KeyEvent {
-        KeyEvent {
-            code: KeyCode::Char(ch),
-            modifiers: KeyModifiers::NONE,
-        }
-    }
 
     // --- handle_select_g_prefix ---
 
     #[test]
     fn select_g_prefix_gg_extends_to_first_line() {
         let cmds = handle_select_g_prefix(&key('g'));
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::ExtendToFirstLine));
+        assert_single_command!(cmds, EditorCommand::ExtendToFirstLine);
     }
 
     #[test]
     fn select_g_prefix_ge_extends_to_last_line() {
         let cmds = handle_select_g_prefix(&key('e'));
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::ExtendToLastLine));
+        assert_single_command!(cmds, EditorCommand::ExtendToLastLine);
     }
 
     #[test]
     fn select_g_prefix_gh_extends_line_start() {
         let cmds = handle_select_g_prefix(&key('h'));
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::ExtendLineStart));
+        assert_single_command!(cmds, EditorCommand::ExtendLineStart);
     }
 
     #[test]
     fn select_g_prefix_gl_extends_line_end() {
         let cmds = handle_select_g_prefix(&key('l'));
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::ExtendLineEnd));
+        assert_single_command!(cmds, EditorCommand::ExtendLineEnd);
     }
 
     #[test]
     fn select_g_prefix_gs_extends_first_nonwhitespace() {
         let cmds = handle_select_g_prefix(&key('s'));
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(
-            cmds[0],
-            EditorCommand::ExtendGotoFirstNonWhitespace
-        ));
+        assert_single_command!(cmds, EditorCommand::ExtendGotoFirstNonWhitespace);
     }
 
     #[test]
     fn select_g_prefix_g_pipe_extends_goto_column() {
         let cmds = handle_select_g_prefix(&key('|'));
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::ExtendGotoColumn));
+        assert_single_command!(cmds, EditorCommand::ExtendGotoColumn);
     }
 
     #[test]
     fn select_g_prefix_gd_goes_to_definition() {
         let cmds = handle_select_g_prefix(&key('d'));
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::GotoDefinition));
+        assert_single_command!(cmds, EditorCommand::GotoDefinition);
     }
 
     #[test]
@@ -215,52 +199,33 @@ mod tests {
         assert!(cmds.is_empty());
     }
 
-    fn ctrl_key(ch: char) -> KeyEvent {
-        KeyEvent {
-            code: KeyCode::Char(ch),
-            modifiers: KeyModifiers::CONTROL,
-        }
-    }
-
     #[test]
     fn select_ctrl_o_jumps_backward() {
         let cmds = handle_select_mode(&ctrl_key('o'));
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::JumpBackward));
+        assert_single_command!(cmds, EditorCommand::JumpBackward);
     }
 
     #[test]
     fn select_ctrl_i_jumps_forward() {
         let cmds = handle_select_mode(&ctrl_key('i'));
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::JumpForward));
+        assert_single_command!(cmds, EditorCommand::JumpForward);
     }
 
     #[test]
     fn select_ctrl_s_saves_selection() {
         let cmds = handle_select_mode(&ctrl_key('s'));
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::SaveSelection));
-    }
-
-    fn alt_key(ch: char) -> KeyEvent {
-        KeyEvent {
-            code: KeyCode::Char(ch),
-            modifiers: KeyModifiers::ALT,
-        }
+        assert_single_command!(cmds, EditorCommand::SaveSelection);
     }
 
     #[test]
     fn select_alt_o_expands_selection() {
         let cmds = handle_select_mode(&alt_key('o'));
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::ExpandSelection));
+        assert_single_command!(cmds, EditorCommand::ExpandSelection);
     }
 
     #[test]
     fn select_alt_i_shrinks_selection() {
         let cmds = handle_select_mode(&alt_key('i'));
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::ShrinkSelection));
+        assert_single_command!(cmds, EditorCommand::ShrinkSelection);
     }
 }

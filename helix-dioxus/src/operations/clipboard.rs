@@ -248,7 +248,7 @@ impl ClipboardOps for EditorContext {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_helpers::{doc_view, test_context};
+    use crate::test_helpers::{assert_text, doc_view, test_context};
 
     use super::*;
 
@@ -302,9 +302,7 @@ mod tests {
             .expect("write succeeds");
         ctx.editor.selected_register = Some('a');
         ctx.paste(doc_id, view_id, false);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "hworldello\n");
+        assert_text(&ctx, "hworldello\n");
     }
 
     #[test]
@@ -320,9 +318,7 @@ mod tests {
             .and_then(|mut v| v.next().map(|s| s.into_owned()))
             .unwrap_or_default();
         assert_eq!(content, "hello");
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, " world\n");
+        assert_text(&ctx, " world\n");
     }
 
     #[test]
@@ -338,9 +334,7 @@ mod tests {
             .read('_', &ctx.editor)
             .and_then(|mut v| v.next().map(|s| s.into_owned()));
         assert!(content.is_none() || content.as_deref() == Some(""));
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, " world\n");
+        assert_text(&ctx, " world\n");
     }
 
     #[test]
@@ -354,9 +348,7 @@ mod tests {
             .expect("write succeeds");
         ctx.editor.selected_register = Some('c');
         ctx.replace_with_yanked(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "REPLACED world\n");
+        assert_text(&ctx, "REPLACED world\n");
     }
 
     #[test]
@@ -365,9 +357,7 @@ mod tests {
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.editor.selected_register = Some('z');
         ctx.replace_with_yanked(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "hello world\n");
+        assert_text(&ctx, "hello world\n");
     }
 
     // --- delete_selection_noyank ---
@@ -377,9 +367,7 @@ mod tests {
         let mut ctx = test_context("#[hello|]# world\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.delete_selection_noyank(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, " world\n");
+        assert_text(&ctx, " world\n");
         // Verify nothing was yanked to default register
         let content = ctx
             .editor
@@ -397,9 +385,7 @@ mod tests {
         let mut ctx = test_context("#[h|]#ello\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.delete_selection_noyank(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "ello\n");
+        assert_text(&ctx, "ello\n");
     }
 
     // --- yank_main_selection_to_clipboard ---

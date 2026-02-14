@@ -1023,3 +1023,121 @@ pub struct GlobalSearchResult {
     /// The matching line content (trimmed).
     pub line_content: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- centered_window ---
+
+    #[test]
+    fn centered_window_at_start() {
+        assert_eq!(centered_window(0, 100, 15), (0, 15));
+    }
+
+    #[test]
+    fn centered_window_at_end() {
+        assert_eq!(centered_window(99, 100, 15), (85, 100));
+    }
+
+    #[test]
+    fn centered_window_centered() {
+        assert_eq!(centered_window(50, 100, 15), (43, 58));
+    }
+
+    #[test]
+    fn centered_window_small_list() {
+        assert_eq!(centered_window(2, 5, 15), (0, 5));
+    }
+
+    #[test]
+    fn centered_window_exact_fit() {
+        assert_eq!(centered_window(7, 15, 15), (0, 15));
+    }
+
+    #[test]
+    fn centered_window_empty() {
+        assert_eq!(centered_window(0, 0, 15), (0, 0));
+    }
+
+    // --- PickerMode::title ---
+
+    #[test]
+    fn picker_mode_title_all_variants() {
+        let modes = [
+            PickerMode::DirectoryBrowser,
+            PickerMode::FilesRecursive,
+            PickerMode::Buffers,
+            PickerMode::DocumentSymbols,
+            PickerMode::WorkspaceSymbols,
+            PickerMode::DocumentDiagnostics,
+            PickerMode::WorkspaceDiagnostics,
+            PickerMode::GlobalSearch,
+            PickerMode::References,
+            PickerMode::Definitions,
+            PickerMode::Registers,
+            PickerMode::Commands,
+            PickerMode::JumpList,
+        ];
+        for mode in modes {
+            let title = mode.title();
+            assert!(!title.is_empty(), "{mode:?} should have a non-empty title");
+        }
+    }
+
+    // --- PickerMode::enter_hint ---
+
+    #[test]
+    fn enter_hint_directory_browser() {
+        assert!(PickerMode::DirectoryBrowser
+            .enter_hint()
+            .contains("open/enter"));
+    }
+
+    #[test]
+    fn enter_hint_global_search() {
+        assert!(PickerMode::GlobalSearch
+            .enter_hint()
+            .contains("search/open"));
+    }
+
+    #[test]
+    fn enter_hint_default() {
+        assert!(PickerMode::Buffers.enter_hint().contains("select"));
+        assert!(PickerMode::Commands.enter_hint().contains("select"));
+    }
+
+    // --- PickerMode::supports_preview ---
+
+    #[test]
+    fn supports_preview_file_modes() {
+        let file_modes = [
+            PickerMode::DirectoryBrowser,
+            PickerMode::FilesRecursive,
+            PickerMode::Buffers,
+            PickerMode::DocumentSymbols,
+            PickerMode::WorkspaceSymbols,
+            PickerMode::DocumentDiagnostics,
+            PickerMode::WorkspaceDiagnostics,
+            PickerMode::GlobalSearch,
+            PickerMode::References,
+            PickerMode::Definitions,
+            PickerMode::JumpList,
+        ];
+        for mode in file_modes {
+            assert!(mode.supports_preview(), "{mode:?} should support preview");
+        }
+    }
+
+    #[test]
+    fn supports_preview_non_file_modes() {
+        assert!(
+            !PickerMode::Registers.supports_preview(),
+            "Registers should not support preview"
+        );
+        assert!(
+            !PickerMode::Commands.supports_preview(),
+            "Commands should not support preview"
+        );
+    }
+}

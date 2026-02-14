@@ -7,6 +7,7 @@ use std::sync::mpsc;
 
 use helix_core::test::{plain, print};
 use helix_core::Transaction;
+use helix_view::input::{KeyCode, KeyEvent, KeyModifiers};
 use helix_view::{current_ref, DocumentId, ViewId};
 
 use crate::state::EditorContext;
@@ -101,4 +102,60 @@ pub fn assert_state(ctx: &EditorContext, expected: &str) {
         actual, expected,
         "\n--- actual ---\n{actual}\n--- expected ---\n{expected}\n"
     );
+}
+
+/// Assert that the document text matches the expected string (ignoring selection).
+pub fn assert_text(ctx: &EditorContext, expected: &str) {
+    let (_view, doc) = current_ref!(ctx.editor);
+    let text: String = doc.text().slice(..).into();
+    assert_eq!(
+        text, expected,
+        "\n--- actual ---\n{text}\n--- expected ---\n{expected}\n"
+    );
+}
+
+/// Create a `KeyEvent` with no modifiers for the given character.
+pub fn key(ch: char) -> KeyEvent {
+    KeyEvent {
+        code: KeyCode::Char(ch),
+        modifiers: KeyModifiers::NONE,
+    }
+}
+
+/// Create a `KeyEvent` with the Ctrl modifier for the given character.
+pub fn ctrl_key(ch: char) -> KeyEvent {
+    KeyEvent {
+        code: KeyCode::Char(ch),
+        modifiers: KeyModifiers::CONTROL,
+    }
+}
+
+/// Create a `KeyEvent` with the Alt modifier for the given character.
+pub fn alt_key(ch: char) -> KeyEvent {
+    KeyEvent {
+        code: KeyCode::Char(ch),
+        modifiers: KeyModifiers::ALT,
+    }
+}
+
+/// Assert that a command list contains exactly one command matching the pattern.
+///
+/// Usage: `assert_single_command!(cmds, EditorCommand::JumpBackward);`
+#[macro_export]
+macro_rules! assert_single_command {
+    ($cmds:expr, $pattern:pat) => {{
+        assert_eq!(
+            $cmds.len(),
+            1,
+            "expected 1 command, got {}: {:?}",
+            $cmds.len(),
+            $cmds
+        );
+        assert!(
+            matches!($cmds[0], $pattern),
+            "expected {}, got {:?}",
+            stringify!($pattern),
+            $cmds[0]
+        );
+    }};
 }

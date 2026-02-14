@@ -389,67 +389,44 @@ pub fn handle_space_leader(key: &KeyEvent) -> Vec<EditorCommand> {
 
 #[cfg(test)]
 mod tests {
-    use helix_view::input::KeyEvent;
+    use crate::assert_single_command;
+    use crate::test_helpers::{alt_key, ctrl_key, key};
 
     use super::*;
-
-    fn alt_key(ch: char) -> KeyEvent {
-        KeyEvent {
-            code: KeyCode::Char(ch),
-            modifiers: KeyModifiers::ALT,
-        }
-    }
-
-    fn ctrl_key(ch: char) -> KeyEvent {
-        KeyEvent {
-            code: KeyCode::Char(ch),
-            modifiers: KeyModifiers::CONTROL,
-        }
-    }
 
     #[test]
     fn ctrl_o_jumps_backward() {
         let cmds = handle_normal_mode(&ctrl_key('o'));
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::JumpBackward));
+        assert_single_command!(cmds, EditorCommand::JumpBackward);
     }
 
     #[test]
     fn ctrl_i_jumps_forward() {
         let cmds = handle_normal_mode(&ctrl_key('i'));
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::JumpForward));
+        assert_single_command!(cmds, EditorCommand::JumpForward);
     }
 
     #[test]
     fn ctrl_s_saves_selection() {
         let cmds = handle_normal_mode(&ctrl_key('s'));
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::SaveSelection));
+        assert_single_command!(cmds, EditorCommand::SaveSelection);
     }
 
     #[test]
     fn space_j_shows_jumplist_picker() {
-        let key = KeyEvent {
-            code: KeyCode::Char('j'),
-            modifiers: KeyModifiers::NONE,
-        };
-        let cmds = handle_space_leader(&key);
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::ShowJumpListPicker));
+        let cmds = handle_space_leader(&key('j'));
+        assert_single_command!(cmds, EditorCommand::ShowJumpListPicker);
     }
 
     #[test]
     fn alt_o_expands_selection() {
         let cmds = handle_normal_mode(&alt_key('o'));
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::ExpandSelection));
+        assert_single_command!(cmds, EditorCommand::ExpandSelection);
     }
 
     #[test]
     fn alt_i_shrinks_selection() {
         let cmds = handle_normal_mode(&alt_key('i'));
-        assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], EditorCommand::ShrinkSelection));
+        assert_single_command!(cmds, EditorCommand::ShrinkSelection);
     }
 }

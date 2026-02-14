@@ -998,7 +998,7 @@ fn surround_pair(ch: char) -> (char, char) {
 #[cfg(test)]
 mod tests {
     use crate::operations::SelectionOps;
-    use crate::test_helpers::{assert_state, doc_view, test_context};
+    use crate::test_helpers::{assert_state, assert_text, doc_view, test_context};
 
     use super::*;
 
@@ -1070,9 +1070,7 @@ mod tests {
         ctx.change_selection(doc_id, view_id);
         // "hello" deleted, cursor at position 0, insert mode
         assert_eq!(ctx.editor.mode, Mode::Insert);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, " world\n");
+        assert_text(&ctx, " world\n");
     }
 
     #[test]
@@ -1091,9 +1089,7 @@ mod tests {
         let mut ctx = test_context("#[h|]#ello\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.replace_char(doc_id, view_id, 'X');
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "Xello\n");
+        assert_text(&ctx, "Xello\n");
     }
 
     #[test]
@@ -1101,9 +1097,7 @@ mod tests {
         let mut ctx = test_context("#[hel|]#lo\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.replace_char(doc_id, view_id, '.');
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "...lo\n");
+        assert_text(&ctx, "...lo\n");
     }
 
     #[test]
@@ -1111,9 +1105,7 @@ mod tests {
         let mut ctx = test_context("#[hello\nworld|]#\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.replace_char(doc_id, view_id, '.');
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, ".....\n.....\n");
+        assert_text(&ctx, ".....\n.....\n");
     }
 
     // --- join_lines ---
@@ -1123,9 +1115,7 @@ mod tests {
         let mut ctx = test_context("#[h|]#ello\nworld\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.join_lines(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "hello world\n");
+        assert_text(&ctx, "hello world\n");
     }
 
     #[test]
@@ -1133,9 +1123,7 @@ mod tests {
         let mut ctx = test_context("#[h|]#ello\n    world\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.join_lines(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "hello world\n");
+        assert_text(&ctx, "hello world\n");
     }
 
     #[test]
@@ -1147,9 +1135,7 @@ mod tests {
         ctx.select_line(doc_id, view_id);
         ctx.select_line(doc_id, view_id);
         ctx.join_lines(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "hello world foo\n");
+        assert_text(&ctx, "hello world foo\n");
     }
 
     // --- toggle_case ---
@@ -1159,9 +1145,7 @@ mod tests {
         let mut ctx = test_context("#[Hello|]#\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.toggle_case(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "hELLO\n");
+        assert_text(&ctx, "hELLO\n");
     }
 
     #[test]
@@ -1169,9 +1153,7 @@ mod tests {
         let mut ctx = test_context("#[h|]#ello\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.toggle_case(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "Hello\n");
+        assert_text(&ctx, "Hello\n");
     }
 
     // --- to_lowercase / to_uppercase ---
@@ -1181,9 +1163,7 @@ mod tests {
         let mut ctx = test_context("#[HELLO|]#\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.to_lowercase(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "hello\n");
+        assert_text(&ctx, "hello\n");
     }
 
     #[test]
@@ -1191,9 +1171,7 @@ mod tests {
         let mut ctx = test_context("#[hello|]#\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.to_uppercase(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "HELLO\n");
+        assert_text(&ctx, "HELLO\n");
     }
 
     // --- surround_add ---
@@ -1203,9 +1181,7 @@ mod tests {
         let mut ctx = test_context("#[hello|]#\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.surround_add(doc_id, view_id, '(');
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "(hello)\n");
+        assert_text(&ctx, "(hello)\n");
     }
 
     #[test]
@@ -1213,9 +1189,7 @@ mod tests {
         let mut ctx = test_context("#[hello|]#\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.surround_add(doc_id, view_id, '"');
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "\"hello\"\n");
+        assert_text(&ctx, "\"hello\"\n");
     }
 
     #[test]
@@ -1223,9 +1197,7 @@ mod tests {
         let mut ctx = test_context("#[hello|]#\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.surround_add(doc_id, view_id, '[');
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "[hello]\n");
+        assert_text(&ctx, "[hello]\n");
     }
 
     // --- surround_delete ---
@@ -1235,9 +1207,7 @@ mod tests {
         let mut ctx = test_context("(#[hello|]#)\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.surround_delete(doc_id, view_id, '(');
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "hello\n");
+        assert_text(&ctx, "hello\n");
     }
 
     // --- surround_replace ---
@@ -1247,9 +1217,7 @@ mod tests {
         let mut ctx = test_context("(#[hello|]#)\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.surround_replace(doc_id, view_id, '(', '[');
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "[hello]\n");
+        assert_text(&ctx, "[hello]\n");
     }
 
     #[test]
@@ -1257,9 +1225,7 @@ mod tests {
         let mut ctx = test_context("\"#[hello|]#\"\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.surround_replace(doc_id, view_id, '"', '(');
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "(hello)\n");
+        assert_text(&ctx, "(hello)\n");
     }
 
     // --- insert_char ---
@@ -1269,9 +1235,7 @@ mod tests {
         let mut ctx = test_context("hel#[l|]#o\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.insert_char(doc_id, view_id, 'X');
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "helXlo\n");
+        assert_text(&ctx, "helXlo\n");
     }
 
     #[test]
@@ -1279,9 +1243,7 @@ mod tests {
         let mut ctx = test_context("#[h|]#ello\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.insert_char(doc_id, view_id, 'X');
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "Xhello\n");
+        assert_text(&ctx, "Xhello\n");
     }
 
     // --- insert_newline ---
@@ -1291,9 +1253,7 @@ mod tests {
         let mut ctx = test_context("hel#[l|]#o\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.insert_newline(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "hel\nlo\n");
+        assert_text(&ctx, "hel\nlo\n");
     }
 
     #[test]
@@ -1301,9 +1261,7 @@ mod tests {
         let mut ctx = test_context("    hel#[l|]#o\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.insert_newline(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "    hel\n    lo\n");
+        assert_text(&ctx, "    hel\n    lo\n");
     }
 
     // --- insert_tab ---
@@ -1313,11 +1271,11 @@ mod tests {
         let mut ctx = test_context("#[h|]#ello\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.insert_tab(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
         // Default indent style inserts tab or spaces
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let actual: String = doc.text().slice(..).into();
         assert!(
-            text.starts_with('\t') || text.starts_with(' '),
+            actual.starts_with('\t') || actual.starts_with(' '),
             "should insert indent"
         );
     }
@@ -1329,9 +1287,7 @@ mod tests {
         let mut ctx = test_context("he#[l|]#lo\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.delete_char_backward(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "hllo\n");
+        assert_text(&ctx, "hllo\n");
     }
 
     #[test]
@@ -1339,9 +1295,7 @@ mod tests {
         let mut ctx = test_context("#[h|]#ello\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.delete_char_backward(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "hello\n");
+        assert_text(&ctx, "hello\n");
     }
 
     // --- delete_char_forward ---
@@ -1351,9 +1305,7 @@ mod tests {
         let mut ctx = test_context("he#[l|]#lo\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.delete_char_forward(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "helo\n");
+        assert_text(&ctx, "helo\n");
     }
 
     // --- open_line_below ---
@@ -1363,9 +1315,7 @@ mod tests {
         let mut ctx = test_context("hel#[l|]#o\nworld\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.open_line_below(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "hello\n\nworld\n");
+        assert_text(&ctx, "hello\n\nworld\n");
     }
 
     #[test]
@@ -1373,9 +1323,7 @@ mod tests {
         let mut ctx = test_context("    hel#[l|]#o\nworld\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.open_line_below(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "    hello\n    \nworld\n");
+        assert_text(&ctx, "    hello\n    \nworld\n");
     }
 
     // --- open_line_above ---
@@ -1385,9 +1333,7 @@ mod tests {
         let mut ctx = test_context("hello\n#[w|]#orld\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.open_line_above(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "hello\n\nworld\n");
+        assert_text(&ctx, "hello\n\nworld\n");
     }
 
     // --- undo / redo ---
@@ -1401,9 +1347,7 @@ mod tests {
         ctx.insert_char(doc_id, view_id, 'X');
         ctx.undo(doc_id, view_id);
         ctx.redo(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "Xhello\n");
+        assert_text(&ctx, "Xhello\n");
     }
 
     // --- delete_word_backward ---
@@ -1413,10 +1357,8 @@ mod tests {
         let mut ctx = test_context("hello #[w|]#orld\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.delete_word_backward(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
         // Should delete "hello " backward
-        assert_eq!(text, "world\n");
+        assert_text(&ctx, "world\n");
     }
 
     #[test]
@@ -1424,9 +1366,7 @@ mod tests {
         let mut ctx = test_context("#[h|]#ello\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.delete_word_backward(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "hello\n");
+        assert_text(&ctx, "hello\n");
     }
 
     // --- delete_to_line_start ---
@@ -1436,9 +1376,7 @@ mod tests {
         let mut ctx = test_context("hel#[l|]#o\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.delete_to_line_start(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "lo\n");
+        assert_text(&ctx, "lo\n");
     }
 
     #[test]
@@ -1446,9 +1384,7 @@ mod tests {
         let mut ctx = test_context("#[h|]#ello\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.delete_to_line_start(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "hello\n");
+        assert_text(&ctx, "hello\n");
     }
 
     // --- change_selection_noyank ---
@@ -1459,9 +1395,7 @@ mod tests {
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.change_selection_noyank(doc_id, view_id);
         assert_eq!(ctx.editor.mode, Mode::Insert);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, " world\n");
+        assert_text(&ctx, " world\n");
         // Verify nothing was yanked to default register
         let reg_content = ctx.editor.registers.read('"', &ctx.editor);
         assert!(
@@ -1477,9 +1411,7 @@ mod tests {
         let mut ctx = test_context("#[h|]#ello world\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.delete_word_forward(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "world\n");
+        assert_text(&ctx, "world\n");
     }
 
     // --- kill_to_line_end ---
@@ -1489,9 +1421,7 @@ mod tests {
         let mut ctx = test_context("he#[l|]#lo\nworld\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.kill_to_line_end(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "he\nworld\n");
+        assert_text(&ctx, "he\nworld\n");
     }
 
     #[test]
@@ -1499,10 +1429,8 @@ mod tests {
         let mut ctx = test_context("hell#[o|]#\nworld\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.kill_to_line_end(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
         // Cursor is at 'o' which is the last char before \n, so nothing to kill
-        assert_eq!(text, "hell\nworld\n");
+        assert_text(&ctx, "hell\nworld\n");
     }
 
     // --- add_newline_below ---
@@ -1512,9 +1440,7 @@ mod tests {
         let mut ctx = test_context("#[h|]#ello\nworld\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.add_newline_below(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "hello\n\nworld\n");
+        assert_text(&ctx, "hello\n\nworld\n");
     }
 
     // --- add_newline_above ---
@@ -1524,9 +1450,7 @@ mod tests {
         let mut ctx = test_context("hello\n#[w|]#orld\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.add_newline_above(doc_id, view_id);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "hello\n\nworld\n");
+        assert_text(&ctx, "hello\n\nworld\n");
     }
 
     // --- increment ---
@@ -1537,9 +1461,7 @@ mod tests {
         let mut ctx = test_context("#[42|]#\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.increment(doc_id, view_id, 1);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "43\n");
+        assert_text(&ctx, "43\n");
     }
 
     #[test]
@@ -1547,9 +1469,7 @@ mod tests {
         let mut ctx = test_context("#[42|]#\n");
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.increment(doc_id, view_id, -1);
-        let (_view, doc) = helix_view::current_ref!(ctx.editor);
-        let text: String = doc.text().slice(..).into();
-        assert_eq!(text, "41\n");
+        assert_text(&ctx, "41\n");
     }
 
     // Note: earlier_and_later_navigate_history removed — test_context setup
