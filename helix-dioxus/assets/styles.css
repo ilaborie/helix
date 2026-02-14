@@ -28,7 +28,8 @@
     /* Cursor */
     --cursor-normal: #61afef;
     --cursor-select: #c678dd;
-    --cursor-fg: #282c34;
+    --cursor-fg: #000000;
+    --cursor-in-selection: #e5c07b;
 
     /* Z-index layers */
     --z-dropdown: 100;
@@ -156,29 +157,51 @@ body {
 }
 
 /* ───── Cursor ───── */
-@keyframes cursor-blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+@keyframes cursor-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px var(--cursor-normal), 0 0 6px 2px var(--cursor-normal); }
+    50% { box-shadow: 0 0 0 2px var(--cursor-normal), 0 0 14px 4px var(--cursor-normal); }
+}
+@keyframes cursor-pulse-select {
+    0%, 100% { box-shadow: 0 0 0 2px var(--cursor-select), 0 0 4px 1px var(--cursor-select); }
+    50% { box-shadow: 0 0 0 2px var(--cursor-select), 0 0 10px 3px var(--cursor-select); }
+}
+@keyframes cursor-pulse-insert {
+    0%, 100% { box-shadow: -3px 0 0 0 var(--cursor-normal), -3px 0 6px 0 var(--cursor-normal); }
+    50% { box-shadow: -3px 0 0 0 var(--cursor-normal), -3px 0 12px 0 var(--cursor-normal); }
 }
 .cursor-block-normal {
     background-color: var(--cursor-normal);
     color: var(--cursor-fg);
     position: relative;
     z-index: 1;
-    box-shadow: 0 0 0 1px var(--cursor-normal);
-    animation: cursor-blink 1s step-end infinite;
+    box-shadow: 0 0 0 2px var(--cursor-normal), 0 0 6px 2px var(--cursor-normal);
+    animation: cursor-pulse 1.5s ease-in-out infinite;
 }
 .cursor-block-select {
     background-color: var(--cursor-select);
     color: var(--cursor-fg);
     position: relative;
     z-index: 1;
-    box-shadow: 0 0 0 1px var(--cursor-select);
-    animation: cursor-blink 1s step-end infinite;
+    box-shadow: 0 0 0 2px var(--cursor-select), 0 0 4px 1px var(--cursor-select);
+    animation: cursor-pulse-select 1.5s ease-in-out infinite;
 }
 .cursor-line-insert {
-    box-shadow: -2px 0 0 0 var(--cursor-normal);
-    animation: cursor-blink 1s step-end infinite;
+    box-shadow: -3px 0 0 0 var(--cursor-normal);
+    animation: cursor-pulse-insert 1.5s ease-in-out infinite;
+}
+
+/* Cursor inside selection: shift to orange for contrast */
+.line-selected .cursor-block-normal {
+    background-color: var(--cursor-in-selection);
+    color: var(--cursor-fg);
+    box-shadow: 0 0 0 2px var(--cursor-in-selection), 0 0 6px 2px var(--cursor-in-selection);
+    animation: none;
+}
+
+/* Select mode cursor inside selection: keep purple but solid */
+.line-selected .cursor-block-select {
+    box-shadow: 0 0 0 2px var(--cursor-select), 0 0 6px 2px var(--cursor-select);
+    animation: none;
 }
 
 /* ───── Buffer bar ───── */
