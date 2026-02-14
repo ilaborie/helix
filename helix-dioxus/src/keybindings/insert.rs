@@ -37,6 +37,8 @@ pub fn handle_insert_mode(key: &KeyEvent) -> Vec<EditorCommand> {
             KeyCode::Char(' ') => vec![EditorCommand::TriggerCompletion],
             // Ctrl+. - show code actions (quick fix)
             KeyCode::Char('.') => vec![EditorCommand::ShowCodeActions],
+            // Ctrl+s - commit undo checkpoint
+            KeyCode::Char('s') => vec![EditorCommand::CommitUndoCheckpoint],
             // Ctrl+w - delete word backward
             KeyCode::Char('w') => vec![EditorCommand::DeleteWordBackward],
             // Ctrl+u - delete to line start
@@ -47,6 +49,9 @@ pub fn handle_insert_mode(key: &KeyEvent) -> Vec<EditorCommand> {
 
     match key.code {
         KeyCode::Char(c) => vec![EditorCommand::InsertChar(c)],
+        KeyCode::Tab if key.modifiers.contains(KeyModifiers::SHIFT) => {
+            vec![EditorCommand::UnindentLine]
+        }
         KeyCode::Tab => vec![EditorCommand::InsertTab],
         KeyCode::Enter => vec![EditorCommand::InsertNewline],
         KeyCode::Backspace => vec![EditorCommand::DeleteCharBackward],

@@ -603,6 +603,10 @@ impl EditorContext {
             // History operations
             EditorCommand::Undo => self.undo(doc_id, view_id),
             EditorCommand::Redo => self.redo(doc_id, view_id),
+            EditorCommand::CommitUndoCheckpoint => {
+                self.commit_undo_checkpoint(doc_id, view_id);
+            }
+            EditorCommand::InsertRegister(ch) => self.insert_register(doc_id, view_id, ch),
 
             // Comments
             EditorCommand::ToggleLineComment => self.toggle_line_comment(doc_id, view_id),

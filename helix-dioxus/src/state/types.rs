@@ -520,6 +520,10 @@ pub enum EditorCommand {
     // History
     Undo,
     Redo,
+    /// Commit an undo checkpoint (C-s in insert mode).
+    CommitUndoCheckpoint,
+    /// Insert register content at cursor (C-r then register char in insert mode).
+    InsertRegister(char),
 
     // Comments
     ToggleLineComment,
@@ -1068,6 +1072,8 @@ pub enum PendingKeySequence {
     ViewPrefix,
     /// Waiting for sub-key after 'Z' (sticky view mode — stays until Esc)
     ViewPrefixSticky,
+    /// Waiting for register char after C-r in insert mode.
+    InsertRegisterPrefix,
     /// Waiting for first label character after word jump labels appear.
     WordJumpFirstChar,
     /// Waiting for second label character during word jump.

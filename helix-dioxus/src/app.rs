@@ -329,6 +329,11 @@ pub fn App() -> Element {
                             cmds
                         }
                     }
+                    PendingKeySequence::InsertRegisterPrefix => {
+                        // Should not happen in normal/select mode; reset
+                        pending_key.set(PendingKeySequence::None);
+                        vec![]
+                    }
                     PendingKeySequence::None => {
                         // Check for Ctrl modifier first - Ctrl+key combos go to normal mode handler
                         if key_event.modifiers.contains(KeyModifiers::CONTROL) {
@@ -403,11 +408,30 @@ pub fn App() -> Element {
                         }
                     }
                 }
-            } else {
-                match snapshot.mode.as_str() {
-                    "INSERT" => handle_insert_mode(&key_event),
-                    _ => vec![],
+            } else if snapshot.mode == "INSERT" {
+                // Handle C-r pending key sequence in insert mode
+                match pending_key() {
+                    PendingKeySequence::InsertRegisterPrefix => {
+                        pending_key.set(PendingKeySequence::None);
+                        match key_event.code {
+                            KeyCode::Char(ch) => vec![EditorCommand::InsertRegister(ch)],
+                            _ => vec![], // Esc or non-char cancels
+                        }
+                    }
+                    _ => {
+                        // C-r starts the register prompt
+                        if key_event.modifiers.contains(KeyModifiers::CONTROL)
+                            && key_event.code == KeyCode::Char('r')
+                        {
+                            pending_key.set(PendingKeySequence::InsertRegisterPrefix);
+                            vec![]
+                        } else {
+                            handle_insert_mode(&key_event)
+                        }
+                    }
                 }
+            } else {
+                vec![]
             };
 
             // Send commands to editor

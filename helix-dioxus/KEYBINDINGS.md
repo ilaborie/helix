@@ -303,6 +303,9 @@ Reference: `helix-term/src/keymap/default.rs`
 | `C-d` | Delete char forward |
 | `C-j` | Insert newline |
 | `A-d` | Delete word forward |
+| `C-r` | Insert from register |
+| `C-s` | Commit undo checkpoint |
+| `S-Tab` | Unindent |
 | arrows, Home, End | Cursor movement |
 | PageUp/PageDown | Page movement |
 
@@ -319,9 +322,6 @@ Reference: `helix-term/src/keymap/default.rs`
 | Key | Helix Action | Notes |
 |-----|-------------|-------|
 | `C-x` | `completion` | Helix completion trigger (use `C-Space` instead) |
-| `C-r` | `insert_register` | Insert from register |
-| `C-s` | `commit_undo_checkpoint` | Manual undo checkpoint |
-| `S-Tab` | `unindent` | Unindent |
 | `A-Backspace` | `delete_word_backward` | Alt backspace (use `C-w` instead) |
 
 ---
@@ -436,7 +436,7 @@ Window/split management is not supported. helix-dioxus uses a single-view design
 | View Mode (z/Z) | 13 bindings | 0 | 100% |
 | Match (m-prefix) | 6 bindings | 0 | 100% |
 | Select Mode | 35+ bindings | 0 | 100% |
-| Insert Mode | 15 bindings | 3 (`C-r`, `C-s`, `S-Tab`) | 83% |
+| Insert Mode | 18 bindings | 0 | 100% |
 | Commands | 32 commands | 11 | 74% |
 | **Overall** | **~93%** | | |
 

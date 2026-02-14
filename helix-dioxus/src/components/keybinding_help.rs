@@ -96,7 +96,7 @@ fn hints_for_context(mode: &str, pending: PendingKeySequence) -> Vec<(&'static s
                 ("\"", "quotes"),
             ]
         }
-        PendingKeySequence::RegisterPrefix => vec![
+        PendingKeySequence::RegisterPrefix | PendingKeySequence::InsertRegisterPrefix => vec![
             ("a-z", "named"),
             ("+", "clipboard"),
             ("_", "black hole"),
@@ -125,6 +125,9 @@ fn hints_for_context(mode: &str, pending: PendingKeySequence) -> Vec<(&'static s
         PendingKeySequence::None => match mode {
             "INSERT" => vec![
                 ("Esc", "exit"),
+                ("C-r", "insert reg"),
+                ("C-s", "checkpoint"),
+                ("S-Tab", "unindent"),
                 ("C-w", "del word"),
                 ("C-u", "del to start"),
                 ("C-k", "kill to end"),
@@ -171,6 +174,7 @@ fn pending_prefix(pending: PendingKeySequence) -> Option<&'static str> {
         PendingKeySequence::TillForward => Some("t"),
         PendingKeySequence::TillBackward => Some("T"),
         PendingKeySequence::RegisterPrefix => Some("\""),
+        PendingKeySequence::InsertRegisterPrefix => Some("C-r"),
         PendingKeySequence::ReplacePrefix => Some("r"),
         PendingKeySequence::MatchPrefix => Some("m"),
         PendingKeySequence::MatchInside => Some("mi"),
@@ -202,6 +206,7 @@ fn is_char_prompt(pending: PendingKeySequence) -> bool {
             | PendingKeySequence::MatchDeleteSurround
             | PendingKeySequence::MatchReplaceSurroundFrom
             | PendingKeySequence::MatchReplaceSurroundTo(_)
+            | PendingKeySequence::InsertRegisterPrefix
             | PendingKeySequence::WordJumpFirstChar
             | PendingKeySequence::WordJumpSecondChar
     )

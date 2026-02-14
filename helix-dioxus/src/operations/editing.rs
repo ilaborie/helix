@@ -67,6 +67,8 @@ pub trait EditingOps {
     fn add_newline_below(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn add_newline_above(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn increment(&mut self, doc_id: DocumentId, view_id: ViewId, amount: i64);
+    fn commit_undo_checkpoint(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn insert_register(&mut self, doc_id: DocumentId, view_id: ViewId, register: char);
     fn format_document(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn format_selections(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn align_selections(&mut self, doc_id: DocumentId, view_id: ViewId);
@@ -794,6 +796,42 @@ impl EditingOps for EditorContext {
         }
     }
 
+    /// Commit an undo checkpoint, saving current changes to history.
+    fn commit_undo_checkpoint(&mut self, doc_id: DocumentId, view_id: ViewId) {
+        let view = self.editor.tree.get_mut(view_id);
+        let doc = self.editor.documents.get_mut(&doc_id).expect("doc exists");
+        doc.append_changes_to_history(view);
+    }
+
+    /// Insert register content at cursor position.
+    fn insert_register(&mut self, doc_id: DocumentId, view_id: ViewId, register: char) {
+        // Read from target register; for '+' fall back to internal clipboard
+        let content = self
+            .editor
+            .registers
+            .read(register, &self.editor)
+            .and_then(|mut values| values.next().map(|v| v.into_owned()))
+            .or_else(|| {
+                if register == '+' {
+                    Some(self.clipboard.clone())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_default();
+
+        if content.is_empty() {
+            return;
+        }
+
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone().cursors(text);
+
+        let transaction = helix_core::Transaction::insert(doc.text(), &selection, content.into());
+        doc.apply(&transaction, view_id);
+    }
+
     /// Format the entire document via LSP.
     fn format_document(&mut self, doc_id: DocumentId, _view_id: ViewId) {
         use helix_core::syntax::config::LanguageServerFeature;
@@ -1475,4 +1513,56 @@ mod tests {
     // Note: earlier_and_later_navigate_history removed — test_context setup
     // transaction shares an undo group with subsequent operations, making
     // earlier/later step counts unreliable in test context.
+
+    // --- commit_undo_checkpoint ---
+
+    #[test]
+    fn commit_undo_checkpoint_creates_savepoint() {
+        let mut ctx = test_context("#[|h]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        // Insert char, commit checkpoint, insert another char
+        ctx.insert_char(doc_id, view_id, 'A');
+        ctx.commit_undo_checkpoint(doc_id, view_id);
+        ctx.insert_char(doc_id, view_id, 'B');
+        // Undo should only undo 'B' (since checkpoint was committed after 'A')
+        ctx.undo(doc_id, view_id);
+        assert_text(&ctx, "Ahello\n");
+    }
+
+    // --- insert_register ---
+
+    #[test]
+    fn insert_register_inserts_content_at_cursor() {
+        let mut ctx = test_context("#[|h]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        // Write some content to register 'a'
+        ctx.editor
+            .registers
+            .write('a', vec!["world".to_string()])
+            .expect("write register");
+        ctx.insert_register(doc_id, view_id, 'a');
+        assert_text(&ctx, "worldhello\n");
+    }
+
+    #[test]
+    fn insert_register_empty_register_noop() {
+        let mut ctx = test_context("#[|h]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        // Register 'z' is empty, should be a no-op
+        ctx.insert_register(doc_id, view_id, 'z');
+        assert_text(&ctx, "hello\n");
+    }
+
+    #[test]
+    fn insert_register_from_plus_register() {
+        let mut ctx = test_context("#[|h]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        // Write to '+' register explicitly
+        ctx.editor
+            .registers
+            .write('+', vec!["clip".to_string()])
+            .expect("write + register");
+        ctx.insert_register(doc_id, view_id, '+');
+        assert_text(&ctx, "cliphello\n");
+    }
 }
