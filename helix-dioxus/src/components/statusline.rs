@@ -68,7 +68,11 @@ fn LspStatusBlock(servers: Vec<LspServerSnapshot>, on_click: EventHandler<MouseE
                 Plug { size: 14, color: color }
             }
             span {
-                class: "icon-wrapper",
+                class: match status {
+                    LspServerStatus::Starting => "icon-wrapper lsp-icon-blinking",
+                    LspServerStatus::Indexing => "icon-wrapper lsp-icon-spinning",
+                    _ => "icon-wrapper",
+                },
                 style: "margin-right: 4px;",
                 match status {
                     LspServerStatus::Running => rsx! { CircleCheck { size: 12, color: color } },

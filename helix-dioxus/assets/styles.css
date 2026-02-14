@@ -79,6 +79,19 @@ body {
     50% { opacity: 0; }
 }
 
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.lsp-icon-blinking {
+    animation: blink 1.5s ease-in-out infinite;
+}
+
+.lsp-icon-spinning {
+    animation: spin 1.5s linear infinite;
+}
+
 /* ───── App container ───── */
 .app-container {
     display: flex;

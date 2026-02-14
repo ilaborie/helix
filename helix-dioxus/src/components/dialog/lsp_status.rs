@@ -116,7 +116,11 @@ fn LspServerRow(
 
             // Status icon
             span {
-                class: "lsp-server-status icon-wrapper",
+                class: match server.status {
+                    LspServerStatus::Starting => "lsp-server-status icon-wrapper lsp-icon-blinking",
+                    LspServerStatus::Indexing => "lsp-server-status icon-wrapper lsp-icon-spinning",
+                    _ => "lsp-server-status icon-wrapper",
+                },
                 match server.status {
                     LspServerStatus::Running => rsx! { CircleCheck { size: 14, color: status_color } },
                     LspServerStatus::Starting => rsx! { LoaderCircle { size: 14, color: status_color } },
