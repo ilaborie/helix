@@ -1,0 +1,7 @@
+allow-dbg-in-tests = true
+allow-expect-in-tests = true
+allow-unwrap-in-tests = true
+allow-indexing-slicing-in-tests = true
+
+# `f` is used in `Display` implementation by the generator
+allowed-idents-below-min-chars = ["s", "f", ".."]

@@ -516,7 +516,28 @@ impl EditingOps for EditorContext {
             changes.push((join_start, ws_end, Some(" ".into())));
         }
 
+        // Select the inserted join spaces (matching helix-term's select_space=true)
+        let mut offset: usize = 0;
+        let ranges: Vec<helix_core::Range> = changes
+            .iter()
+            .filter_map(|change| {
+                if change.2.is_some() {
+                    let range = helix_core::Range::point(change.0 - offset);
+                    offset += change.1 - change.0 - 1; // -1 for the replacement space
+                    Some(range)
+                } else {
+                    offset += change.1 - change.0;
+                    None
+                }
+            })
+            .collect();
+
         let transaction = helix_core::Transaction::change(doc.text(), changes.into_iter());
+        let transaction = if ranges.is_empty() {
+            transaction
+        } else {
+            transaction.with_selection(helix_core::Selection::new(ranges.into(), 0))
+        };
         doc.apply(&transaction, view_id);
     }
 

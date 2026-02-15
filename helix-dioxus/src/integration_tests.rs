@@ -534,3 +534,94 @@ fn dot_repeat_does_not_record_during_replay() {
     assert_text(&ctx, "yyyhello\n");
     assert_eq!(ctx.last_insert_keys.len(), 1);
 }
+
+/// Simulate Alt+Down move-line-down: extend_to_line_bounds, delete_selection, paste_after.
+/// This is the full dispatch path through handle_command (same as the real app).
+#[test]
+fn move_line_down_via_handle_command() {
+    let mut ctx = test_context("fn main() {\n    #[p|]#rintln!(\"Hello\");\n    let x = 1;\n}\n");
+
+    // Dispatch the 3-command sequence (as the user config would)
+    ctx.handle_command(EditorCommand::ExtendToLineBounds);
+    ctx.handle_command(EditorCommand::DeleteSelection);
+    ctx.handle_command(EditorCommand::Paste);
+
+    // println should move below "let x = 1;"
+    assert_text(&ctx, "fn main() {\n    let x = 1;\n    println!(\"Hello\");\n}\n");
+}
+
+#[test]
+fn move_line_down_test_error_rs_content() {
+    // Exact content of examples/test_error.rs — cursor on println line
+    let mut ctx = test_context(
+        "// Test file with intentional error for testing LSP diagnostics.\n\
+         // DO NOT DELETE - see CLAUDE.md for details.\n\
+         \n\
+         fn main() {\n\
+         \n\
+         \u{0020}   #[p|]#rintln!(\"Hello\");\n\
+         \u{0020}   let x: String = 1;\n\
+         }\n",
+    );
+
+    let before_len = {
+        let (_, doc) = helix_view::current_ref!(ctx.editor);
+        doc.text().len_lines()
+    };
+
+    ctx.handle_command(EditorCommand::ExtendToLineBounds);
+    ctx.handle_command(EditorCommand::DeleteSelection);
+    ctx.handle_command(EditorCommand::Paste);
+
+    let after_len = {
+        let (_, doc) = helix_view::current_ref!(ctx.editor);
+        doc.text().len_lines()
+    };
+
+    // Line count must not change (no extra empty line)
+    assert_eq!(before_len, after_len, "line count changed from {before_len} to {after_len}");
+
+    assert_text(
+        &ctx,
+        "// Test file with intentional error for testing LSP diagnostics.\n\
+         // DO NOT DELETE - see CLAUDE.md for details.\n\
+         \n\
+         fn main() {\n\
+         \n\
+         \u{0020}   let x: String = 1;\n\
+         \u{0020}   println!(\"Hello\");\n\
+         }\n",
+    );
+}
+
+/// Join lines should place cursor at the join space (matching helix-term select_space=true).
+#[test]
+fn join_lines_cursor_at_join_space() {
+    let mut ctx = test_context("#[h|]#ello\n    world\n");
+
+    ctx.handle_command(EditorCommand::JoinLines);
+
+    // After join, cursor should be at the space between "hello" and "world"
+    assert_state(&ctx, "hello#[ |]#world\n");
+}
+
+/// Join lines with multi-line selection.
+#[test]
+fn join_lines_multi_line_selection() {
+    let mut ctx = test_context("#[line1\n    line2\n    lin|]#e3\n");
+
+    ctx.handle_command(EditorCommand::JoinLines);
+
+    // Both joins produce spaces; cursor should be at the first join space
+    assert_text(&ctx, "line1 line2 line3\n");
+}
+
+/// Join lines on single line joins with next line.
+#[test]
+fn join_lines_single_line() {
+    let mut ctx = test_context("foo\n  #[b|]#ar\nbaz\n");
+
+    ctx.handle_command(EditorCommand::JoinLines);
+
+    assert_state(&ctx, "foo\n  bar#[ |]#baz\n");
+}

@@ -243,7 +243,7 @@ pub fn App() -> Element {
             };
 
             // Send commands to editor
-            log::trace!("Commands: {commands:?}");
+            log::trace!("dispatch: mode={}, key={key_event:?}, cmds={commands:?}", snapshot.mode);
             for cmd in commands {
                 app_state_for_handler.send_command(cmd);
             }

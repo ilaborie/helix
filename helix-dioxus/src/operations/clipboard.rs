@@ -80,6 +80,9 @@ impl ClipboardOps for EditorContext {
     }
 
     /// Paste from the selected register.
+    ///
+    /// Matches helix-term behavior: after paste, the selection covers the pasted
+    /// text so the cursor follows the content (critical for linewise paste).
     fn paste(&mut self, doc_id: DocumentId, view_id: ViewId, before: bool) {
         let register = self.take_register();
 
@@ -105,43 +108,40 @@ impl ClipboardOps for EditorContext {
         let doc = self.editor.document_mut(doc_id).expect("doc exists");
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
+        let direction = selection.primary().direction();
 
-        let pos = if before {
+        // if any value ends with a line ending, it's linewise paste
+        let is_linewise = clipboard_text.ends_with('\n');
+
+        let insert_pos = if is_linewise && !before {
+            // Linewise paste after: insert at start of next line
+            let line = selection.primary().line_range(text).1;
+            text.line_to_char((line + 1).min(text.len_lines()))
+        } else if is_linewise && before {
+            // Linewise paste before: insert at start of current line
+            text.line_to_char(text.char_to_line(selection.primary().from()))
+        } else if before {
             selection.primary().from()
         } else {
             selection.primary().to()
         };
 
-        // Check if clipboard ends with newline (line-wise paste)
-        let is_linewise = clipboard_text.ends_with('\n');
-
-        let insert_pos = if is_linewise && !before {
-            // For line-wise paste after, move to start of next line
-            let line = text.char_to_line(pos);
-            if line + 1 < text.len_lines() {
-                text.line_to_char(line + 1)
-            } else {
-                text.len_chars()
-            }
-        } else if is_linewise && before {
-            // For line-wise paste before, move to start of current line
-            let line = text.char_to_line(pos);
-            text.line_to_char(line)
-        } else {
-            pos
-        };
+        let value_len = clipboard_text.chars().count();
+        let new_range =
+            helix_core::Range::new(insert_pos, insert_pos + value_len).with_direction(direction);
+        let new_selection = helix_core::Selection::single(new_range.anchor, new_range.head);
 
         let insert_selection = helix_core::Selection::point(insert_pos);
         let transaction = helix_core::Transaction::insert(
             doc.text(),
             &insert_selection,
-            clipboard_text.clone().into(),
-        );
+            clipboard_text.into(),
+        )
+        .with_selection(new_selection);
         doc.apply(&transaction, view_id);
 
         log::info!(
-            "Pasted {} characters from register '{register}'",
-            clipboard_text.len(),
+            "Pasted {value_len} chars from register '{register}' at pos {insert_pos}, linewise={is_linewise}",
         );
     }
 
@@ -409,5 +409,73 @@ mod tests {
             .and_then(|mut v| v.next().map(|s| s.into_owned()))
             .unwrap_or_default();
         assert_eq!(content, "hello");
+    }
+
+    // --- move line down sequence: extend_to_line_bounds + delete_selection + paste_after ---
+
+    #[test]
+    fn move_line_down_via_extend_delete_paste() {
+        use crate::operations::SelectionOps;
+
+        // Cursor on "bb" line (middle line)
+        let mut ctx = test_context("aa\n#[b|]#b\ncc\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+
+        // Step 1: extend_to_line_bounds — select the entire "bb\n"
+        ctx.extend_to_line_bounds(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        let text = doc.text().slice(..);
+        let selected: String = text.slice(sel.from()..sel.to()).into();
+        assert_eq!(selected, "bb\n", "should select entire line including newline");
+
+        // Step 2: delete_selection — delete the line, yank to register
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.delete_selection(doc_id, view_id);
+        assert_text(&ctx, "aa\ncc\n");
+
+        // Step 3: paste_after — paste the deleted line after current position
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.paste(doc_id, view_id, false);
+
+        // Expected: "bb" should now be AFTER "cc"
+        assert_text(&ctx, "aa\ncc\nbb\n");
+    }
+
+    #[test]
+    fn move_line_down_indented_content() {
+        use crate::operations::SelectionOps;
+
+        // Simulate the test_error.rs scenario: cursor on println line
+        let mut ctx = test_context(
+            "fn main() {\n    #[p|]#rintln!(\"Hello\");\n    let x: String = 1;\n}\n",
+        );
+        let (doc_id, view_id) = doc_view(&ctx);
+
+        // Step 1: extend_to_line_bounds
+        ctx.extend_to_line_bounds(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        let text = doc.text().slice(..);
+        let selected: String = text.slice(sel.from()..sel.to()).into();
+        assert_eq!(
+            selected, "    println!(\"Hello\");\n",
+            "should select entire line including newline"
+        );
+
+        // Step 2: delete_selection
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.delete_selection(doc_id, view_id);
+        assert_text(&ctx, "fn main() {\n    let x: String = 1;\n}\n");
+
+        // Step 3: paste_after
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.paste(doc_id, view_id, false);
+
+        // Expected: println moved below let x
+        assert_text(
+            &ctx,
+            "fn main() {\n    let x: String = 1;\n    println!(\"Hello\");\n}\n",
+        );
     }
 }
