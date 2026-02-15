@@ -22,7 +22,7 @@ mod statusline;
 // Submodules
 mod dialog;
 mod inline_dialog;
-mod lsp;
+pub(crate) mod lsp;
 mod picker;
 
 pub use buffer_bar::BufferBar;

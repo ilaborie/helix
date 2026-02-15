@@ -580,9 +580,9 @@ pub fn App() -> Element {
 
             // LSP - Hover popup
             if snapshot.hover_visible {
-                if let Some(ref hover) = snapshot.hover_content {
+                if let Some(ref hover_html) = snapshot.hover_html {
                     HoverPopup {
-                        hover: hover.clone(),
+                        hover_html: hover_html.clone(),
                         cursor_line: snapshot.cursor_line,
                         cursor_col: snapshot.cursor_col,
                     }

@@ -10,7 +10,7 @@ use helix_view::DocumentId;
 use crate::config::DialogSearchMode;
 use crate::lsp::{
     CodeActionPreviewState, CodeActionSnapshot, CompletionItemSnapshot, DiagnosticSeverity,
-    DiagnosticSnapshot, HoverSnapshot, InlayHintSnapshot, LocationSnapshot, LspServerSnapshot,
+    DiagnosticSnapshot, InlayHintSnapshot, LocationSnapshot, LspServerSnapshot,
     SignatureHelpSnapshot,
 };
 
@@ -307,8 +307,8 @@ pub struct EditorSnapshot {
     pub completion_selected: usize,
     /// Whether the hover popup is visible.
     pub hover_visible: bool,
-    /// Hover content to display.
-    pub hover_content: Option<HoverSnapshot>,
+    /// Pre-rendered hover HTML with syntax-highlighted code blocks.
+    pub hover_html: Option<String>,
     /// Whether signature help is visible.
     pub signature_help_visible: bool,
     /// Signature help content.

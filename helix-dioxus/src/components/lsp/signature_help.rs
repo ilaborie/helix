@@ -82,7 +82,7 @@ pub fn SignatureHelpPopup(
                 if let Some(ref docs) = sig.documentation {
                     div {
                         class: "signature-docs",
-                        dangerous_inner_html: super::markdown::markdown_to_html(docs),
+                        dangerous_inner_html: super::markdown::markdown_to_html(docs, None),
                     }
                 }
 

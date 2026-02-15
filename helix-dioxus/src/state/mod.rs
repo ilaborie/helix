@@ -467,6 +467,12 @@ impl EditorContext {
             None
         };
 
+        // Auto-close hover popup on any command except opening hover
+        if self.hover_visible && !matches!(cmd, EditorCommand::TriggerHover) {
+            self.hover_visible = false;
+            self.hover_content = None;
+        }
+
         let view_id = self.editor.tree.focus;
         let view = self.editor.tree.get(view_id);
         let doc_id = view.doc;
@@ -2199,7 +2205,15 @@ impl EditorContext {
             completion_items: self.completion_items.clone(),
             completion_selected: self.completion_selected,
             hover_visible: self.hover_visible,
-            hover_content: self.hover_content.clone(),
+            hover_html: self.hover_content.as_ref().map(|hover| {
+                use crate::components::lsp::markdown::{highlight_code_block, markdown_to_html};
+                let loader = self.editor.syn_loader.load();
+                let theme = &self.editor.theme;
+                markdown_to_html(
+                    &hover.contents,
+                    Some(&|code, lang| highlight_code_block(code, lang, theme, &loader)),
+                )
+            }),
             signature_help_visible: self.signature_help_visible,
             signature_help: self.signature_help.clone(),
             inlay_hints: self.inlay_hints.clone(),
