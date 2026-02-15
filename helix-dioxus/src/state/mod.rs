@@ -875,6 +875,10 @@ impl EditorContext {
             EditorCommand::CommandExecute => {
                 self.execute_command();
             }
+            EditorCommand::TypeableCommand(ref cmd_str) => {
+                self.command_input = cmd_str.clone();
+                self.execute_command();
+            }
             EditorCommand::CommandCompletionUp => {
                 if self.command_completion_selected > 0 {
                     self.command_completion_selected -= 1;
@@ -4615,15 +4619,17 @@ pub(crate) fn load_editor_config() -> helix_view::editor::Config {
     }
 }
 
-/// Load configurable keymaps: start with defaults, merge user `[keys]` from config.toml.
+///// Load configurable keymaps: start with defaults, merge user `[keys]` from config.toml.
+///
+/// Entries with unknown commands are skipped with a warning rather than
+/// aborting the entire mode, so partial configs still work.
 fn load_keymaps() -> crate::keymap::DhxKeymaps {
-    use crate::keymap::{default::default_keymaps, merge_keys, trie::DhxKeyTrie, DhxKeymaps};
+    use crate::keymap::{default::default_keymaps, merge_keys, DhxKeymaps};
 
     let mut map = default_keymaps();
 
     if let Some(merged_config) = load_merged_config_toml() {
         if let Some(keys_val) = merged_config.get("keys") {
-            // Expect [keys.normal], [keys.select], [keys.insert]
             if let Some(keys_table) = keys_val.as_table() {
                 for (mode_name, mode_val) in keys_table {
                     let mode = match mode_name.as_str() {
@@ -4636,16 +4642,14 @@ fn load_keymaps() -> crate::keymap::DhxKeymaps {
                         }
                     };
 
-                    // Deserialize user overrides into a DhxKeyTrie
-                    let user_trie: DhxKeyTrie = match mode_val.clone().try_into() {
-                        Ok(trie) => trie,
-                        Err(err) => {
-                            log::warn!("Failed to deserialize [keys.{mode_name}]: {err}");
-                            continue;
-                        }
+                    // Parse individual entries to skip bad ones gracefully
+                    let Some(mode_table) = mode_val.as_table() else {
+                        log::warn!("[keys.{mode_name}] is not a table, skipping");
+                        continue;
                     };
 
-                    // Merge into defaults
+                    let user_trie = parse_key_table_lenient(mode_table, mode_name);
+
                     if let Some(base) = map.get_mut(&mode) {
                         merge_keys(base, user_trie);
                     }
@@ -4655,6 +4659,43 @@ fn load_keymaps() -> crate::keymap::DhxKeymaps {
     }
 
     DhxKeymaps::new(map)
+}
+
+/// Parse a TOML key table into a `DhxKeyTrie`, skipping entries that fail
+/// to parse (unknown commands, invalid key names) with warnings.
+fn parse_key_table_lenient(
+    table: &toml::map::Map<String, toml::Value>,
+    mode_name: &str,
+) -> crate::keymap::trie::DhxKeyTrie {
+    use crate::keymap::trie::{DhxKeyTrie, DhxKeyTrieNode};
+
+    let mut node = DhxKeyTrieNode::new(mode_name);
+
+    for (key_str, value) in table {
+        // Parse key string (e.g., "ret", "C-s", "A-down")
+        let key_event: helix_view::input::KeyEvent = match key_str.parse() {
+            Ok(k) => k,
+            Err(err) => {
+                log::warn!("[keys.{mode_name}] skipping invalid key '{key_str}': {err}");
+                continue;
+            }
+        };
+
+        // Try to deserialize the value
+        let child: DhxKeyTrie = match value.clone().try_into() {
+            Ok(trie) => trie,
+            Err(err) => {
+                log::warn!(
+                    "[keys.{mode_name}] skipping '{key_str}': {err}"
+                );
+                continue;
+            }
+        };
+
+        node.insert(key_event, child);
+    }
+
+    DhxKeyTrie::Node(node)
 }
 
 /// Check if a character matches any of the LSP signature help trigger characters.

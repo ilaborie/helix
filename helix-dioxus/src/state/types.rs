@@ -718,6 +718,8 @@ pub enum EditorCommand {
     CommandInput(char),
     CommandBackspace,
     CommandExecute,
+    /// Execute a typable command directly (from `[keys]` config, e.g. `:write`).
+    TypeableCommand(String),
     /// Navigate up in command completion list.
     CommandCompletionUp,
     /// Navigate down in command completion list.
