@@ -38,6 +38,7 @@ helix-dioxus/src/
 │   ├── mod.rs                  # Re-exports all components
 │   ├── editor_view.rs          # Document rendering with syntax highlighting
 │   ├── buffer_bar.rs           # Tab bar with scroll buttons
+│   ├── kbd.rs                  # Reusable KbdKey component (physical key styling)
 │   ├── statusline.rs           # Mode, filename, position display
 │   ├── keybinding_help.rs      # Context-aware keybinding help bar
 │   ├── scrollbar.rs            # Custom scrollbar with diagnostic markers
@@ -167,6 +168,7 @@ Functions defined in `script.js`:
 
 **CSS Custom Properties** (`styles.css` uses `:root` variables for theming):
 - Colors: `--bg-primary`, `--bg-secondary`, `--bg-highlight`, `--bg-selection`, `--bg-deep`, `--text`, `--text-dim`, `--text-dimmer`, `--accent`, `--error`, `--warning`, `--info`, `--hint`, `--success`, `--purple`, `--orange`
+- Kbd: `--kbd-bg`, `--kbd-border`, `--kbd-text`
 - Font: `--font-mono`
 - Z-index layers: `--z-dropdown` (100), `--z-overlay` (200), `--z-modal` (300), `--z-notification` (300), `--z-confirmation` (400), `--z-tooltip` (9999)
 
@@ -183,6 +185,7 @@ Functions defined in `script.js`:
 - `.editor-scrollbar`, `.scrollbar-*` (custom scrollbar with markers)
 - `.code-actions-layout`, `.code-actions-list-column`, `.code-actions-preview-column` (two-column preview)
 - `.code-action-preview`, `.code-action-diff-*` (diff preview panel)
+- `.kbd-key-compact` (compact kbd variant for 20px help bar)
 
 **Dynamic Styles**: Styles requiring Rust variables remain inline:
 - Mode colors: `style: "background-color: {mode_bg};"`
@@ -450,6 +453,7 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - **DAP/Debug**: Not supported — `Space G` sub-menu will not be implemented. Debug adapter protocol is not integrated.
 
 ### Recently Completed
+- [x] KbdKey component + keyboard shortcut contrast fix — reusable `KbdKey` Dioxus component with physical key CSS styling (border, box-shadow), `--kbd-bg`/`--kbd-border`/`--kbd-text` CSS custom properties with dark/light theme defaults, `.kbd-key-compact` variant for 20px help bar, WCAG contrast fix (description text uses `--text` with `opacity: 0.85` instead of `--text-dim`), removed duplicate `kbd` overrides in LSP/input dialog help sections
 - [x] Code actions preview panel — two-column layout with diff preview when navigating code actions, async `codeAction/resolve` for workspace edits, `imara-diff` Histogram algorithm for line-level diffs, `apply_text_edits()` with LSP offset encoding, `compute_file_diff()` with context lines, `CodeActionPreviewPanel` component (Loading/Available/Unavailable states), preview caching by action index, `.code-actions-layout` flex row CSS, diff line colors (added/removed/context), 16 diff computation tests
 - [x] Command mode autocompletion — fuzzy-matching popup above `:` prompt showing all ~45 commands with aliases and descriptions, Tab to accept, Up/Down to navigate, `CommandCompletion` struct as single source of truth, `CommandCompletionPopup` component, `compute_command_completions()` reuses `fuzzy_match_with_indices`, CSS `.command-completion-*` classes
 - [x] File explorer picker (`Space e` / `Space E`) — tree-style file explorer with expandable/collapsible directories (Enter/Left/Right/h/l), `FolderOpen` icon, `depth`-based indentation, hidden files shown, flat fuzzy filtering when typing (restores tree on clear), file preview panel, `rebuild_explorer_items()` with dirs-first sorting, `explorer_expanded` state, `collect_all_files()` via `ignore::WalkBuilder`, command panel entries, help bar hint

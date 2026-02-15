@@ -7,6 +7,7 @@
 use dioxus::prelude::*;
 use lucide_dioxus::Search;
 
+use crate::components::KbdKey;
 use crate::config::DialogSearchMode;
 use crate::state::{centered_window, EditorCommand, PickerItem, PickerMode, PickerPreview};
 use crate::AppState;
@@ -128,20 +129,20 @@ pub fn GenericPicker(
                         span {
                             class: "picker-help-text",
                             if search_mode == DialogSearchMode::VimStyle {
-                                kbd { "j/k" }
+                                KbdKey { label: "j/k" }
                                 " navigate \u{2022} "
-                                kbd { "/" }
+                                KbdKey { label: "/" }
                                 " search \u{2022} "
-                                kbd { "Enter" }
+                                KbdKey { label: "Enter" }
                                 {mode.enter_hint()}
-                                kbd { "Esc" }
+                                KbdKey { label: "Esc" }
                                 " cancel"
                             } else {
-                                kbd { "\u{2191}\u{2193}" }
+                                KbdKey { label: "\u{2191}\u{2193}" }
                                 " navigate \u{2022} "
-                                kbd { "Enter" }
+                                KbdKey { label: "Enter" }
                                 {mode.enter_hint()}
-                                kbd { "Esc" }
+                                KbdKey { label: "Esc" }
                                 " cancel"
                             }
                         }

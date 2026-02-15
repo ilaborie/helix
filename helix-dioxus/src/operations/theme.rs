@@ -93,6 +93,9 @@ const DARK_DEFAULTS: &[(&str, &str)] = &[
     ("--notification-warning-bg", "#3d3520"),
     ("--notification-info-bg", "#1e2a3d"),
     ("--notification-success-bg", "#1e3d20"),
+    ("--kbd-bg", "#2c313a"),
+    ("--kbd-border", "#4b5263"),
+    ("--kbd-text", "#abb2bf"),
     ("--scrollbar-thumb", "rgba(92, 99, 112, 0.5)"),
     ("--scrollbar-thumb-hover", "rgba(108, 115, 128, 0.6)"),
 ];
@@ -129,6 +132,9 @@ const LIGHT_DEFAULTS: &[(&str, &str)] = &[
     ("--notification-warning-bg", "#fdf3e0"),
     ("--notification-info-bg", "#e8f0fd"),
     ("--notification-success-bg", "#e8fde8"),
+    ("--kbd-bg", "#ffffff"),
+    ("--kbd-border", "#c8c8c8"),
+    ("--kbd-text", "#383a42"),
     ("--scrollbar-thumb", "rgba(160, 161, 167, 0.5)"),
     ("--scrollbar-thumb-hover", "rgba(140, 141, 147, 0.6)"),
 ];

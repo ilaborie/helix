@@ -5,6 +5,7 @@
 
 use dioxus::prelude::*;
 
+use super::KbdKey;
 use crate::state::{EditorCommand, PendingKeySequence, RegisterSnapshot};
 use crate::AppState;
 
@@ -265,7 +266,7 @@ pub fn KeybindingHelpBar(
         div { class: "keybinding-help-bar",
             // Show prefix label for pending sequences
             if let Some(pfx) = prefix {
-                span { class: "keybinding-help-prefix", "{pfx}" }
+                KbdKey { label: pfx, class: "kbd-key-compact keybinding-help-prefix" }
                 span { class: "keybinding-help-separator" }
             }
 
@@ -280,7 +281,7 @@ pub fn KeybindingHelpBar(
                     span { class: "keybinding-help-separator" }
                 }
                 span { class: "keybinding-help-item",
-                    span { class: "keybinding-help-key", "{key}" }
+                    KbdKey { label: key, class: "kbd-key-compact" }
                     span { class: "keybinding-help-desc", "{desc}" }
                 }
             }

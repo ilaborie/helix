@@ -13,6 +13,7 @@
 mod buffer_bar;
 mod diagnostics;
 mod editor_view;
+mod kbd;
 mod keybinding_help;
 mod scrollbar;
 mod statusline;
@@ -29,6 +30,7 @@ pub use diagnostics::{
     DiagnosticUnderline, ErrorLens,
 };
 pub use editor_view::EditorView;
+pub use kbd::KbdKey;
 pub use keybinding_help::KeybindingHelpBar;
 pub use scrollbar::Scrollbar;
 pub use statusline::StatusLine;
