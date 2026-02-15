@@ -246,6 +246,8 @@ pub struct SignatureSnapshot {
 pub struct ParameterSnapshot {
     /// The parameter label (e.g., "a: i32").
     pub label: String,
+    /// Byte offset range of this parameter within the signature label.
+    pub label_range: Option<(usize, usize)>,
     /// Documentation for the parameter.
     pub documentation: Option<String>,
 }

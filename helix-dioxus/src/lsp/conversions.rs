@@ -179,7 +179,7 @@ fn convert_signature(sig: lsp::SignatureInformation) -> super::SignatureSnapshot
         .parameters
         .unwrap_or_default()
         .into_iter()
-        .map(convert_parameter)
+        .map(|param| convert_parameter(param, &sig.label))
         .collect();
 
     super::SignatureSnapshot {
@@ -190,11 +190,28 @@ fn convert_signature(sig: lsp::SignatureInformation) -> super::SignatureSnapshot
 }
 
 /// Convert a single LSP parameter to a parameter snapshot.
-fn convert_parameter(param: lsp::ParameterInformation) -> ParameterSnapshot {
-    let label = match param.label {
-        lsp::ParameterLabel::Simple(s) => s,
+///
+/// Computes byte offset range of the parameter within the signature label.
+/// Handles both `Simple` (substring match) and `LabelOffsets` (UTF-16 offsets) variants.
+fn convert_parameter(
+    param: lsp::ParameterInformation,
+    signature_label: &str,
+) -> ParameterSnapshot {
+    let (label, label_range) = match param.label {
+        lsp::ParameterLabel::Simple(s) => {
+            let range = signature_label.find(&s).map(|start| (start, start + s.len()));
+            (s, range)
+        }
         lsp::ParameterLabel::LabelOffsets([start, end]) => {
-            format!("[{start}:{end}]")
+            // LSP sends UTF-16 character offsets; convert to byte offsets.
+            use helix_core::str_utils::char_to_byte_idx;
+            let byte_start = char_to_byte_idx(signature_label, start as usize);
+            let byte_end = char_to_byte_idx(signature_label, end as usize);
+            let label = signature_label
+                .get(byte_start..byte_end)
+                .unwrap_or("")
+                .to_string();
+            (label, Some((byte_start, byte_end)))
         }
     };
 
@@ -205,6 +222,7 @@ fn convert_parameter(param: lsp::ParameterInformation) -> ParameterSnapshot {
 
     ParameterSnapshot {
         label,
+        label_range,
         documentation,
     }
 }
@@ -405,5 +423,135 @@ pub fn convert_workspace_symbols(response: lsp::WorkspaceSymbolResponse) -> Vec<
                 }
             })
             .collect(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_simple_param(label: &str) -> lsp::ParameterInformation {
+        lsp::ParameterInformation {
+            label: lsp::ParameterLabel::Simple(label.to_string()),
+            documentation: None,
+        }
+    }
+
+    fn make_offset_param(start: u32, end: u32) -> lsp::ParameterInformation {
+        lsp::ParameterInformation {
+            label: lsp::ParameterLabel::LabelOffsets([start, end]),
+            documentation: None,
+        }
+    }
+
+    #[test]
+    fn convert_parameter_simple_label_finds_range() {
+        let sig_label = "fn foo(a: i32, b: String) -> bool";
+        let param = make_simple_param("a: i32");
+        let snapshot = convert_parameter(param, sig_label);
+
+        assert_eq!(snapshot.label, "a: i32");
+        assert_eq!(snapshot.label_range, Some((7, 13)));
+        // Verify the range slices back correctly
+        assert_eq!(&sig_label[7..13], "a: i32");
+    }
+
+    #[test]
+    fn convert_parameter_simple_label_second_param() {
+        let sig_label = "fn foo(a: i32, b: String) -> bool";
+        let param = make_simple_param("b: String");
+        let snapshot = convert_parameter(param, sig_label);
+
+        assert_eq!(snapshot.label, "b: String");
+        assert_eq!(snapshot.label_range, Some((15, 24)));
+        assert_eq!(&sig_label[15..24], "b: String");
+    }
+
+    #[test]
+    fn convert_parameter_simple_label_not_found() {
+        let sig_label = "fn foo(a: i32)";
+        let param = make_simple_param("x: bool");
+        let snapshot = convert_parameter(param, sig_label);
+
+        assert_eq!(snapshot.label, "x: bool");
+        assert_eq!(snapshot.label_range, None);
+    }
+
+    #[test]
+    fn convert_parameter_label_offsets_ascii() {
+        // "fn foo(a: i32, b: String)"
+        //  0123456789...
+        // UTF-16 offsets match byte offsets for ASCII
+        let sig_label = "fn foo(a: i32, b: String)";
+        let param = make_offset_param(7, 13); // "a: i32"
+        let snapshot = convert_parameter(param, sig_label);
+
+        assert_eq!(snapshot.label, "a: i32");
+        assert_eq!(snapshot.label_range, Some((7, 13)));
+    }
+
+    #[test]
+    fn convert_parameter_label_offsets_extracts_label_text() {
+        let sig_label = "fn bar(name: &str, count: usize)";
+        let param = make_offset_param(19, 31); // "count: usize"
+        let snapshot = convert_parameter(param, sig_label);
+
+        assert_eq!(snapshot.label, "count: usize");
+        assert_eq!(snapshot.label_range, Some((19, 31)));
+    }
+
+    #[test]
+    fn convert_parameter_overlapping_name_uses_first_occurrence() {
+        // Parameter "s" appears as substring in "self" earlier in the label
+        let sig_label = "fn push(self, s: &str)";
+        let param = make_simple_param("s: &str");
+        let snapshot = convert_parameter(param, sig_label);
+
+        assert_eq!(snapshot.label_range, Some((14, 21)));
+        assert_eq!(&sig_label[14..21], "s: &str");
+    }
+
+    #[test]
+    fn convert_signature_populates_label_ranges() {
+        let sig = lsp::SignatureInformation {
+            label: "fn foo(a: i32, b: String)".to_string(),
+            documentation: None,
+            parameters: Some(vec![
+                make_simple_param("a: i32"),
+                make_simple_param("b: String"),
+            ]),
+            active_parameter: None,
+        };
+
+        let snapshot = convert_signature(sig);
+        assert_eq!(snapshot.parameters.len(), 2);
+        assert_eq!(snapshot.parameters[0].label_range, Some((7, 13)));
+        assert_eq!(snapshot.parameters[1].label_range, Some((15, 24)));
+    }
+
+    #[test]
+    fn convert_signature_no_parameters() {
+        let sig = lsp::SignatureInformation {
+            label: "fn bar()".to_string(),
+            documentation: None,
+            parameters: None,
+            active_parameter: None,
+        };
+
+        let snapshot = convert_signature(sig);
+        assert!(snapshot.parameters.is_empty());
+    }
+
+    #[test]
+    fn convert_parameter_with_documentation() {
+        let sig_label = "fn foo(x: i32)";
+        let param = lsp::ParameterInformation {
+            label: lsp::ParameterLabel::Simple("x: i32".to_string()),
+            documentation: Some(lsp::Documentation::String("the value".to_string())),
+        };
+        let snapshot = convert_parameter(param, sig_label);
+
+        assert_eq!(snapshot.documentation.as_deref(), Some("the value"));
+        assert_eq!(snapshot.label_range, Some((7, 13)));
     }
 }

@@ -13,34 +13,28 @@ fn render_signature_label(
     parameters: &[crate::lsp::ParameterSnapshot],
     active_param: Option<usize>,
 ) -> Element {
-    // For now, simple rendering - highlight by wrapping active param
-    // TODO: Parse the label to find parameter positions
-
     let active_idx = active_param.unwrap_or(0);
 
-    if parameters.is_empty() {
-        return rsx! { span { "{label}" } };
+    if let Some((start, end)) = parameters
+        .get(active_idx)
+        .and_then(|p| p.label_range)
+        .filter(|&(s, e)| s <= e && e <= label.len())
+    {
+        let before = &label[..start];
+        let highlighted = &label[start..end];
+        let after = &label[end..];
+
+        return rsx! {
+            span { "{before}" }
+            span {
+                class: "signature-param-active",
+                "{highlighted}"
+            }
+            span { "{after}" }
+        };
     }
 
-    // Try to find and highlight the active parameter in the label
-    if let Some(param) = parameters.get(active_idx) {
-        if let Some(pos) = label.find(&param.label) {
-            let before = &label[..pos];
-            let param_text = &param.label;
-            let after = &label[pos + param.label.len()..];
-
-            return rsx! {
-                span { "{before}" }
-                span {
-                    class: "signature-param-active",
-                    "{param_text}"
-                }
-                span { "{after}" }
-            };
-        }
-    }
-
-    // Fallback: just render the label
+    // Fallback: no active parameter or range out of bounds
     rsx! { span { "{label}" } }
 }
 
