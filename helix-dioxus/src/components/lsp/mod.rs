@@ -8,6 +8,7 @@ mod code_actions;
 mod completion;
 mod hover;
 mod location_picker;
+pub mod markdown;
 mod signature_help;
 
 pub use code_actions::CodeActionsMenu;

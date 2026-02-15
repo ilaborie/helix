@@ -917,18 +917,110 @@ kbd {
     line-height: 1.5;
 }
 
-.hover-popup code {
+/* ───── Markdown content (hover, signature docs) ───── */
+.hover-markdown,
+.signature-docs {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.hover-markdown > :first-child,
+.signature-docs > :first-child {
+    margin-top: 0;
+}
+
+.hover-markdown > :last-child,
+.signature-docs > :last-child {
+    margin-bottom: 0;
+}
+
+.hover-markdown h1,
+.hover-markdown h2,
+.hover-markdown h3,
+.hover-markdown h4,
+.hover-markdown h5,
+.hover-markdown h6,
+.signature-docs h1,
+.signature-docs h2,
+.signature-docs h3,
+.signature-docs h4,
+.signature-docs h5,
+.signature-docs h6 {
+    color: var(--text);
+    margin: 8px 0 4px;
+    line-height: 1.3;
+}
+
+.hover-markdown h1, .signature-docs h1 { font-size: 1.3em; }
+.hover-markdown h2, .signature-docs h2 { font-size: 1.15em; }
+.hover-markdown h3, .signature-docs h3 { font-size: 1.05em; }
+.hover-markdown h4, .signature-docs h4 { font-size: 1em; }
+.hover-markdown h5, .signature-docs h5 { font-size: 0.95em; }
+.hover-markdown h6, .signature-docs h6 { font-size: 0.9em; color: var(--text-dim); }
+
+.hover-markdown p,
+.signature-docs p {
+    margin: 4px 0;
+}
+
+.hover-markdown strong, .signature-docs strong { font-weight: 600; }
+.hover-markdown em, .signature-docs em { font-style: italic; }
+.hover-markdown del, .signature-docs del { text-decoration: line-through; opacity: 0.7; }
+
+.hover-markdown code,
+.signature-docs code {
     background-color: var(--bg-primary);
     padding: 2px 4px;
     border-radius: 2px;
+    font-size: 0.9em;
 }
 
-.hover-popup pre {
+.hover-markdown pre,
+.signature-docs pre {
     background-color: var(--bg-primary);
     padding: 8px;
     border-radius: 4px;
     overflow-x: auto;
     margin: 8px 0;
+}
+
+.hover-markdown pre code,
+.signature-docs pre code {
+    background-color: transparent;
+    padding: 0;
+    border-radius: 0;
+    font-size: inherit;
+}
+
+.hover-markdown ul,
+.hover-markdown ol,
+.signature-docs ul,
+.signature-docs ol {
+    margin: 4px 0;
+    padding-left: 20px;
+}
+
+.hover-markdown li,
+.signature-docs li {
+    margin: 2px 0;
+}
+
+.hover-markdown hr,
+.signature-docs hr {
+    border: none;
+    border-top: 1px solid var(--bg-selection);
+    margin: 8px 0;
+}
+
+.hover-markdown a,
+.signature-docs a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.hover-markdown a:hover,
+.signature-docs a:hover {
+    text-decoration: underline;
 }
 
 /* ───── Signature help popup ───── */

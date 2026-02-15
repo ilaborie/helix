@@ -4,6 +4,7 @@
 
 use dioxus::prelude::*;
 
+use super::markdown::markdown_to_html;
 use crate::components::inline_dialog::{DialogConstraints, DialogPosition, InlineDialogContainer};
 use crate::lsp::HoverSnapshot;
 
@@ -16,6 +17,8 @@ pub fn HoverPopup(hover: HoverSnapshot, cursor_line: usize, cursor_col: usize) -
         max_height: Some(400),
     };
 
+    let html = markdown_to_html(&hover.contents);
+
     rsx! {
         InlineDialogContainer {
             cursor_line,
@@ -24,12 +27,9 @@ pub fn HoverPopup(hover: HoverSnapshot, cursor_line: usize, cursor_col: usize) -
             class: "hover-popup",
             constraints,
 
-            // Render the hover content
-            // For now, just render as pre-formatted text
-            // TODO: Add proper markdown rendering
-            pre {
-                style: "margin: 0; white-space: pre-wrap; word-wrap: break-word;",
-                "{hover.contents}"
+            div {
+                class: "hover-markdown",
+                dangerous_inner_html: "{html}",
             }
         }
     }

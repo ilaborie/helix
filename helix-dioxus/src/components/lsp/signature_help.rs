@@ -78,11 +78,11 @@ pub fn SignatureHelpPopup(
                     {render_signature_label(&sig.label, &sig.parameters, signature_help.active_parameter)}
                 }
 
-                // Documentation
+                // Documentation (rendered as markdown)
                 if let Some(ref docs) = sig.documentation {
                     div {
                         class: "signature-docs",
-                        "{docs}"
+                        dangerous_inner_html: super::markdown::markdown_to_html(docs),
                     }
                 }
 
