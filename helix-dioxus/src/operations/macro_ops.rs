@@ -28,10 +28,7 @@ impl MacroOps for EditorContext {
 
             let _ = self.editor.registers.write(reg, vec![key_string]);
 
-            log::info!(
-                "Macro recording stopped, saved {} keys to register '{reg}'",
-                keys.len()
-            );
+            log::info!("Macro recording stopped, saved {} keys to register '{reg}'", keys.len());
         } else {
             // Start recording: use selected register or default '@'
             let reg = self.editor.selected_register.take().unwrap_or('@');
@@ -103,9 +100,7 @@ impl MacroOps for EditorContext {
 impl EditorContext {
     /// Replay a single key event by dispatching it through the appropriate mode handler.
     fn replay_key(&mut self, key: &KeyEvent) {
-        use crate::keybindings::{
-            handle_command_mode, handle_regex_mode, handle_search_mode, handle_shell_mode,
-        };
+        use crate::keybindings::{handle_command_mode, handle_regex_mode, handle_search_mode, handle_shell_mode};
         use crate::keymap::DhxKeymapResult;
         use crate::state::EditorCommand;
         use helix_view::input::KeyCode;
@@ -145,10 +140,7 @@ impl EditorContext {
 
         for cmd in commands {
             // Skip macro commands during replay to prevent infinite recursion
-            if matches!(
-                cmd,
-                EditorCommand::ToggleMacroRecording | EditorCommand::ReplayMacro
-            ) {
+            if matches!(cmd, EditorCommand::ToggleMacroRecording | EditorCommand::ReplayMacro) {
                 continue;
             }
             self.handle_command(cmd);
@@ -284,10 +276,7 @@ mod tests {
         let mut ctx = test_context("#[|h]#ello\n");
 
         // Write a macro that tries to replay itself
-        ctx.editor
-            .registers
-            .write('@', vec!["q".to_string()])
-            .expect("write");
+        ctx.editor.registers.write('@', vec!["q".to_string()]).expect("write");
 
         // Should not infinitely recurse — the q inside replay is skipped
         ctx.replay_macro();

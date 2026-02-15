@@ -1,4 +1,4 @@
-//! LSP event handling for EditorContext.
+//! LSP event handling for `EditorContext`.
 //!
 //! This module handles incoming LSP notifications and method calls,
 //! including diagnostics, progress messages, and other LSP events.
@@ -7,7 +7,7 @@ use helix_lsp::lsp;
 
 use super::EditorContext;
 
-/// LSP event handling operations for EditorContext.
+/// LSP event handling operations for `EditorContext`.
 pub trait LspEventOps {
     /// Poll for LSP events non-blockingly and handle them.
     fn poll_lsp_events(&mut self);
@@ -23,11 +23,7 @@ pub trait LspEventOps {
     );
 
     /// Handle progress message from LSP.
-    fn handle_progress_message(
-        &mut self,
-        server_id: helix_lsp::LanguageServerId,
-        params: lsp::ProgressParams,
-    );
+    fn handle_progress_message(&mut self, server_id: helix_lsp::LanguageServerId, params: lsp::ProgressParams);
 }
 
 impl LspEventOps for EditorContext {
@@ -51,11 +47,7 @@ impl LspEventOps for EditorContext {
         }
     }
 
-    fn handle_lsp_message(
-        &mut self,
-        server_id: helix_lsp::LanguageServerId,
-        call: helix_lsp::Call,
-    ) {
+    fn handle_lsp_message(&mut self, server_id: helix_lsp::LanguageServerId, call: helix_lsp::Call) {
         use helix_lsp::{Call, Notification};
 
         match call {
@@ -140,10 +132,7 @@ impl LspEventOps for EditorContext {
         };
 
         if !ls.is_initialized() {
-            log::warn!(
-                "Discarding diagnostics from uninitialized server: {}",
-                ls.name()
-            );
+            log::warn!("Discarding diagnostics from uninitialized server: {}", ls.name());
             return;
         }
 
@@ -152,11 +141,7 @@ impl LspEventOps for EditorContext {
             identifier: None,
         };
 
-        log::info!(
-            "Received {} diagnostics for {:?}",
-            params.diagnostics.len(),
-            params.uri
-        );
+        log::info!("Received {} diagnostics for {:?}", params.diagnostics.len(), params.uri);
 
         // Log first few diagnostics for debugging
         for (i, diag) in params.diagnostics.iter().take(3).enumerate() {
@@ -172,21 +157,13 @@ impl LspEventOps for EditorContext {
             .handle_lsp_diagnostics(&provider, uri, params.version, params.diagnostics);
     }
 
-    fn handle_progress_message(
-        &mut self,
-        server_id: helix_lsp::LanguageServerId,
-        params: lsp::ProgressParams,
-    ) {
+    fn handle_progress_message(&mut self, server_id: helix_lsp::LanguageServerId, params: lsp::ProgressParams) {
         let token = params.token;
         let lsp::ProgressParamsValue::WorkDone(work) = params.value;
 
         match work {
             lsp::WorkDoneProgress::Begin(begin) => {
-                log::info!(
-                    "LSP progress begin: {} (server {:?})",
-                    begin.title,
-                    server_id
-                );
+                log::info!("LSP progress begin: {} (server {:?})", begin.title, server_id);
                 self.lsp_progress.begin(server_id, token, begin);
             }
             lsp::WorkDoneProgress::Report(report) => {

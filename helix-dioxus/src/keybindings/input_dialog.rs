@@ -7,6 +7,7 @@ use helix_view::input::{KeyCode, KeyEvent};
 use crate::state::EditorCommand;
 
 /// Handle input in input dialog mode.
+#[must_use]
 pub fn handle_input_dialog_mode(key: &KeyEvent) -> Vec<EditorCommand> {
     match key.code {
         KeyCode::Esc => vec![EditorCommand::InputDialogCancel],

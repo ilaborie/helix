@@ -10,9 +10,7 @@ use grep_searcher::{BinaryDetection, SearcherBuilder};
 use ignore::WalkBuilder;
 
 use crate::operations::{BufferOps, ThemeOps};
-use crate::state::{
-    EditorCommand, EditorContext, GlobalSearchResult, PickerIcon, PickerItem, PickerMode,
-};
+use crate::state::{EditorCommand, EditorContext, GlobalSearchResult, PickerIcon, PickerItem, PickerMode};
 
 impl EditorContext {
     /// Navigate to a specific line and column in the current document.
@@ -89,20 +87,12 @@ impl PickerOps for EditorContext {
                 }
 
                 let is_dir = path.is_dir();
-                let display_name = if is_dir {
-                    format!("{name}/")
-                } else {
-                    name.clone()
-                };
+                let display_name = if is_dir { format!("{name}/") } else { name.clone() };
 
                 items.push(PickerItem {
                     id: path.to_string_lossy().to_string(),
                     display: display_name,
-                    icon: if is_dir {
-                        PickerIcon::Folder
-                    } else {
-                        PickerIcon::File
-                    },
+                    icon: if is_dir { PickerIcon::Folder } else { PickerIcon::File },
                     match_indices: vec![],
                     secondary: None,
                     depth: 0,
@@ -158,11 +148,7 @@ impl PickerOps for EditorContext {
             }
 
             // Get relative path
-            let relative = path
-                .strip_prefix(&cwd)
-                .unwrap_or(path)
-                .to_string_lossy()
-                .to_string();
+            let relative = path.strip_prefix(&cwd).unwrap_or(path).to_string_lossy().to_string();
 
             let name = path
                 .file_name()
@@ -217,11 +203,7 @@ impl PickerOps for EditorContext {
                         PickerIcon::Buffer
                     },
                     match_indices: vec![],
-                    secondary: if is_current {
-                        Some("current".to_string())
-                    } else {
-                        None
-                    },
+                    secondary: is_current.then(|| "current".to_string()),
                     depth: 0,
                 }
             })
@@ -240,10 +222,7 @@ impl PickerOps for EditorContext {
     /// Confirm the current picker selection.
     fn picker_confirm(&mut self) {
         let picker_selected = self.picker_selected;
-        let selected = self
-            .get_or_compute_filtered_items()
-            .get(picker_selected)
-            .cloned();
+        let selected = self.get_or_compute_filtered_items().get(picker_selected).cloned();
         if let Some(selected) = selected {
             match self.picker_mode {
                 PickerMode::DirectoryBrowser => {
@@ -381,8 +360,7 @@ impl PickerOps for EditorContext {
                                 view.doc
                             };
                             if doc_id != current_doc_id {
-                                self.editor
-                                    .switch(doc_id, helix_view::editor::Action::Replace);
+                                self.editor.switch(doc_id, helix_view::editor::Action::Replace);
                             }
                             let (view, doc) = helix_view::current!(self.editor);
                             doc.set_selection(view.id, selection);
@@ -417,9 +395,7 @@ impl PickerOps for EditorContext {
                 }
                 PickerMode::Emojis => {
                     // Insert the emoji text via deferred dispatch (same pattern as Commands)
-                    let _ = self
-                        .command_tx
-                        .send(EditorCommand::InsertText(selected.id.clone()));
+                    let _ = self.command_tx.send(EditorCommand::InsertText(selected.id.clone()));
                 }
                 PickerMode::References | PickerMode::Definitions => {
                     // Extract location data before mutable borrow
@@ -528,8 +504,7 @@ impl EditorContext {
             .and_then(|doc| doc.path())
             .and_then(|p| p.parent().map(Path::to_path_buf));
 
-        let root = buffer_dir
-            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+        let root = buffer_dir.unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
         self.show_file_explorer_at(root);
     }
 
@@ -550,10 +525,7 @@ impl EditorContext {
             return;
         }
         let picker_selected = self.picker_selected;
-        let selected = self
-            .get_or_compute_filtered_items()
-            .get(picker_selected)
-            .cloned();
+        let selected = self.get_or_compute_filtered_items().get(picker_selected).cloned();
         let Some(selected) = selected else { return };
         if selected.icon != PickerIcon::Folder {
             return;
@@ -574,10 +546,7 @@ impl EditorContext {
             return;
         }
         let picker_selected = self.picker_selected;
-        let selected = self
-            .get_or_compute_filtered_items()
-            .get(picker_selected)
-            .cloned();
+        let selected = self.get_or_compute_filtered_items().get(picker_selected).cloned();
         let Some(selected) = selected else { return };
         if selected.icon == PickerIcon::FolderOpen {
             // Collapse this directory
@@ -612,15 +581,14 @@ impl EditorContext {
             .map(|(name, preview)| {
                 // For clipboard registers, try to read actual content
                 let content = if matches!(name, '+' | '*') {
-                    self.editor
-                        .registers
-                        .first(name, &self.editor)
-                        .map(|cow| {
+                    self.editor.registers.first(name, &self.editor).map_or_else(
+                        || preview.to_string(),
+                        |cow| {
                             let s = cow.as_ref();
                             // Take first line, truncated
                             s.lines().next().unwrap_or(s).to_string()
-                        })
-                        .unwrap_or_else(|| preview.to_string())
+                        },
+                    )
                 } else {
                     preview.to_string()
                 };
@@ -709,20 +677,13 @@ impl EditorContext {
                 display: name.clone(),
                 icon: PickerIcon::Theme,
                 match_indices: vec![],
-                secondary: if *name == current {
-                    Some("current".to_string())
-                } else {
-                    None
-                },
+                secondary: (*name == current).then(|| "current".to_string()),
                 depth: 0,
             })
             .collect();
 
         // Pre-select the current theme
-        let selected = items
-            .iter()
-            .position(|item| item.id == current)
-            .unwrap_or(0);
+        let selected = items.iter().position(|item| item.id == current).unwrap_or(0);
 
         self.picker_items = items;
         self.picker_filter.clear();
@@ -815,7 +776,7 @@ impl EditorContext {
             .filter_map(|doc| {
                 doc.path().map(|p| {
                     let content = doc.text().to_string();
-                    (p.to_path_buf(), content)
+                    (p.clone(), content)
                 })
             })
             .collect();
@@ -823,13 +784,7 @@ impl EditorContext {
 
         // Spawn search task on blocking thread pool (CPU-bound operation)
         tokio::task::spawn_blocking(move || {
-            let result = execute_global_search_blocking(
-                pattern,
-                cwd,
-                open_docs,
-                command_tx.clone(),
-                cancel_rx,
-            );
+            let result = execute_global_search_blocking(pattern, cwd, open_docs, command_tx.clone(), cancel_rx);
 
             if let Err(e) = result {
                 log::error!("Global search error: {e:?}");
@@ -858,11 +813,7 @@ impl EditorContext {
             .enumerate()
             .map(|(idx, result)| {
                 // Get relative path for display
-                let relative_path = result
-                    .path
-                    .strip_prefix(&cwd)
-                    .unwrap_or(&result.path)
-                    .to_string_lossy();
+                let relative_path = result.path.strip_prefix(&cwd).unwrap_or(&result.path).to_string_lossy();
 
                 let display = format!("{relative_path}:{}", result.line_num);
 
@@ -888,11 +839,7 @@ impl EditorContext {
             .iter()
             .enumerate()
             .map(|(idx, loc)| {
-                let relative_path = loc
-                    .path
-                    .strip_prefix(&cwd)
-                    .unwrap_or(&loc.path)
-                    .to_string_lossy();
+                let relative_path = loc.path.strip_prefix(&cwd).unwrap_or(&loc.path).to_string_lossy();
 
                 let display = format!("{relative_path}:{}:{}", loc.line, loc.column);
                 let secondary = loc.preview.clone();
@@ -930,11 +877,7 @@ impl EditorContext {
             .iter()
             .enumerate()
             .map(|(idx, loc)| {
-                let relative_path = loc
-                    .path
-                    .strip_prefix(&cwd)
-                    .unwrap_or(&loc.path)
-                    .to_string_lossy();
+                let relative_path = loc.path.strip_prefix(&cwd).unwrap_or(&loc.path).to_string_lossy();
 
                 let display = format!("{relative_path}:{}:{}", loc.line, loc.column);
                 let secondary = loc.preview.clone();
@@ -965,6 +908,7 @@ impl EditorContext {
 }
 
 /// Execute global search on a blocking thread.
+#[allow(clippy::needless_pass_by_value)] // Owned types required: moved into blocking thread, mpsc::Sender/Receiver are not Clone-free to borrow
 fn execute_global_search_blocking(
     pattern: String,
     cwd: PathBuf,
@@ -1042,6 +986,7 @@ fn execute_global_search_blocking(
 
                     results.push(GlobalSearchResult {
                         path: canonical_path_clone.clone(),
+                        #[allow(clippy::cast_possible_truncation)] // Line numbers in source files never exceed usize
                         line_num: line_num as usize,
                         line_content,
                     });
@@ -1053,7 +998,7 @@ fn execute_global_search_blocking(
 
             if let Err(e) = search_result {
                 // Skip files that can't be read (binary, permission denied, etc.)
-                log::debug!("Skipping file {path:?}: {e:?}");
+                log::debug!("Skipping file {}: {e}", path.display());
             }
         }
 
@@ -1076,7 +1021,7 @@ fn execute_global_search_blocking(
     Ok(())
 }
 
-/// Fuzzy match with indices: returns (score, match_indices) or None if no match.
+/// Fuzzy match with indices: returns (score, `match_indices`) or None if no match.
 /// Score is based on consecutive matches and start-of-word bonuses.
 /// Case-insensitive matching.
 /// Returns the static list of command panel entries: (command, display name, keybinding hint).
@@ -1084,24 +1029,12 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
     vec![
         // File operations
         (EditorCommand::ShowFilePicker, "Open File", Some("Space f")),
-        (
-            EditorCommand::ShowFilesRecursivePicker,
-            "Find Files",
-            Some("Ctrl+f"),
-        ),
+        (EditorCommand::ShowFilesRecursivePicker, "Find Files", Some("Ctrl+f")),
         (EditorCommand::ShowBufferPicker, "Switch Buffer", Some(":b")),
         // Buffer management
         (EditorCommand::NextBuffer, "Next Buffer", Some("Ctrl+l")),
-        (
-            EditorCommand::PreviousBuffer,
-            "Previous Buffer",
-            Some("Ctrl+h"),
-        ),
-        (
-            EditorCommand::ReloadDocument,
-            "Reload Document",
-            Some(":reload"),
-        ),
+        (EditorCommand::PreviousBuffer, "Previous Buffer", Some("Ctrl+h")),
+        (EditorCommand::ReloadDocument, "Reload Document", Some(":reload")),
         (EditorCommand::WriteAll, "Save All", Some(":wa")),
         // Navigation
         (EditorCommand::GotoFirstLine, "Go to First Line", Some("gg")),
@@ -1116,11 +1049,7 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
         (EditorCommand::HalfPageUp, "Half Page Up", Some("C-u")),
         (EditorCommand::HalfPageDown, "Half Page Down", Some("C-d")),
         // Search
-        (
-            EditorCommand::ShowGlobalSearch,
-            "Global Search",
-            Some("Space /"),
-        ),
+        (EditorCommand::ShowGlobalSearch, "Global Search", Some("Space /")),
         (
             EditorCommand::EnterSearchMode { backwards: false },
             "Search Forward",
@@ -1132,58 +1061,18 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
             Some("?"),
         ),
         // Editing
-        (
-            EditorCommand::AlignSelections,
-            "Align Selections",
-            Some("&"),
-        ),
+        (EditorCommand::AlignSelections, "Align Selections", Some("&")),
         // LSP
         (EditorCommand::FormatDocument, "Format Document", None),
-        (
-            EditorCommand::FormatSelections,
-            "Format Selections",
-            Some("="),
-        ),
-        (
-            EditorCommand::RenameSymbol,
-            "Rename Symbol",
-            Some("Space r"),
-        ),
-        (
-            EditorCommand::GotoDeclaration,
-            "Go to Declaration",
-            Some("gD"),
-        ),
-        (
-            EditorCommand::GotoDefinition,
-            "Go to Definition",
-            Some("gd"),
-        ),
-        (
-            EditorCommand::GotoReferences,
-            "Go to References",
-            Some("gr"),
-        ),
-        (
-            EditorCommand::GotoTypeDefinition,
-            "Go to Type Definition",
-            Some("gy"),
-        ),
-        (
-            EditorCommand::GotoImplementation,
-            "Go to Implementation",
-            Some("gi"),
-        ),
-        (
-            EditorCommand::ShowCodeActions,
-            "Show Code Actions",
-            Some("Space a"),
-        ),
-        (
-            EditorCommand::ShowDocumentSymbols,
-            "Document Symbols",
-            Some("Space s"),
-        ),
+        (EditorCommand::FormatSelections, "Format Selections", Some("=")),
+        (EditorCommand::RenameSymbol, "Rename Symbol", Some("Space r")),
+        (EditorCommand::GotoDeclaration, "Go to Declaration", Some("gD")),
+        (EditorCommand::GotoDefinition, "Go to Definition", Some("gd")),
+        (EditorCommand::GotoReferences, "Go to References", Some("gr")),
+        (EditorCommand::GotoTypeDefinition, "Go to Type Definition", Some("gy")),
+        (EditorCommand::GotoImplementation, "Go to Implementation", Some("gi")),
+        (EditorCommand::ShowCodeActions, "Show Code Actions", Some("Space a")),
+        (EditorCommand::ShowDocumentSymbols, "Document Symbols", Some("Space s")),
         (
             EditorCommand::ShowWorkspaceSymbols,
             "Workspace Symbols",
@@ -1200,33 +1089,17 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
             Some("Space D"),
         ),
         (EditorCommand::NextDiagnostic, "Next Diagnostic", Some("]d")),
-        (
-            EditorCommand::PrevDiagnostic,
-            "Previous Diagnostic",
-            Some("[d"),
-        ),
-        (
-            EditorCommand::ToggleInlayHints,
-            "Toggle Inlay Hints",
-            Some("Space i"),
-        ),
+        (EditorCommand::PrevDiagnostic, "Previous Diagnostic", Some("[d")),
+        (EditorCommand::ToggleInlayHints, "Toggle Inlay Hints", Some("Space i")),
         (EditorCommand::ToggleLspDialog, "LSP Server Status", None),
-        (
-            EditorCommand::TriggerHover,
-            "Trigger Hover",
-            Some("Space k"),
-        ),
+        (EditorCommand::TriggerHover, "Trigger Hover", Some("Space k")),
         (
             EditorCommand::TriggerCompletion,
             "Trigger Completion",
             Some("Ctrl+Space"),
         ),
         // Editing
-        (
-            EditorCommand::ToggleLineComment,
-            "Toggle Line Comment",
-            Some("Space c"),
-        ),
+        (EditorCommand::ToggleLineComment, "Toggle Line Comment", Some("Space c")),
         (
             EditorCommand::ToggleBlockComment,
             "Toggle Block Comment",
@@ -1237,11 +1110,7 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
         (EditorCommand::IndentLine, "Indent", Some(">")),
         (EditorCommand::UnindentLine, "Unindent", Some("<")),
         (EditorCommand::SelectAll, "Select All", Some("%")),
-        (
-            EditorCommand::FlipSelections,
-            "Flip Selections",
-            Some("A-;"),
-        ),
+        (EditorCommand::FlipSelections, "Flip Selections", Some("A-;")),
         (
             EditorCommand::ExpandSelection,
             "Expand Selection (tree-sitter)",
@@ -1257,16 +1126,8 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
         // Jump list
         (EditorCommand::JumpBackward, "Jump Backward", Some("C-o")),
         (EditorCommand::JumpForward, "Jump Forward", Some("C-i")),
-        (
-            EditorCommand::SaveSelection,
-            "Save Position to Jump List",
-            Some("C-s"),
-        ),
-        (
-            EditorCommand::ShowJumpListPicker,
-            "Jump List",
-            Some("Space j"),
-        ),
+        (EditorCommand::SaveSelection, "Save Position to Jump List", Some("C-s")),
+        (EditorCommand::ShowJumpListPicker, "Jump List", Some("Space j")),
         (
             EditorCommand::CliCommand("jumplist-clear".to_string()),
             "Clear Jump List",
@@ -1300,11 +1161,7 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
             Some("A-!"),
         ),
         // File explorer
-        (
-            EditorCommand::ShowFileExplorer,
-            "File Explorer",
-            Some("Space e"),
-        ),
+        (EditorCommand::ShowFileExplorer, "File Explorer", Some("Space e")),
         (
             EditorCommand::ShowFileExplorerInBufferDir,
             "File Explorer (Buffer Dir)",
@@ -1313,27 +1170,15 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
         // Word jump
         (EditorCommand::GotoWord, "Goto Word (Jump)", Some("gw")),
         // Theme
-        (
-            EditorCommand::ShowThemePicker,
-            "Switch Theme",
-            Some(":theme"),
-        ),
+        (EditorCommand::ShowThemePicker, "Switch Theme", Some(":theme")),
         // VCS
-        (
-            EditorCommand::ShowChangedFilesPicker,
-            "Changed Files",
-            Some("Space g"),
-        ),
+        (EditorCommand::ShowChangedFilesPicker, "Changed Files", Some("Space g")),
         (EditorCommand::NextChange, "Next Change", Some("]g")),
         (EditorCommand::PrevChange, "Previous Change", Some("[g")),
         (EditorCommand::GotoFirstChange, "First Change", Some("[G")),
         (EditorCommand::GotoLastChange, "Last Change", Some("]G")),
         // Emoji picker
-        (
-            EditorCommand::ShowEmojiPicker,
-            "Insert Emoji",
-            Some("C-Cmd-Spc"),
-        ),
+        (EditorCommand::ShowEmojiPicker, "Insert Emoji", Some("C-Cmd-Spc")),
         // Text manipulation
         (
             EditorCommand::CliCommand("sort".to_string()),
@@ -1433,6 +1278,7 @@ pub(crate) fn compute_filtered_items(
     results.into_iter().map(|(_, item)| item).collect()
 }
 
+#[allow(clippy::indexing_slicing)] // Indices are bounded by iteration: pattern_idx < pattern_lower.len(), text_idx > 0 implies text_idx-1 is valid
 pub(crate) fn fuzzy_match_with_indices(text: &str, pattern: &str) -> Option<(u16, Vec<usize>)> {
     if pattern.is_empty() {
         return Some((0, vec![]));
@@ -1462,10 +1308,8 @@ pub(crate) fn fuzzy_match_with_indices(text: &str, pattern: &str) -> Option<(u16
             }
 
             // Word boundary bonus (after separator)
-            if text_idx > 0 {
-                if matches!(text_lower[text_idx - 1], '/' | '\\' | '_' | '-' | ' ' | '.') {
-                    score = score.saturating_add(8);
-                }
+            if text_idx > 0 && matches!(text_lower[text_idx - 1], '/' | '\\' | '_' | '-' | ' ' | '.') {
+                score = score.saturating_add(8);
             }
 
             prev_match_idx = Some(text_idx);
@@ -1473,15 +1317,12 @@ pub(crate) fn fuzzy_match_with_indices(text: &str, pattern: &str) -> Option<(u16
         }
     }
 
-    if pattern_idx == pattern_lower.len() {
-        // All pattern characters matched
-        // Bonus for shorter text (prefer exact or near-exact matches)
+    (pattern_idx == pattern_lower.len()).then(|| {
+        #[allow(clippy::cast_possible_truncation)] // text.len() capped at 100 by saturating_sub, truncation is harmless
         let len_bonus = (100u16).saturating_sub(text.len() as u16);
         score = score.saturating_add(len_bonus / 10);
-        Some((score, match_indices))
-    } else {
-        None
-    }
+        (score, match_indices)
+    })
 }
 
 /// Build tree-view items from a root directory, recursing into expanded dirs.
@@ -1564,11 +1405,7 @@ fn collect_all_files(root: &std::path::Path) -> Vec<PickerItem> {
         if path.is_dir() {
             continue;
         }
-        let relative = path
-            .strip_prefix(root)
-            .unwrap_or(path)
-            .to_string_lossy()
-            .to_string();
+        let relative = path.strip_prefix(root).unwrap_or(path).to_string_lossy().to_string();
         let name = path
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
@@ -1644,17 +1481,11 @@ mod tests {
 
         // subdir/ (depth 0, FolderOpen), inner.txt (depth 1)
         assert!(items.len() >= 2);
-        let subdir_item = items
-            .iter()
-            .find(|i| i.display == "subdir/")
-            .expect("subdir");
+        let subdir_item = items.iter().find(|i| i.display == "subdir/").expect("subdir");
         assert_eq!(subdir_item.depth, 0);
         assert_eq!(subdir_item.icon, PickerIcon::FolderOpen);
 
-        let inner_item = items
-            .iter()
-            .find(|i| i.display == "inner.txt")
-            .expect("inner");
+        let inner_item = items.iter().find(|i| i.display == "inner.txt").expect("inner");
         assert_eq!(inner_item.depth, 1);
     }
 

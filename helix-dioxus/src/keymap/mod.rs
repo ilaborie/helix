@@ -152,9 +152,7 @@ impl DhxKeymaps {
             // Search and extract what we need before dropping the borrow
             match trie.search(&self.state) {
                 TrieSearchResult::Found(slot) => SearchOutcome::Found(slot.clone()),
-                TrieSearchResult::FoundSeq(slots) => {
-                    SearchOutcome::FoundSeq(slots.to_vec())
-                }
+                TrieSearchResult::FoundSeq(slots) => SearchOutcome::FoundSeq(slots.to_vec()),
                 TrieSearchResult::Partial(node) => {
                     SearchOutcome::Partial(node.name().to_string(), node.is_sticky(), node.clone())
                 }
@@ -243,9 +241,7 @@ impl DhxKeymaps {
                 }
                 StaticTrieResult::Matched(cmds)
             }
-            DhxKeyTrie::Node(node) => {
-                StaticTrieResult::Pending(node.name().to_string(), node.clone())
-            }
+            DhxKeyTrie::Node(node) => StaticTrieResult::Pending(node.name().to_string(), node.clone()),
         }
     }
 
@@ -297,10 +293,7 @@ mod tests {
         root.insert(key('g'), DhxKeyTrie::node(g_node));
 
         // f = await char (find forward)
-        root.insert(
-            key('f'),
-            DhxKeyTrie::await_char(AwaitCharKind::FindForward),
-        );
+        root.insert(key('f'), DhxKeyTrie::await_char(AwaitCharKind::FindForward));
 
         // Z = sticky view mode
         let mut z_sticky = DhxKeyTrieNode::new_sticky("view");
@@ -475,10 +468,7 @@ mod tests {
         // Build a keymap with m prefix → mr (surround replace)
         let mut root = DhxKeyTrieNode::new("normal");
         let mut m_node = DhxKeyTrieNode::new("match");
-        m_node.insert(
-            key('r'),
-            DhxKeyTrie::await_char(AwaitCharKind::SurroundReplaceFrom),
-        );
+        m_node.insert(key('r'), DhxKeyTrie::await_char(AwaitCharKind::SurroundReplaceFrom));
         root.insert(key('m'), DhxKeyTrie::node(m_node));
 
         let mut map = std::collections::HashMap::new();
@@ -545,14 +535,8 @@ mod tests {
         merge_keys(&mut base, delta);
 
         // Both bindings should exist
-        assert!(matches!(
-            base.search(&[key('g'), key('g')]),
-            TrieSearchResult::Found(_)
-        ));
-        assert!(matches!(
-            base.search(&[key('g'), key('d')]),
-            TrieSearchResult::Found(_)
-        ));
+        assert!(matches!(base.search(&[key('g'), key('g')]), TrieSearchResult::Found(_)));
+        assert!(matches!(base.search(&[key('g'), key('d')]), TrieSearchResult::Found(_)));
     }
 
     #[test]

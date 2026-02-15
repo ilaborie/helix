@@ -10,6 +10,7 @@ use crate::state::{EditorCommand, PickerMode};
 /// Behavior depends on the `dialog_search_mode` config:
 /// - `Direct` (default): typing filters directly, arrows navigate.
 /// - `VimStyle`: j/k navigate, `/` focuses search, typing only filters when focused.
+#[must_use]
 pub fn handle_picker_mode(
     key: &KeyEvent,
     search_mode: DialogSearchMode,
@@ -52,11 +53,7 @@ fn handle_picker_direct(key: &KeyEvent, picker_mode: PickerMode) -> Vec<EditorCo
 }
 
 /// Vim-style mode: j/k navigate, `/` focuses search.
-fn handle_picker_vim(
-    key: &KeyEvent,
-    search_focused: bool,
-    picker_mode: PickerMode,
-) -> Vec<EditorCommand> {
+fn handle_picker_vim(key: &KeyEvent, search_focused: bool, picker_mode: PickerMode) -> Vec<EditorCommand> {
     let is_explorer = picker_mode == PickerMode::FileExplorer;
     if search_focused {
         // Search input is focused: typing filters, Esc unfocuses, Enter confirms search
@@ -83,10 +80,8 @@ fn handle_picker_vim(
                 vec![EditorCommand::ExplorerExpand]
             }
             KeyCode::Char('/') => vec![EditorCommand::PickerFocusSearch],
-            KeyCode::Char('g') => vec![EditorCommand::PickerFirst],
-            KeyCode::Char('G') => vec![EditorCommand::PickerLast],
-            KeyCode::Home => vec![EditorCommand::PickerFirst],
-            KeyCode::End => vec![EditorCommand::PickerLast],
+            KeyCode::Char('g') | KeyCode::Home => vec![EditorCommand::PickerFirst],
+            KeyCode::Char('G') | KeyCode::End => vec![EditorCommand::PickerLast],
             KeyCode::PageUp => vec![EditorCommand::PickerPageUp],
             KeyCode::PageDown => vec![EditorCommand::PickerPageDown],
             _ => vec![],

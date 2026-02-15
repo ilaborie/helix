@@ -8,6 +8,7 @@ use crate::state::EditorCommand;
 ///
 /// Tab accepts the selected completion, Up/Down navigate the completion list,
 /// and the remaining keys behave as before (Esc exits, Enter executes, etc.).
+#[must_use]
 pub fn handle_command_mode(key: &KeyEvent) -> Vec<EditorCommand> {
     match key.code {
         KeyCode::Esc => vec![EditorCommand::ExitCommandMode],

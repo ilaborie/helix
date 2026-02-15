@@ -33,6 +33,7 @@ pub trait VcsOps {
 ///
 /// Additions and modifications cover the changed line range.
 /// Deletions are represented as a point at the deletion location.
+#[allow(clippy::needless_pass_by_value)] // Hunk is a small Copy struct
 fn hunk_range(hunk: Hunk, text: helix_core::RopeSlice) -> helix_core::Range {
     let anchor = text.line_to_char(hunk.after.start as usize);
     let head = if hunk.after.is_empty() {
@@ -102,28 +103,23 @@ fn file_change_to_picker_item(change: &FileChange, cwd: &std::path::Path) -> Pic
 
 /// Display a path relative to `cwd` if possible, otherwise as-is.
 fn path_display(path: &std::path::Path, cwd: &std::path::Path) -> String {
-    path.strip_prefix(cwd)
-        .unwrap_or(path)
-        .to_string_lossy()
-        .to_string()
+    path.strip_prefix(cwd).unwrap_or(path).to_string_lossy().to_string()
 }
 
 impl VcsOps for EditorContext {
     fn goto_next_change(&mut self, doc_id: DocumentId, view_id: helix_view::ViewId) {
-        let doc = match self.editor.document(doc_id) {
-            Some(doc) => doc,
-            None => return,
+        let Some(doc) = self.editor.document(doc_id) else {
+            return;
         };
 
-        let diff_handle = match doc.diff_handle() {
-            Some(handle) => handle.clone(),
-            None => {
-                self.show_notification(
-                    "Diff not available in current buffer".to_string(),
-                    NotificationSeverity::Info,
-                );
-                return;
-            }
+        let diff_handle = if let Some(handle) = doc.diff_handle() {
+            handle.clone()
+        } else {
+            self.show_notification(
+                "Diff not available in current buffer".to_string(),
+                NotificationSeverity::Info,
+            );
+            return;
         };
 
         let text = doc.text().slice(..);
@@ -131,6 +127,7 @@ impl VcsOps for EditorContext {
         let is_select = self.editor.mode == Mode::Select;
 
         let new_selection = selection.transform(|range| {
+            #[allow(clippy::cast_possible_truncation)] // line index fits in u32
             let cursor_line = range.cursor_line(text) as u32;
             let diff = diff_handle.load();
             let Some(hunk_idx) = diff.next_hunk(cursor_line) else {
@@ -156,20 +153,18 @@ impl VcsOps for EditorContext {
     }
 
     fn goto_prev_change(&mut self, doc_id: DocumentId, view_id: helix_view::ViewId) {
-        let doc = match self.editor.document(doc_id) {
-            Some(doc) => doc,
-            None => return,
+        let Some(doc) = self.editor.document(doc_id) else {
+            return;
         };
 
-        let diff_handle = match doc.diff_handle() {
-            Some(handle) => handle.clone(),
-            None => {
-                self.show_notification(
-                    "Diff not available in current buffer".to_string(),
-                    NotificationSeverity::Info,
-                );
-                return;
-            }
+        let diff_handle = if let Some(handle) = doc.diff_handle() {
+            handle.clone()
+        } else {
+            self.show_notification(
+                "Diff not available in current buffer".to_string(),
+                NotificationSeverity::Info,
+            );
+            return;
         };
 
         let text = doc.text().slice(..);
@@ -177,6 +172,7 @@ impl VcsOps for EditorContext {
         let is_select = self.editor.mode == Mode::Select;
 
         let new_selection = selection.transform(|range| {
+            #[allow(clippy::cast_possible_truncation)] // line index fits in u32
             let cursor_line = range.cursor_line(text) as u32;
             let diff = diff_handle.load();
             let Some(hunk_idx) = diff.prev_hunk(cursor_line) else {
@@ -202,14 +198,12 @@ impl VcsOps for EditorContext {
     }
 
     fn goto_first_change(&mut self, doc_id: DocumentId, view_id: helix_view::ViewId) {
-        let doc = match self.editor.document(doc_id) {
-            Some(doc) => doc,
-            None => return,
+        let Some(doc) = self.editor.document(doc_id) else {
+            return;
         };
 
-        let handle = match doc.diff_handle() {
-            Some(h) => h.clone(),
-            None => return,
+        let Some(handle) = doc.diff_handle().cloned() else {
+            return;
         };
 
         let diff = handle.load();
@@ -227,18 +221,16 @@ impl VcsOps for EditorContext {
     }
 
     fn goto_last_change(&mut self, doc_id: DocumentId, view_id: helix_view::ViewId) {
-        let doc = match self.editor.document(doc_id) {
-            Some(doc) => doc,
-            None => return,
+        let Some(doc) = self.editor.document(doc_id) else {
+            return;
         };
 
-        let handle = match doc.diff_handle() {
-            Some(h) => h.clone(),
-            None => return,
+        let Some(handle) = doc.diff_handle().cloned() else {
+            return;
         };
 
         let diff = handle.load();
-        if diff.len() == 0 {
+        if diff.is_empty() {
             return;
         }
         let hunk = diff.nth_hunk(diff.len() - 1);
@@ -255,15 +247,12 @@ impl VcsOps for EditorContext {
     }
 
     fn show_changed_files_picker(&mut self) {
-        let cwd = match std::env::current_dir() {
-            Ok(cwd) => cwd,
-            Err(_) => {
-                self.show_notification(
-                    "Cannot determine current directory".to_string(),
-                    NotificationSeverity::Error,
-                );
-                return;
-            }
+        let Ok(cwd) = std::env::current_dir() else {
+            self.show_notification(
+                "Cannot determine current directory".to_string(),
+                NotificationSeverity::Error,
+            );
+            return;
         };
 
         let providers = self.editor.diff_providers.clone();
@@ -286,10 +275,7 @@ impl VcsOps for EditorContext {
             return;
         }
 
-        let items: Vec<PickerItem> = changes
-            .iter()
-            .map(|c| file_change_to_picker_item(c, &cwd))
-            .collect();
+        let items: Vec<PickerItem> = changes.iter().map(|c| file_change_to_picker_item(c, &cwd)).collect();
 
         self.picker_items = items;
         self.picker_filter.clear();

@@ -78,7 +78,10 @@ pub fn normal_mode_defaults() -> DhxKeyTrieNode {
     root.insert(key('='), DhxKeyTrie::cmd(EditorCommand::FormatSelections));
 
     // --- Regex select/split ---
-    root.insert(key('s'), DhxKeyTrie::cmd(EditorCommand::EnterRegexMode { split: false }));
+    root.insert(
+        key('s'),
+        DhxKeyTrie::cmd(EditorCommand::EnterRegexMode { split: false }),
+    );
     root.insert(key('S'), DhxKeyTrie::cmd(EditorCommand::EnterRegexMode { split: true }));
 
     // --- Copy selection on next line ---
@@ -102,8 +105,14 @@ pub fn normal_mode_defaults() -> DhxKeyTrieNode {
     root.insert(key('y'), DhxKeyTrie::cmd(EditorCommand::Yank));
 
     // --- Search ---
-    root.insert(key('/'), DhxKeyTrie::cmd(EditorCommand::EnterSearchMode { backwards: false }));
-    root.insert(key('?'), DhxKeyTrie::cmd(EditorCommand::EnterSearchMode { backwards: true }));
+    root.insert(
+        key('/'),
+        DhxKeyTrie::cmd(EditorCommand::EnterSearchMode { backwards: false }),
+    );
+    root.insert(
+        key('?'),
+        DhxKeyTrie::cmd(EditorCommand::EnterSearchMode { backwards: true }),
+    );
     root.insert(key('n'), DhxKeyTrie::cmd(EditorCommand::SearchNext));
     root.insert(key('N'), DhxKeyTrie::cmd(EditorCommand::SearchPrevious));
     root.insert(key('*'), DhxKeyTrie::cmd(EditorCommand::SearchWordUnderCursor));
@@ -130,8 +139,14 @@ pub fn normal_mode_defaults() -> DhxKeyTrieNode {
     root.insert(key('K'), DhxKeyTrie::cmd(EditorCommand::TriggerHover));
 
     // --- Shell integration ---
-    root.insert(key('|'), DhxKeyTrie::cmd(EditorCommand::EnterShellMode(ShellBehavior::Replace)));
-    root.insert(key('!'), DhxKeyTrie::cmd(EditorCommand::EnterShellMode(ShellBehavior::Insert)));
+    root.insert(
+        key('|'),
+        DhxKeyTrie::cmd(EditorCommand::EnterShellMode(ShellBehavior::Replace)),
+    );
+    root.insert(
+        key('!'),
+        DhxKeyTrie::cmd(EditorCommand::EnterShellMode(ShellBehavior::Insert)),
+    );
 
     // --- Macro ---
     root.insert(key('Q'), DhxKeyTrie::cmd(EditorCommand::ToggleMacroRecording));
@@ -162,8 +177,14 @@ pub fn normal_mode_defaults() -> DhxKeyTrieNode {
     root.insert(alt('x'), DhxKeyTrie::cmd(EditorCommand::ShrinkToLineBounds));
     root.insert(alt('o'), DhxKeyTrie::cmd(EditorCommand::ExpandSelection));
     root.insert(alt('i'), DhxKeyTrie::cmd(EditorCommand::ShrinkSelection));
-    root.insert(alt('|'), DhxKeyTrie::cmd(EditorCommand::EnterShellMode(ShellBehavior::Ignore)));
-    root.insert(alt('!'), DhxKeyTrie::cmd(EditorCommand::EnterShellMode(ShellBehavior::Append)));
+    root.insert(
+        alt('|'),
+        DhxKeyTrie::cmd(EditorCommand::EnterShellMode(ShellBehavior::Ignore)),
+    );
+    root.insert(
+        alt('!'),
+        DhxKeyTrie::cmd(EditorCommand::EnterShellMode(ShellBehavior::Append)),
+    );
 
     // --- Ctrl+key combinations ---
     root.insert(ctrl('b'), DhxKeyTrie::cmd(EditorCommand::PageUp));
@@ -250,7 +271,10 @@ pub fn select_mode_defaults() -> DhxKeyTrieNode {
     root.insert(key('X'), DhxKeyTrie::cmd(EditorCommand::ExtendLine));
 
     // --- Clipboard ---
-    root.insert(key('y'), DhxKeyTrie::seq(vec![EditorCommand::Yank, EditorCommand::ExitSelectMode]));
+    root.insert(
+        key('y'),
+        DhxKeyTrie::seq(vec![EditorCommand::Yank, EditorCommand::ExitSelectMode]),
+    );
     root.insert(key('d'), DhxKeyTrie::cmd(EditorCommand::DeleteSelection));
     root.insert(key('c'), DhxKeyTrie::cmd(EditorCommand::ChangeSelection));
 
@@ -271,7 +295,10 @@ pub fn select_mode_defaults() -> DhxKeyTrieNode {
     root.insert(key(','), DhxKeyTrie::cmd(EditorCommand::KeepPrimarySelection));
 
     // --- Regex select/split ---
-    root.insert(key('s'), DhxKeyTrie::cmd(EditorCommand::EnterRegexMode { split: false }));
+    root.insert(
+        key('s'),
+        DhxKeyTrie::cmd(EditorCommand::EnterRegexMode { split: false }),
+    );
     root.insert(key('S'), DhxKeyTrie::cmd(EditorCommand::EnterRegexMode { split: true }));
 
     // --- Copy selection on next line ---
@@ -282,8 +309,14 @@ pub fn select_mode_defaults() -> DhxKeyTrieNode {
     root.insert(key('('), DhxKeyTrie::cmd(EditorCommand::RotateSelectionsBackward));
 
     // --- Shell integration ---
-    root.insert(key('|'), DhxKeyTrie::cmd(EditorCommand::EnterShellMode(ShellBehavior::Replace)));
-    root.insert(key('!'), DhxKeyTrie::cmd(EditorCommand::EnterShellMode(ShellBehavior::Insert)));
+    root.insert(
+        key('|'),
+        DhxKeyTrie::cmd(EditorCommand::EnterShellMode(ShellBehavior::Replace)),
+    );
+    root.insert(
+        key('!'),
+        DhxKeyTrie::cmd(EditorCommand::EnterShellMode(ShellBehavior::Insert)),
+    );
 
     // --- Macro ---
     root.insert(key('Q'), DhxKeyTrie::cmd(EditorCommand::ToggleMacroRecording));
@@ -303,8 +336,14 @@ pub fn select_mode_defaults() -> DhxKeyTrieNode {
     root.insert(alt('s'), DhxKeyTrie::cmd(EditorCommand::SplitSelectionOnNewline));
     root.insert(alt('o'), DhxKeyTrie::cmd(EditorCommand::ExpandSelection));
     root.insert(alt('i'), DhxKeyTrie::cmd(EditorCommand::ShrinkSelection));
-    root.insert(alt('|'), DhxKeyTrie::cmd(EditorCommand::EnterShellMode(ShellBehavior::Ignore)));
-    root.insert(alt('!'), DhxKeyTrie::cmd(EditorCommand::EnterShellMode(ShellBehavior::Append)));
+    root.insert(
+        alt('|'),
+        DhxKeyTrie::cmd(EditorCommand::EnterShellMode(ShellBehavior::Ignore)),
+    );
+    root.insert(
+        alt('!'),
+        DhxKeyTrie::cmd(EditorCommand::EnterShellMode(ShellBehavior::Append)),
+    );
 
     // --- Ctrl+key combinations ---
     root.insert(ctrl('c'), DhxKeyTrie::cmd(EditorCommand::ToggleLineComment));
@@ -348,8 +387,14 @@ pub fn insert_mode_defaults() -> DhxKeyTrieNode {
     root.insert(special(KeyCode::Tab), DhxKeyTrie::cmd(EditorCommand::InsertTab));
     root.insert(shift_tab(), DhxKeyTrie::cmd(EditorCommand::UnindentLine));
     root.insert(special(KeyCode::Enter), DhxKeyTrie::cmd(EditorCommand::InsertNewline));
-    root.insert(special(KeyCode::Backspace), DhxKeyTrie::cmd(EditorCommand::DeleteCharBackward));
-    root.insert(special(KeyCode::Delete), DhxKeyTrie::cmd(EditorCommand::DeleteCharForward));
+    root.insert(
+        special(KeyCode::Backspace),
+        DhxKeyTrie::cmd(EditorCommand::DeleteCharBackward),
+    );
+    root.insert(
+        special(KeyCode::Delete),
+        DhxKeyTrie::cmd(EditorCommand::DeleteCharForward),
+    );
 
     // --- Arrow keys ---
     root.insert(special(KeyCode::Left), DhxKeyTrie::cmd(EditorCommand::MoveLeft));
@@ -505,29 +550,38 @@ fn space_leader_defaults() -> DhxKeyTrieNode {
     node.insert(key('i'), DhxKeyTrie::cmd(EditorCommand::ToggleInlayHints));
     node.insert(key('j'), DhxKeyTrie::cmd(EditorCommand::ShowJumpListPicker));
     node.insert(key('k'), DhxKeyTrie::cmd(EditorCommand::TriggerHover));
-    node.insert(key('p'), DhxKeyTrie::seq(vec![
-        EditorCommand::SetSelectedRegister('+'),
-        EditorCommand::Paste,
-    ]));
-    node.insert(key('P'), DhxKeyTrie::seq(vec![
-        EditorCommand::SetSelectedRegister('+'),
-        EditorCommand::PasteBefore,
-    ]));
+    node.insert(
+        key('p'),
+        DhxKeyTrie::seq(vec![EditorCommand::SetSelectedRegister('+'), EditorCommand::Paste]),
+    );
+    node.insert(
+        key('P'),
+        DhxKeyTrie::seq(vec![
+            EditorCommand::SetSelectedRegister('+'),
+            EditorCommand::PasteBefore,
+        ]),
+    );
     node.insert(key('r'), DhxKeyTrie::cmd(EditorCommand::RenameSymbol));
-    node.insert(key('R'), DhxKeyTrie::seq(vec![
-        EditorCommand::SetSelectedRegister('+'),
-        EditorCommand::ReplaceWithYanked,
-    ]));
+    node.insert(
+        key('R'),
+        DhxKeyTrie::seq(vec![
+            EditorCommand::SetSelectedRegister('+'),
+            EditorCommand::ReplaceWithYanked,
+        ]),
+    );
     node.insert(key('s'), DhxKeyTrie::cmd(EditorCommand::ShowDocumentSymbols));
     node.insert(key('S'), DhxKeyTrie::cmd(EditorCommand::ShowWorkspaceSymbols));
-    node.insert(key('y'), DhxKeyTrie::seq(vec![
-        EditorCommand::SetSelectedRegister('+'),
-        EditorCommand::Yank,
-    ]));
-    node.insert(key('Y'), DhxKeyTrie::seq(vec![
-        EditorCommand::SetSelectedRegister('+'),
-        EditorCommand::YankMainSelectionToClipboard,
-    ]));
+    node.insert(
+        key('y'),
+        DhxKeyTrie::seq(vec![EditorCommand::SetSelectedRegister('+'), EditorCommand::Yank]),
+    );
+    node.insert(
+        key('Y'),
+        DhxKeyTrie::seq(vec![
+            EditorCommand::SetSelectedRegister('+'),
+            EditorCommand::YankMainSelectionToClipboard,
+        ]),
+    );
     node.insert(key('\''), DhxKeyTrie::cmd(EditorCommand::ShowLastPicker));
     node
 }
@@ -572,8 +626,14 @@ fn view_prefix_defaults() -> DhxKeyTrieNode {
     node.insert(ctrl('d'), DhxKeyTrie::cmd(EditorCommand::HalfPageDown));
 
     // Search
-    node.insert(key('/'), DhxKeyTrie::cmd(EditorCommand::EnterSearchMode { backwards: false }));
-    node.insert(key('?'), DhxKeyTrie::cmd(EditorCommand::EnterSearchMode { backwards: true }));
+    node.insert(
+        key('/'),
+        DhxKeyTrie::cmd(EditorCommand::EnterSearchMode { backwards: false }),
+    );
+    node.insert(
+        key('?'),
+        DhxKeyTrie::cmd(EditorCommand::EnterSearchMode { backwards: true }),
+    );
     node.insert(key('n'), DhxKeyTrie::cmd(EditorCommand::SearchNext));
     node.insert(key('N'), DhxKeyTrie::cmd(EditorCommand::SearchPrevious));
 
@@ -605,8 +665,14 @@ fn view_prefix_sticky_defaults() -> DhxKeyTrieNode {
     node.insert(ctrl('u'), DhxKeyTrie::cmd(EditorCommand::HalfPageUp));
     node.insert(ctrl('d'), DhxKeyTrie::cmd(EditorCommand::HalfPageDown));
 
-    node.insert(key('/'), DhxKeyTrie::cmd(EditorCommand::EnterSearchMode { backwards: false }));
-    node.insert(key('?'), DhxKeyTrie::cmd(EditorCommand::EnterSearchMode { backwards: true }));
+    node.insert(
+        key('/'),
+        DhxKeyTrie::cmd(EditorCommand::EnterSearchMode { backwards: false }),
+    );
+    node.insert(
+        key('?'),
+        DhxKeyTrie::cmd(EditorCommand::EnterSearchMode { backwards: true }),
+    );
     node.insert(key('n'), DhxKeyTrie::cmd(EditorCommand::SearchNext));
     node.insert(key('N'), DhxKeyTrie::cmd(EditorCommand::SearchPrevious));
 
@@ -680,20 +746,41 @@ mod tests {
     #[test]
     fn normal_arrow_movement() {
         let trie = DhxKeyTrie::node(normal_mode_defaults());
-        assert!(matches!(expect_cmd(&trie, &[special(KeyCode::Left)]), EditorCommand::MoveLeft));
-        assert!(matches!(expect_cmd(&trie, &[special(KeyCode::Right)]), EditorCommand::MoveRight));
-        assert!(matches!(expect_cmd(&trie, &[special(KeyCode::Up)]), EditorCommand::MoveUp));
-        assert!(matches!(expect_cmd(&trie, &[special(KeyCode::Down)]), EditorCommand::MoveDown));
+        assert!(matches!(
+            expect_cmd(&trie, &[special(KeyCode::Left)]),
+            EditorCommand::MoveLeft
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[special(KeyCode::Right)]),
+            EditorCommand::MoveRight
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[special(KeyCode::Up)]),
+            EditorCommand::MoveUp
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[special(KeyCode::Down)]),
+            EditorCommand::MoveDown
+        ));
     }
 
     #[test]
     fn normal_word_movement() {
         let trie = DhxKeyTrie::node(normal_mode_defaults());
         assert!(matches!(expect_cmd(&trie, &[key('w')]), EditorCommand::MoveWordForward));
-        assert!(matches!(expect_cmd(&trie, &[key('b')]), EditorCommand::MoveWordBackward));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('b')]),
+            EditorCommand::MoveWordBackward
+        ));
         assert!(matches!(expect_cmd(&trie, &[key('e')]), EditorCommand::MoveWordEnd));
-        assert!(matches!(expect_cmd(&trie, &[key('W')]), EditorCommand::MoveLongWordForward));
-        assert!(matches!(expect_cmd(&trie, &[key('B')]), EditorCommand::MoveLongWordBackward));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('W')]),
+            EditorCommand::MoveLongWordForward
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('B')]),
+            EditorCommand::MoveLongWordBackward
+        ));
         assert!(matches!(expect_cmd(&trie, &[key('E')]), EditorCommand::MoveLongWordEnd));
     }
 
@@ -701,23 +788,56 @@ mod tests {
     fn normal_g_prefix() {
         let trie = DhxKeyTrie::node(normal_mode_defaults());
         expect_partial(&trie, &[key('g')]);
-        assert!(matches!(expect_cmd(&trie, &[key('g'), key('g')]), EditorCommand::GotoFirstLine));
-        assert!(matches!(expect_cmd(&trie, &[key('g'), key('e')]), EditorCommand::GotoLastLine));
-        assert!(matches!(expect_cmd(&trie, &[key('g'), key('d')]), EditorCommand::GotoDefinition));
-        assert!(matches!(expect_cmd(&trie, &[key('g'), key('r')]), EditorCommand::GotoReferences));
-        assert!(matches!(expect_cmd(&trie, &[key('g'), key('h')]), EditorCommand::MoveLineStart));
-        assert!(matches!(expect_cmd(&trie, &[key('g'), key('l')]), EditorCommand::MoveLineEnd));
-        assert!(matches!(expect_cmd(&trie, &[key('g'), key('w')]), EditorCommand::GotoWord));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('g'), key('g')]),
+            EditorCommand::GotoFirstLine
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('g'), key('e')]),
+            EditorCommand::GotoLastLine
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('g'), key('d')]),
+            EditorCommand::GotoDefinition
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('g'), key('r')]),
+            EditorCommand::GotoReferences
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('g'), key('h')]),
+            EditorCommand::MoveLineStart
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('g'), key('l')]),
+            EditorCommand::MoveLineEnd
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('g'), key('w')]),
+            EditorCommand::GotoWord
+        ));
     }
 
     #[test]
     fn normal_space_leader() {
         let trie = DhxKeyTrie::node(normal_mode_defaults());
         expect_partial(&trie, &[key(' ')]);
-        assert!(matches!(expect_cmd(&trie, &[key(' '), key('f')]), EditorCommand::ShowFilePicker));
-        assert!(matches!(expect_cmd(&trie, &[key(' '), key('b')]), EditorCommand::ShowBufferPicker));
-        assert!(matches!(expect_cmd(&trie, &[key(' '), key('r')]), EditorCommand::RenameSymbol));
-        assert!(matches!(expect_cmd(&trie, &[key(' '), key('k')]), EditorCommand::TriggerHover));
+        assert!(matches!(
+            expect_cmd(&trie, &[key(' '), key('f')]),
+            EditorCommand::ShowFilePicker
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key(' '), key('b')]),
+            EditorCommand::ShowBufferPicker
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key(' '), key('r')]),
+            EditorCommand::RenameSymbol
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key(' '), key('k')]),
+            EditorCommand::TriggerHover
+        ));
     }
 
     #[test]
@@ -733,25 +853,46 @@ mod tests {
     fn normal_bracket_next() {
         let trie = DhxKeyTrie::node(normal_mode_defaults());
         expect_partial(&trie, &[key(']')]);
-        assert!(matches!(expect_cmd(&trie, &[key(']'), key('d')]), EditorCommand::NextDiagnostic));
-        assert!(matches!(expect_cmd(&trie, &[key(']'), key('f')]), EditorCommand::NextFunction));
-        assert!(matches!(expect_cmd(&trie, &[key(']'), key('g')]), EditorCommand::NextChange));
+        assert!(matches!(
+            expect_cmd(&trie, &[key(']'), key('d')]),
+            EditorCommand::NextDiagnostic
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key(']'), key('f')]),
+            EditorCommand::NextFunction
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key(']'), key('g')]),
+            EditorCommand::NextChange
+        ));
     }
 
     #[test]
     fn normal_bracket_prev() {
         let trie = DhxKeyTrie::node(normal_mode_defaults());
         expect_partial(&trie, &[key('[')]);
-        assert!(matches!(expect_cmd(&trie, &[key('['), key('d')]), EditorCommand::PrevDiagnostic));
-        assert!(matches!(expect_cmd(&trie, &[key('['), key('f')]), EditorCommand::PrevFunction));
-        assert!(matches!(expect_cmd(&trie, &[key('['), key('g')]), EditorCommand::PrevChange));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('['), key('d')]),
+            EditorCommand::PrevDiagnostic
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('['), key('f')]),
+            EditorCommand::PrevFunction
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('['), key('g')]),
+            EditorCommand::PrevChange
+        ));
     }
 
     #[test]
     fn normal_match_prefix() {
         let trie = DhxKeyTrie::node(normal_mode_defaults());
         expect_partial(&trie, &[key('m')]);
-        assert!(matches!(expect_cmd(&trie, &[key('m'), key('m')]), EditorCommand::MatchBracket));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('m'), key('m')]),
+            EditorCommand::MatchBracket
+        ));
         assert!(matches!(
             expect_await(&trie, &[key('m'), key('i')]),
             AwaitCharKind::SelectInsidePair
@@ -778,11 +919,26 @@ mod tests {
     fn normal_view_prefix() {
         let trie = DhxKeyTrie::node(normal_mode_defaults());
         expect_partial(&trie, &[key('z')]);
-        assert!(matches!(expect_cmd(&trie, &[key('z'), key('z')]), EditorCommand::AlignViewCenter));
-        assert!(matches!(expect_cmd(&trie, &[key('z'), key('t')]), EditorCommand::AlignViewTop));
-        assert!(matches!(expect_cmd(&trie, &[key('z'), key('b')]), EditorCommand::AlignViewBottom));
-        assert!(matches!(expect_cmd(&trie, &[key('z'), key('k')]), EditorCommand::ScrollUp(1)));
-        assert!(matches!(expect_cmd(&trie, &[key('z'), key('j')]), EditorCommand::ScrollDown(1)));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('z'), key('z')]),
+            EditorCommand::AlignViewCenter
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('z'), key('t')]),
+            EditorCommand::AlignViewTop
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('z'), key('b')]),
+            EditorCommand::AlignViewBottom
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('z'), key('k')]),
+            EditorCommand::ScrollUp(1)
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('z'), key('j')]),
+            EditorCommand::ScrollDown(1)
+        ));
     }
 
     #[test]
@@ -802,7 +958,10 @@ mod tests {
         assert!(matches!(expect_await(&trie, &[key('t')]), AwaitCharKind::TillForward));
         assert!(matches!(expect_await(&trie, &[key('T')]), AwaitCharKind::TillBackward));
         assert!(matches!(expect_await(&trie, &[key('r')]), AwaitCharKind::ReplaceChar));
-        assert!(matches!(expect_await(&trie, &[key('"')]), AwaitCharKind::SelectRegister));
+        assert!(matches!(
+            expect_await(&trie, &[key('"')]),
+            AwaitCharKind::SelectRegister
+        ));
     }
 
     #[test]
@@ -812,7 +971,10 @@ mod tests {
         assert!(matches!(expect_cmd(&trie, &[alt(';')]), EditorCommand::FlipSelections));
         assert!(matches!(expect_cmd(&trie, &[alt('o')]), EditorCommand::ExpandSelection));
         assert!(matches!(expect_cmd(&trie, &[alt('i')]), EditorCommand::ShrinkSelection));
-        assert!(matches!(expect_cmd(&trie, &[alt('d')]), EditorCommand::DeleteSelectionNoYank));
+        assert!(matches!(
+            expect_cmd(&trie, &[alt('d')]),
+            EditorCommand::DeleteSelectionNoYank
+        ));
     }
 
     #[test]
@@ -840,8 +1002,14 @@ mod tests {
     #[test]
     fn select_word_extends() {
         let trie = DhxKeyTrie::node(select_mode_defaults());
-        assert!(matches!(expect_cmd(&trie, &[key('w')]), EditorCommand::ExtendWordForward));
-        assert!(matches!(expect_cmd(&trie, &[key('b')]), EditorCommand::ExtendWordBackward));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('w')]),
+            EditorCommand::ExtendWordForward
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('b')]),
+            EditorCommand::ExtendWordBackward
+        ));
         assert!(matches!(expect_cmd(&trie, &[key('e')]), EditorCommand::ExtendWordEnd));
     }
 
@@ -900,15 +1068,27 @@ mod tests {
     #[test]
     fn select_search_extends() {
         let trie = DhxKeyTrie::node(select_mode_defaults());
-        assert!(matches!(expect_cmd(&trie, &[key('n')]), EditorCommand::ExtendSearchNext));
-        assert!(matches!(expect_cmd(&trie, &[key('N')]), EditorCommand::ExtendSearchPrev));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('n')]),
+            EditorCommand::ExtendSearchNext
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('N')]),
+            EditorCommand::ExtendSearchPrev
+        ));
     }
 
     #[test]
     fn select_replace_and_paste() {
         let trie = DhxKeyTrie::node(select_mode_defaults());
-        assert!(matches!(expect_cmd(&trie, &[key('R')]), EditorCommand::ReplaceWithYanked));
-        assert!(matches!(expect_cmd(&trie, &[key('p')]), EditorCommand::ReplaceWithYanked));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('R')]),
+            EditorCommand::ReplaceWithYanked
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[key('p')]),
+            EditorCommand::ReplaceWithYanked
+        ));
     }
 
     // ======== Insert Mode ========
@@ -925,8 +1105,14 @@ mod tests {
     #[test]
     fn insert_special_keys() {
         let trie = DhxKeyTrie::node(insert_mode_defaults());
-        assert!(matches!(expect_cmd(&trie, &[special(KeyCode::Tab)]), EditorCommand::InsertTab));
-        assert!(matches!(expect_cmd(&trie, &[special(KeyCode::Enter)]), EditorCommand::InsertNewline));
+        assert!(matches!(
+            expect_cmd(&trie, &[special(KeyCode::Tab)]),
+            EditorCommand::InsertTab
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[special(KeyCode::Enter)]),
+            EditorCommand::InsertNewline
+        ));
         assert!(matches!(
             expect_cmd(&trie, &[special(KeyCode::Backspace)]),
             EditorCommand::DeleteCharBackward
@@ -947,10 +1133,22 @@ mod tests {
     fn insert_ctrl_keys() {
         let trie = DhxKeyTrie::node(insert_mode_defaults());
         assert!(matches!(expect_cmd(&trie, &[ctrl('k')]), EditorCommand::KillToLineEnd));
-        assert!(matches!(expect_cmd(&trie, &[ctrl('w')]), EditorCommand::DeleteWordBackward));
-        assert!(matches!(expect_cmd(&trie, &[ctrl('u')]), EditorCommand::DeleteToLineStart));
-        assert!(matches!(expect_cmd(&trie, &[ctrl(' ')]), EditorCommand::TriggerCompletion));
-        assert!(matches!(expect_cmd(&trie, &[ctrl('s')]), EditorCommand::CommitUndoCheckpoint));
+        assert!(matches!(
+            expect_cmd(&trie, &[ctrl('w')]),
+            EditorCommand::DeleteWordBackward
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[ctrl('u')]),
+            EditorCommand::DeleteToLineStart
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[ctrl(' ')]),
+            EditorCommand::TriggerCompletion
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[ctrl('s')]),
+            EditorCommand::CommitUndoCheckpoint
+        ));
     }
 
     #[test]
@@ -974,12 +1172,30 @@ mod tests {
     #[test]
     fn insert_arrow_keys() {
         let trie = DhxKeyTrie::node(insert_mode_defaults());
-        assert!(matches!(expect_cmd(&trie, &[special(KeyCode::Left)]), EditorCommand::MoveLeft));
-        assert!(matches!(expect_cmd(&trie, &[special(KeyCode::Right)]), EditorCommand::MoveRight));
-        assert!(matches!(expect_cmd(&trie, &[special(KeyCode::Up)]), EditorCommand::MoveUp));
-        assert!(matches!(expect_cmd(&trie, &[special(KeyCode::Down)]), EditorCommand::MoveDown));
-        assert!(matches!(expect_cmd(&trie, &[special(KeyCode::Home)]), EditorCommand::MoveLineStart));
-        assert!(matches!(expect_cmd(&trie, &[special(KeyCode::End)]), EditorCommand::MoveLineEnd));
+        assert!(matches!(
+            expect_cmd(&trie, &[special(KeyCode::Left)]),
+            EditorCommand::MoveLeft
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[special(KeyCode::Right)]),
+            EditorCommand::MoveRight
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[special(KeyCode::Up)]),
+            EditorCommand::MoveUp
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[special(KeyCode::Down)]),
+            EditorCommand::MoveDown
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[special(KeyCode::Home)]),
+            EditorCommand::MoveLineStart
+        ));
+        assert!(matches!(
+            expect_cmd(&trie, &[special(KeyCode::End)]),
+            EditorCommand::MoveLineEnd
+        ));
     }
 
     // ======== default_keymaps() ========

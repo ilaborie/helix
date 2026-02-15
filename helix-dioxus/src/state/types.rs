@@ -9,13 +9,13 @@ use helix_view::DocumentId;
 
 use crate::config::DialogSearchMode;
 use crate::lsp::{
-    CodeActionPreviewState, CodeActionSnapshot, CompletionItemSnapshot, DiagnosticSeverity,
-    DiagnosticSnapshot, InlayHintSnapshot, LocationSnapshot, LspServerSnapshot,
-    SignatureHelpSnapshot,
+    CodeActionPreviewState, CodeActionSnapshot, CompletionItemSnapshot, DiagnosticSeverity, DiagnosticSnapshot,
+    InlayHintSnapshot, LocationSnapshot, LspServerSnapshot, SignatureHelpSnapshot,
 };
 
 /// Compute a visible window of `window_size` items centered on `selected`,
 /// clamped to `[0, total)`. Returns `(start, end)`.
+#[must_use]
 pub fn centered_window(selected: usize, total: usize, window_size: usize) -> (usize, usize) {
     let half = window_size / 2;
     let start = if selected <= half {
@@ -64,6 +64,7 @@ pub enum DiffLineType {
 
 impl DiffLineType {
     /// CSS color variable for this diff type.
+    #[must_use]
     pub fn css_color(&self) -> &'static str {
         match self {
             Self::Added => "var(--success)",
@@ -159,6 +160,7 @@ pub enum PickerMode {
 
 impl PickerMode {
     /// Human-readable title for the picker header.
+    #[must_use]
     pub fn title(&self) -> &'static str {
         match self {
             Self::DirectoryBrowser => "Open File",
@@ -182,6 +184,7 @@ impl PickerMode {
     }
 
     /// Hint text for the Enter key action in the help row.
+    #[must_use]
     pub fn enter_hint(&self) -> &'static str {
         match self {
             Self::DirectoryBrowser => " open/enter \u{2022} ",
@@ -192,11 +195,9 @@ impl PickerMode {
     }
 
     /// Whether this picker mode supports file preview.
+    #[must_use]
     pub fn supports_preview(&self) -> bool {
-        !matches!(
-            self,
-            Self::Registers | Self::Commands | Self::Themes | Self::Emojis
-        )
+        !matches!(self, Self::Registers | Self::Commands | Self::Themes | Self::Emojis)
     }
 }
 
@@ -222,7 +223,7 @@ pub struct PickerPreview {
     pub lines: Vec<PreviewLine>,
     /// 1-indexed focus line number.
     pub focus_line: Option<usize>,
-    /// Search pattern for highlighting matches (GlobalSearch mode).
+    /// Search pattern for highlighting matches (`GlobalSearch` mode).
     pub search_pattern: Option<String>,
 }
 
@@ -283,7 +284,7 @@ pub struct EditorSnapshot {
     pub picker_selected: usize,
     /// Total number of unfiltered source items.
     pub picker_total: usize,
-    /// Number of items after filtering (may differ from picker_items.len() due to windowing).
+    /// Number of items after filtering (may differ from `picker_items.len()` due to windowing).
     pub picker_filtered_count: usize,
     /// Start index of the windowed items in the full filtered list.
     pub picker_window_offset: usize,
@@ -419,7 +420,7 @@ pub struct LineSnapshot {
     /// The primary cursor column on this line (used for `id="editor-cursor"` and scrollIntoView).
     pub primary_cursor_col: Option<usize>,
     pub tokens: Vec<TokenSpan>,
-    /// Selection ranges within this line (start_col, end_col) - for visual mode highlighting.
+    /// Selection ranges within this line (`start_col`, `end_col`) - for visual mode highlighting.
     /// Each range [start, end) should be highlighted as selected.
     pub selection_ranges: Vec<(usize, usize)>,
 }
@@ -1092,7 +1093,7 @@ pub enum ShellBehavior {
 /// A label for word jump (EasyMotion-style) overlay.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WordJumpLabel {
-    /// Line number (1-indexed, matching LineSnapshot).
+    /// Line number (1-indexed, matching `LineSnapshot`).
     pub line: usize,
     /// Column offset (0-indexed character position in the line).
     pub col: usize,
@@ -1363,16 +1364,12 @@ mod tests {
 
     #[test]
     fn enter_hint_directory_browser() {
-        assert!(PickerMode::DirectoryBrowser
-            .enter_hint()
-            .contains("open/enter"));
+        assert!(PickerMode::DirectoryBrowser.enter_hint().contains("open/enter"));
     }
 
     #[test]
     fn enter_hint_global_search() {
-        assert!(PickerMode::GlobalSearch
-            .enter_hint()
-            .contains("search/open"));
+        assert!(PickerMode::GlobalSearch.enter_hint().contains("search/open"));
     }
 
     #[test]
@@ -1432,9 +1429,7 @@ mod tests {
 
     #[test]
     fn file_explorer_enter_hint() {
-        assert!(PickerMode::FileExplorer
-            .enter_hint()
-            .contains("open/toggle"));
+        assert!(PickerMode::FileExplorer.enter_hint().contains("open/toggle"));
     }
 
     #[test]

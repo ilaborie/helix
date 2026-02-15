@@ -190,8 +190,7 @@ pub fn special(code: KeyCode) -> KeyEvent {
 pub fn ctrl_super(ch: char) -> KeyEvent {
     KeyEvent {
         code: KeyCode::Char(ch),
-        modifiers: helix_view::keyboard::KeyModifiers::CONTROL
-            | helix_view::keyboard::KeyModifiers::SUPER,
+        modifiers: helix_view::keyboard::KeyModifiers::CONTROL | helix_view::keyboard::KeyModifiers::SUPER,
     }
 }
 
@@ -219,12 +218,12 @@ impl<'de> serde::Deserialize<'de> for DhxKeyTrie {
 /// (`":write"`, `":buffer-close"`) that match helix-term's config format.
 fn resolve_command_str(v: &str) -> Result<DhxKeyTrie, String> {
     if let Some(typable) = v.strip_prefix(':') {
-        Ok(DhxKeyTrie::Command(CommandSlot::Cmd(
-            EditorCommand::TypeableCommand(typable.to_string()),
-        )))
+        Ok(DhxKeyTrie::Command(CommandSlot::Cmd(EditorCommand::TypeableCommand(
+            typable.to_string(),
+        ))))
     } else {
         super::command::command_from_name(v)
-            .map(|slot| DhxKeyTrie::Command(slot))
+            .map(DhxKeyTrie::Command)
             .ok_or_else(|| format!("unknown command: {v}"))
     }
 }
@@ -243,8 +242,7 @@ impl<'de> serde::de::Visitor<'de> for DhxKeyTrieVisitor {
     where
         E: serde::de::Error,
     {
-        resolve_command_str(v)
-            .map_err(|msg| serde::de::Error::custom(msg))
+        resolve_command_str(v).map_err(|msg| serde::de::Error::custom(msg))
     }
 
     // Array → sequence of commands
@@ -387,14 +385,8 @@ mod tests {
         base.merge(delta);
 
         let trie = DhxKeyTrie::node(base);
-        assert!(matches!(
-            trie.search(&[key('h')]),
-            TrieSearchResult::Found(_)
-        ));
-        assert!(matches!(
-            trie.search(&[key('j')]),
-            TrieSearchResult::Found(_)
-        ));
+        assert!(matches!(trie.search(&[key('h')]), TrieSearchResult::Found(_)));
+        assert!(matches!(trie.search(&[key('j')]), TrieSearchResult::Found(_)));
     }
 
     #[test]
@@ -414,19 +406,10 @@ mod tests {
 
         let trie = DhxKeyTrie::node(base);
         // Original bindings preserved
-        assert!(matches!(
-            trie.search(&[key('g'), key('g')]),
-            TrieSearchResult::Found(_)
-        ));
-        assert!(matches!(
-            trie.search(&[key('g'), key('e')]),
-            TrieSearchResult::Found(_)
-        ));
+        assert!(matches!(trie.search(&[key('g'), key('g')]), TrieSearchResult::Found(_)));
+        assert!(matches!(trie.search(&[key('g'), key('e')]), TrieSearchResult::Found(_)));
         // New binding added
-        assert!(matches!(
-            trie.search(&[key('g'), key('d')]),
-            TrieSearchResult::Found(_)
-        ));
+        assert!(matches!(trie.search(&[key('g'), key('d')]), TrieSearchResult::Found(_)));
     }
 
     #[test]
@@ -466,10 +449,7 @@ mod tests {
             DhxKeyTrie::Sequence(slots) => {
                 assert_eq!(slots.len(), 2);
                 assert!(matches!(slots[0], CommandSlot::Cmd(EditorCommand::Yank)));
-                assert!(matches!(
-                    slots[1],
-                    CommandSlot::Cmd(EditorCommand::CollapseSelection)
-                ));
+                assert!(matches!(slots[1], CommandSlot::Cmd(EditorCommand::CollapseSelection)));
             }
             _ => panic!("expected Sequence, got {trie:?}"),
         }
@@ -483,29 +463,16 @@ mod tests {
             g = { g = "goto_file_start", e = "goto_file_end" }
         "#;
         let trie: DhxKeyTrie = toml::from_str(toml_str).expect("should deserialize");
-        assert!(matches!(
-            trie.search(&[key('h')]),
-            TrieSearchResult::Found(_)
-        ));
-        assert!(matches!(
-            trie.search(&[key('l')]),
-            TrieSearchResult::Found(_)
-        ));
-        assert!(matches!(
-            trie.search(&[key('g'), key('g')]),
-            TrieSearchResult::Found(_)
-        ));
-        assert!(matches!(
-            trie.search(&[key('g'), key('e')]),
-            TrieSearchResult::Found(_)
-        ));
+        assert!(matches!(trie.search(&[key('h')]), TrieSearchResult::Found(_)));
+        assert!(matches!(trie.search(&[key('l')]), TrieSearchResult::Found(_)));
+        assert!(matches!(trie.search(&[key('g'), key('g')]), TrieSearchResult::Found(_)));
+        assert!(matches!(trie.search(&[key('g'), key('e')]), TrieSearchResult::Found(_)));
     }
 
     #[test]
     fn deserialize_invalid_command_fails() {
         let toml_str = r#"key = "nonexistent_command""#;
-        let result: Result<std::collections::HashMap<String, DhxKeyTrie>, _> =
-            toml::from_str(toml_str);
+        let result: Result<std::collections::HashMap<String, DhxKeyTrie>, _> = toml::from_str(toml_str);
         assert!(result.is_err());
     }
 
@@ -516,14 +483,8 @@ mod tests {
             "A-o" = "expand_selection"
         "#;
         let trie: DhxKeyTrie = toml::from_str(toml_str).expect("should deserialize");
-        assert!(matches!(
-            trie.search(&[ctrl('b')]),
-            TrieSearchResult::Found(_)
-        ));
-        assert!(matches!(
-            trie.search(&[alt('o')]),
-            TrieSearchResult::Found(_)
-        ));
+        assert!(matches!(trie.search(&[ctrl('b')]), TrieSearchResult::Found(_)));
+        assert!(matches!(trie.search(&[alt('o')]), TrieSearchResult::Found(_)));
     }
 
     #[test]
@@ -564,14 +525,8 @@ mod tests {
         match result {
             TrieSearchResult::FoundSeq(slots) => {
                 assert_eq!(slots.len(), 2);
-                assert!(matches!(
-                    slots[0],
-                    CommandSlot::Cmd(EditorCommand::OpenLineBelow)
-                ));
-                assert!(matches!(
-                    slots[1],
-                    CommandSlot::Cmd(EditorCommand::ExitInsertMode)
-                ));
+                assert!(matches!(slots[0], CommandSlot::Cmd(EditorCommand::OpenLineBelow)));
+                assert!(matches!(slots[1], CommandSlot::Cmd(EditorCommand::ExitInsertMode)));
             }
             other => panic!("expected FoundSeq, got {other:?}"),
         }

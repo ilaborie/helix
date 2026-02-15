@@ -99,12 +99,7 @@ fn hints_for_context(mode: &str, pending: PendingKeySequence) -> Vec<(&'static s
         | PendingKeySequence::MatchDeleteSurround
         | PendingKeySequence::MatchReplaceSurroundFrom
         | PendingKeySequence::MatchReplaceSurroundTo(_) => {
-            vec![
-                ("(", "parens"),
-                ("[", "brackets"),
-                ("{", "braces"),
-                ("\"", "quotes"),
-            ]
+            vec![("(", "parens"), ("[", "brackets"), ("{", "braces"), ("\"", "quotes")]
         }
         PendingKeySequence::RegisterPrefix | PendingKeySequence::InsertRegisterPrefix => vec![
             ("a-z", "named"),
@@ -196,12 +191,10 @@ fn pending_prefix(pending: PendingKeySequence) -> Option<&'static str> {
         PendingKeySequence::MatchAround => Some("ma"),
         PendingKeySequence::MatchSurround => Some("ms"),
         PendingKeySequence::MatchDeleteSurround => Some("md"),
-        PendingKeySequence::MatchReplaceSurroundFrom => Some("mr"),
-        PendingKeySequence::MatchReplaceSurroundTo(_) => Some("mr"),
+        PendingKeySequence::MatchReplaceSurroundFrom | PendingKeySequence::MatchReplaceSurroundTo(_) => Some("mr"),
         PendingKeySequence::ViewPrefix => Some("z"),
         PendingKeySequence::ViewPrefixSticky => Some("Z"),
-        PendingKeySequence::WordJumpFirstChar => Some("gw"),
-        PendingKeySequence::WordJumpSecondChar => Some("gw"),
+        PendingKeySequence::WordJumpFirstChar | PendingKeySequence::WordJumpSecondChar => Some("gw"),
         PendingKeySequence::None => None,
     }
 }
@@ -333,7 +326,7 @@ pub fn KeybindingHelpBar(
                 RegisterDialog {
                     name: reg.name,
                     content: reg.content.clone(),
-                    on_close: move |_| open_register.set(None),
+                    on_close: move |()| open_register.set(None),
                 }
             }
         }

@@ -83,6 +83,7 @@ fn load_icon() -> Option<Icon> {
 /// - `helix_loader::initialize_config_file(None)` has been called
 /// - `helix_loader::initialize_log_file(None)` has been called
 /// - A Tokio runtime is active (via `Runtime::enter()`)
+#[allow(clippy::needless_pass_by_value)] // called once at startup, ownership is natural
 pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
     // Register helix-view events with helix_event.
     // This must be done before creating handlers that register hooks for these events.
@@ -104,12 +105,7 @@ pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
         StartupAction::OpenFiles(files) => {
             // Open first file, then queue commands to open the rest
             let first = files.first().cloned();
-            let rest: Vec<EditorCommand> = files
-                .iter()
-                .skip(1)
-                .cloned()
-                .map(EditorCommand::OpenFile)
-                .collect();
+            let rest: Vec<EditorCommand> = files.iter().skip(1).cloned().map(EditorCommand::OpenFile).collect();
             (
                 EditorContext::new(&config, first, command_rx, command_tx.clone())?,
                 rest,
@@ -241,6 +237,7 @@ impl AppState {
     ///
     /// Returns the keymap result (matched commands, pending, await-char, etc.).
     /// Accesses `EditorContext` via thread-local for the keymap state.
+    #[must_use]
     pub fn dispatch_key(
         &self,
         mode: helix_view::document::Mode,
@@ -257,6 +254,7 @@ impl AppState {
     }
 
     /// Check if the keymap is in a pending state (multi-key sequence in progress).
+    #[must_use]
     pub fn is_keymap_pending(&self) -> bool {
         EDITOR_CTX.with(|ctx| {
             if let Some(ref editor_ctx) = *ctx.borrow() {
@@ -269,6 +267,7 @@ impl AppState {
     }
 
     /// Check if the keymap is in sticky mode (e.g., Z view mode).
+    #[must_use]
     pub fn is_keymap_sticky(&self) -> bool {
         EDITOR_CTX.with(|ctx| {
             if let Some(ref editor_ctx) = *ctx.borrow() {
@@ -292,6 +291,7 @@ impl AppState {
     }
 
     /// Get the current snapshot.
+    #[must_use]
     pub fn get_snapshot(&self) -> EditorSnapshot {
         self.snapshot.lock().clone()
     }

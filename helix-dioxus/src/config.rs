@@ -83,8 +83,7 @@ impl Default for WindowConfig {
 impl Default for FontConfig {
     fn default() -> Self {
         Self {
-            family: "'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, Monaco, monospace"
-                .to_string(),
+            family: "'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, Monaco, monospace".to_string(),
             size: 14.0,
             weight: None,
             ligatures: true,
@@ -119,10 +118,7 @@ impl DhxConfig {
     /// Falls back to defaults if neither file exists.
     pub fn load_default() -> Result<Self> {
         let global_path = helix_loader::config_dir().join("dhx.toml");
-        let workspace_path = helix_loader::find_workspace()
-            .0
-            .join(".helix")
-            .join("dhx.toml");
+        let workspace_path = helix_loader::find_workspace().0.join(".helix").join("dhx.toml");
 
         let global = Self::read_toml_file(&global_path);
         let local = Self::read_toml_file(&workspace_path);
@@ -344,8 +340,7 @@ search_mode = "direct"
 
     /// Helper: merge two TOML strings and deserialize into DhxConfig.
     fn merge_and_deserialize(global: &str, workspace: &str) -> DhxConfig {
-        let merged =
-            helix_loader::merge_toml_values(parse_toml(global), parse_toml(workspace), 3);
+        let merged = helix_loader::merge_toml_values(parse_toml(global), parse_toml(workspace), 3);
         merged.try_into().expect("should deserialize merged config")
     }
 
@@ -379,9 +374,7 @@ size = 20.0
 size = 18.0
 ligatures = false
 "#;
-        let config: DhxConfig = parse_toml(workspace)
-            .try_into()
-            .expect("should deserialize");
+        let config: DhxConfig = parse_toml(workspace).try_into().expect("should deserialize");
         assert!((config.font.size - 18.0).abs() < f64::EPSILON);
         assert!(!config.font.ligatures);
         // Window should be default

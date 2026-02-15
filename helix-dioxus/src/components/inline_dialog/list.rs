@@ -21,11 +21,7 @@ pub fn InlineListItem(
     children: Element,
 ) -> Element {
     let base_class = "inline-dialog-item";
-    let selected_class = if is_selected {
-        "inline-dialog-item-selected"
-    } else {
-        ""
-    };
+    let selected_class = if is_selected { "inline-dialog-item-selected" } else { "" };
     let custom_class = class.unwrap_or_default();
 
     rsx! {
@@ -82,7 +78,7 @@ pub fn InlineListDialog(
     /// Whether the list has items (used for empty state).
     #[props(default = true)]
     has_items: bool,
-    /// Child elements (should be InlineListItem components).
+    /// Child elements (should be `InlineListItem` components).
     children: Element,
 ) -> Element {
     // Mark selected as used (it's provided for context, actual selection

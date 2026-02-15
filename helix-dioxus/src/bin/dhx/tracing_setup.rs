@@ -39,12 +39,7 @@ where
     S: Subscriber + for<'a> LookupSpan<'a>,
     N: for<'a> FormatFields<'a> + 'static,
 {
-    fn format_event(
-        &self,
-        ctx: &FmtContext<'_, S, N>,
-        mut writer: Writer<'_>,
-        event: &Event<'_>,
-    ) -> std::fmt::Result {
+    fn format_event(&self, ctx: &FmtContext<'_, S, N>, mut writer: Writer<'_>, event: &Event<'_>) -> std::fmt::Result {
         // Capture the formatted message to check for suppressed patterns
         let mut message_buf = String::new();
         let capture_writer = Writer::new(&mut message_buf);
@@ -80,16 +75,12 @@ where
 /// Panics if a global subscriber has already been set.
 pub fn init(config: &LoggingConfig) {
     // Create a base filter from RUST_LOG env var, defaulting to configured level
-    let env_filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.level));
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.level));
 
     let suppressed = config.suppressed_patterns.clone();
 
     // Try to create log file, fall back to stderr if it fails
-    let log_file = config
-        .log_file
-        .as_ref()
-        .and_then(|path| File::create(path).ok());
+    let log_file = config.log_file.as_ref().and_then(|path| File::create(path).ok());
 
     if let Some(log_file) = log_file {
         let path_display = config
@@ -103,12 +94,13 @@ pub fn init(config: &LoggingConfig) {
             .with_writer(Mutex::new(log_file))
             .event_format(FilteringFormatter::new(suppressed));
 
-        tracing_subscriber::registry()
-            .with(env_filter)
-            .with(fmt_layer)
-            .init();
+        tracing_subscriber::registry().with(env_filter).with(fmt_layer).init();
 
-        eprintln!("Logging to {path_display}");
+        // pre-logging: tracing subscriber initializing
+        #[allow(clippy::print_stderr)] // intentional: logging not yet available
+        {
+            eprintln!("Logging to {path_display}");
+        }
     } else {
         // Fall back to stderr
         let fmt_layer = fmt::layer()
@@ -116,9 +108,6 @@ pub fn init(config: &LoggingConfig) {
             .with_writer(io::stderr)
             .event_format(FilteringFormatter::new(suppressed));
 
-        tracing_subscriber::registry()
-            .with(env_filter)
-            .with(fmt_layer)
-            .init();
+        tracing_subscriber::registry().with(env_filter).with(fmt_layer).init();
     }
 }

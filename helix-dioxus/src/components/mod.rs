@@ -27,8 +27,8 @@ mod picker;
 
 pub use buffer_bar::BufferBar;
 pub use diagnostics::{
-    diagnostics_for_line, first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker,
-    DiagnosticUnderline, ErrorLens,
+    diagnostics_for_line, first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker, DiagnosticUnderline,
+    ErrorLens,
 };
 pub use editor_view::EditorView;
 pub use file_icons::{FileTypeIcon, FolderTypeIcon};
@@ -38,8 +38,8 @@ pub use scrollbar::Scrollbar;
 pub use statusline::StatusLine;
 
 pub use dialog::{
-    CommandCompletionPopup, CommandPrompt, ConfirmationDialog, InputDialog, LspStatusDialog,
-    NotificationContainer, RegexPrompt, SearchPrompt, ShellPrompt,
+    CommandCompletionPopup, CommandPrompt, ConfirmationDialog, InputDialog, LspStatusDialog, NotificationContainer,
+    RegexPrompt, SearchPrompt, ShellPrompt,
 };
 pub use lsp::{CodeActionsMenu, CompletionPopup, HoverPopup, LocationPicker, SignatureHelpPopup};
 pub use picker::GenericPicker;

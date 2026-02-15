@@ -7,15 +7,13 @@ use helix_lsp::lsp::{self, MarkedString};
 use helix_lsp::OffsetEncoding;
 
 use super::{
-    CodeActionSnapshot, CompletionItemKind, CompletionItemSnapshot, HoverSnapshot, InlayHintKind,
-    InlayHintSnapshot, LocationSnapshot, ParameterSnapshot, SignatureHelpSnapshot,
-    StoredCodeAction, SymbolKind, SymbolSnapshot,
+    CodeActionSnapshot, CompletionItemKind, CompletionItemSnapshot, HoverSnapshot, InlayHintKind, InlayHintSnapshot,
+    LocationSnapshot, ParameterSnapshot, SignatureHelpSnapshot, StoredCodeAction, SymbolKind, SymbolSnapshot,
 };
 
 /// Convert LSP completion response to completion item snapshots.
-pub fn convert_completion_response(
-    response: lsp::CompletionResponse,
-) -> Vec<CompletionItemSnapshot> {
+#[must_use]
+pub fn convert_completion_response(response: lsp::CompletionResponse) -> Vec<CompletionItemSnapshot> {
     let items = match response {
         lsp::CompletionResponse::Array(items) => items,
         lsp::CompletionResponse::List(list) => list.items,
@@ -39,9 +37,7 @@ fn convert_completion_item(item: lsp::CompletionItem, index: usize) -> Completio
             lsp::CompletionTextEdit::InsertAndReplace(edit) => edit.new_text.clone(),
         }
     } else {
-        item.insert_text
-            .clone()
-            .unwrap_or_else(|| item.label.clone())
+        item.insert_text.clone().unwrap_or_else(|| item.label.clone())
     };
 
     // Extract documentation
@@ -93,7 +89,7 @@ pub fn convert_hover(hover: lsp::Hover) -> HoverSnapshot {
     HoverSnapshot { contents, range }
 }
 
-/// Extract text from a MarkedString.
+/// Extract text from a `MarkedString`.
 fn extract_marked_string(marked: MarkedString) -> String {
     match marked {
         MarkedString::String(s) => s,
@@ -105,15 +101,14 @@ fn extract_marked_string(marked: MarkedString) -> String {
 }
 
 /// Convert LSP goto definition response to location snapshots.
+#[must_use]
 pub fn convert_goto_response(
     response: lsp::GotoDefinitionResponse,
     offset_encoding: OffsetEncoding,
 ) -> Vec<LocationSnapshot> {
     match response {
         lsp::GotoDefinitionResponse::Scalar(location) => {
-            convert_location(location, offset_encoding)
-                .into_iter()
-                .collect()
+            convert_location(location, offset_encoding).into_iter().collect()
         }
         lsp::GotoDefinitionResponse::Array(locations) => locations
             .into_iter()
@@ -130,6 +125,7 @@ pub fn convert_goto_response(
 }
 
 /// Convert LSP references response to location snapshots.
+#[must_use]
 pub fn convert_references_response(
     locations: Vec<lsp::Location>,
     offset_encoding: OffsetEncoding,
@@ -141,10 +137,8 @@ pub fn convert_references_response(
 }
 
 /// Convert a single LSP location to a location snapshot.
-fn convert_location(
-    location: lsp::Location,
-    _offset_encoding: OffsetEncoding,
-) -> Option<LocationSnapshot> {
+#[allow(clippy::needless_pass_by_value)] // OffsetEncoding is a small Copy enum
+fn convert_location(location: lsp::Location, _offset_encoding: OffsetEncoding) -> Option<LocationSnapshot> {
     let path = location.uri.to_file_path().ok()?;
     let line = location.range.start.line as usize + 1; // 1-indexed for display
     let column = location.range.start.character as usize + 1; // 1-indexed for display
@@ -193,10 +187,7 @@ fn convert_signature(sig: lsp::SignatureInformation) -> super::SignatureSnapshot
 ///
 /// Computes byte offset range of the parameter within the signature label.
 /// Handles both `Simple` (substring match) and `LabelOffsets` (UTF-16 offsets) variants.
-fn convert_parameter(
-    param: lsp::ParameterInformation,
-    signature_label: &str,
-) -> ParameterSnapshot {
+fn convert_parameter(param: lsp::ParameterInformation, signature_label: &str) -> ParameterSnapshot {
     let (label, label_range) = match param.label {
         lsp::ParameterLabel::Simple(s) => {
             let range = signature_label.find(&s).map(|start| (start, start + s.len()));
@@ -207,10 +198,7 @@ fn convert_parameter(
             use helix_core::str_utils::char_to_byte_idx;
             let byte_start = char_to_byte_idx(signature_label, start as usize);
             let byte_end = char_to_byte_idx(signature_label, end as usize);
-            let label = signature_label
-                .get(byte_start..byte_end)
-                .unwrap_or("")
-                .to_string();
+            let label = signature_label.get(byte_start..byte_end).unwrap_or("").to_string();
             (label, Some((byte_start, byte_end)))
         }
     };
@@ -229,6 +217,7 @@ fn convert_parameter(
 
 /// Convert LSP code actions to stored code actions with full data for execution.
 /// Actions are sorted to prioritize quickfix (diagnostic) actions first.
+#[must_use]
 pub fn convert_code_actions(
     actions: Vec<lsp::CodeActionOrCommand>,
     language_server_id: helix_lsp::LanguageServerId,
@@ -261,8 +250,8 @@ pub fn convert_code_actions(
         }
 
         // Then sort by kind priority
-        let a_priority = code_action_kind_priority(&a.snapshot.kind);
-        let b_priority = code_action_kind_priority(&b.snapshot.kind);
+        let a_priority = code_action_kind_priority(a.snapshot.kind.as_ref());
+        let b_priority = code_action_kind_priority(b.snapshot.kind.as_ref());
         a_priority.cmp(&b_priority)
     });
 
@@ -271,9 +260,9 @@ pub fn convert_code_actions(
 
 /// Get sorting priority for code action kinds.
 /// Lower number = higher priority (shown first).
-fn code_action_kind_priority(kind: &Option<String>) -> u8 {
-    match kind.as_deref() {
-        Some(k) if k.starts_with("quickfix") => 0, // Diagnostic fixes first
+fn code_action_kind_priority(kind: Option<&String>) -> u8 {
+    match kind.map(String::as_str) {
+        Some(k) if k.starts_with("quickfix") => 0,         // Diagnostic fixes first
         Some(k) if k.starts_with("refactor.rewrite") => 1, // Rewrites (often fixes)
         Some(k) if k.starts_with("refactor.inline") => 2,
         Some(k) if k.starts_with("refactor.extract") => 3,
@@ -285,10 +274,7 @@ fn code_action_kind_priority(kind: &Option<String>) -> u8 {
 }
 
 /// Convert a single LSP code action or command to a snapshot for display.
-fn convert_code_action_snapshot(
-    action: &lsp::CodeActionOrCommand,
-    index: usize,
-) -> CodeActionSnapshot {
+fn convert_code_action_snapshot(action: &lsp::CodeActionOrCommand, index: usize) -> CodeActionSnapshot {
     match action {
         lsp::CodeActionOrCommand::Command(cmd) => CodeActionSnapshot {
             title: cmd.title.clone(),
@@ -308,10 +294,7 @@ fn convert_code_action_snapshot(
 }
 
 /// Convert LSP inlay hints to inlay hint snapshots.
-pub fn convert_inlay_hints(
-    hints: Vec<lsp::InlayHint>,
-    _offset_encoding: OffsetEncoding,
-) -> Vec<InlayHintSnapshot> {
+pub fn convert_inlay_hints(hints: Vec<lsp::InlayHint>, _offset_encoding: OffsetEncoding) -> Vec<InlayHintSnapshot> {
     hints.into_iter().map(convert_inlay_hint).collect()
 }
 
@@ -319,15 +302,10 @@ pub fn convert_inlay_hints(
 fn convert_inlay_hint(hint: lsp::InlayHint) -> InlayHintSnapshot {
     let label = match hint.label {
         lsp::InlayHintLabel::String(s) => s,
-        lsp::InlayHintLabel::LabelParts(parts) => {
-            parts.into_iter().map(|p| p.value).collect::<String>()
-        }
+        lsp::InlayHintLabel::LabelParts(parts) => parts.into_iter().map(|p| p.value).collect::<String>(),
     };
 
-    let kind = hint
-        .kind
-        .map(InlayHintKind::from)
-        .unwrap_or(InlayHintKind::Type);
+    let kind = hint.kind.map_or(InlayHintKind::Type, InlayHintKind::from);
 
     InlayHintSnapshot {
         line: hint.position.line as usize + 1, // 1-indexed for display
@@ -340,7 +318,8 @@ fn convert_inlay_hint(hint: lsp::InlayHint) -> InlayHintSnapshot {
 }
 
 /// Convert LSP document symbols to symbol snapshots.
-/// Handles both flat (SymbolInformation) and nested (DocumentSymbol) responses.
+/// Handles both flat (`SymbolInformation`) and nested (`DocumentSymbol`) responses.
+#[must_use]
 pub fn convert_document_symbols(response: lsp::DocumentSymbolResponse) -> Vec<SymbolSnapshot> {
     match response {
         lsp::DocumentSymbolResponse::Flat(symbols) => symbols
@@ -363,7 +342,7 @@ pub fn convert_document_symbols(response: lsp::DocumentSymbolResponse) -> Vec<Sy
     }
 }
 
-/// Recursively flatten nested DocumentSymbol hierarchy.
+/// Recursively flatten nested `DocumentSymbol` hierarchy.
 fn flatten_document_symbols(
     symbols: &[lsp::DocumentSymbol],
     parent_name: Option<&str>,
@@ -387,6 +366,7 @@ fn flatten_document_symbols(
 }
 
 /// Convert LSP workspace symbols to symbol snapshots.
+#[must_use]
 pub fn convert_workspace_symbols(response: lsp::WorkspaceSymbolResponse) -> Vec<SymbolSnapshot> {
     match response {
         lsp::WorkspaceSymbolResponse::Flat(symbols) => symbols
@@ -409,9 +389,7 @@ pub fn convert_workspace_symbols(response: lsp::WorkspaceSymbolResponse) -> Vec<
                         location.range.start.line as usize + 1,
                         location.range.start.character as usize + 1,
                     ),
-                    lsp::OneOf::Right(location_link) => {
-                        (location_link.uri.to_file_path().ok(), 1, 1)
-                    }
+                    lsp::OneOf::Right(location_link) => (location_link.uri.to_file_path().ok(), 1, 1),
                 };
                 SymbolSnapshot {
                     name: sym.name,
@@ -516,10 +494,7 @@ mod tests {
         let sig = lsp::SignatureInformation {
             label: "fn foo(a: i32, b: String)".to_string(),
             documentation: None,
-            parameters: Some(vec![
-                make_simple_param("a: i32"),
-                make_simple_param("b: String"),
-            ]),
+            parameters: Some(vec![make_simple_param("a: i32"), make_simple_param("b: String")]),
             active_parameter: None,
         };
 

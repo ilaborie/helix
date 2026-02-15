@@ -37,8 +37,7 @@ pub(crate) fn init() -> tokio::runtime::EnterGuard<'static> {
         crate::events::register();
     });
 
-    let runtime = TEST_RUNTIME
-        .get_or_init(|| tokio::runtime::Runtime::new().expect("tokio runtime should start"));
+    let runtime = TEST_RUNTIME.get_or_init(|| tokio::runtime::Runtime::new().expect("tokio runtime should start"));
     runtime.enter()
 }
 
@@ -61,8 +60,7 @@ pub fn test_context(annotated: &str) -> EditorContext {
     let (tx, rx) = mpsc::channel();
 
     let config = crate::config::DhxConfig::default();
-    let mut ctx =
-        EditorContext::new(&config, None, rx, tx).expect("EditorContext creation should succeed");
+    let mut ctx = EditorContext::new(&config, None, rx, tx).expect("EditorContext creation should succeed");
 
     // Replace the scratch buffer content with our test text
     {
@@ -74,8 +72,7 @@ pub fn test_context(annotated: &str) -> EditorContext {
         // Build a transaction that replaces the entire document text
         let old_text = doc.text().clone();
         let old_len = old_text.len_chars();
-        let transaction =
-            Transaction::change(&old_text, std::iter::once((0, old_len, Some(text.into()))));
+        let transaction = Transaction::change(&old_text, std::iter::once((0, old_len, Some(text.into()))));
         doc.apply(&transaction, view_id);
         doc.set_selection(view_id, selection);
     }
@@ -152,13 +149,7 @@ pub fn special_key(code: KeyCode) -> KeyEvent {
 #[macro_export]
 macro_rules! assert_single_command {
     ($cmds:expr, $pattern:pat) => {{
-        assert_eq!(
-            $cmds.len(),
-            1,
-            "expected 1 command, got {}: {:?}",
-            $cmds.len(),
-            $cmds
-        );
+        assert_eq!($cmds.len(), 1, "expected 1 command, got {}: {:?}", $cmds.len(), $cmds);
         assert!(
             matches!($cmds[0], $pattern),
             "expected {}, got {:?}",

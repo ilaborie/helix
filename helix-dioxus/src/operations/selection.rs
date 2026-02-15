@@ -257,10 +257,7 @@ impl SelectionOps for EditorContext {
         let doc = self.editor.document_mut(doc_id).expect("doc exists");
         let selection = doc.selection(view_id).clone();
         let primary = selection.primary();
-        doc.set_selection(
-            view_id,
-            helix_core::Selection::single(primary.anchor, primary.head),
-        );
+        doc.set_selection(view_id, helix_core::Selection::single(primary.anchor, primary.head));
     }
 
     /// Select inside a textobject (`mi` in Helix).
@@ -286,16 +283,11 @@ impl SelectionOps for EditorContext {
                 1,
                 true,
             ),
-            'p' => helix_core::textobject::textobject_paragraph(
-                text,
-                range,
-                helix_core::textobject::TextObject::Inside,
-                1,
-            ),
+            'p' => {
+                helix_core::textobject::textobject_paragraph(text, range, helix_core::textobject::TextObject::Inside, 1)
+            }
             ch if !ch.is_ascii_alphanumeric() => {
-                if let Ok((open, close)) =
-                    helix_core::surround::find_nth_pairs_pos(text, ch, range, 1)
-                {
+                if let Ok((open, close)) = helix_core::surround::find_nth_pairs_pos(text, ch, range, 1) {
                     let new_anchor = open + 1;
                     let new_head = close;
                     if new_anchor < new_head {
@@ -332,16 +324,11 @@ impl SelectionOps for EditorContext {
                 1,
                 true,
             ),
-            'p' => helix_core::textobject::textobject_paragraph(
-                text,
-                range,
-                helix_core::textobject::TextObject::Around,
-                1,
-            ),
+            'p' => {
+                helix_core::textobject::textobject_paragraph(text, range, helix_core::textobject::TextObject::Around, 1)
+            }
             ch if !ch.is_ascii_alphanumeric() => {
-                if let Ok((open, close)) =
-                    helix_core::surround::find_nth_pairs_pos(text, ch, range, 1)
-                {
+                if let Ok((open, close)) = helix_core::surround::find_nth_pairs_pos(text, ch, range, 1) {
                     return helix_core::Range::new(open, close + 1);
                 }
                 range
@@ -363,8 +350,7 @@ impl SelectionOps for EditorContext {
     fn flip_selections(&mut self, doc_id: DocumentId, view_id: ViewId) {
         let doc = self.editor.document_mut(doc_id).expect("doc exists");
         let selection = doc.selection(view_id).clone();
-        let new_selection =
-            selection.transform(|range| helix_core::Range::new(range.head, range.anchor));
+        let new_selection = selection.transform(|range| helix_core::Range::new(range.head, range.anchor));
         doc.set_selection(view_id, new_selection);
     }
 
@@ -452,7 +438,7 @@ impl SelectionOps for EditorContext {
         ranges.extend_from_slice(selection.ranges());
         let mut primary_index = 0;
 
-        for range in selection.iter() {
+        for range in &selection {
             let is_primary = *range == selection.primary();
 
             // The range is always head exclusive
@@ -465,9 +451,7 @@ impl SelectionOps for EditorContext {
             let head_pos = visual_coords_at_pos(text, head, tab_width);
             let anchor_pos = visual_coords_at_pos(text, anchor, tab_width);
 
-            let height = std::cmp::max(head_pos.row, anchor_pos.row)
-                - std::cmp::min(head_pos.row, anchor_pos.row)
-                + 1;
+            let height = std::cmp::max(head_pos.row, anchor_pos.row) - std::cmp::min(head_pos.row, anchor_pos.row) + 1;
 
             if is_primary {
                 primary_index = ranges.len();
@@ -492,10 +476,8 @@ impl SelectionOps for EditorContext {
                 continue;
             }
 
-            let new_anchor =
-                pos_at_visual_coords(text, Position::new(anchor_row, anchor_pos.col), tab_width);
-            let new_head =
-                pos_at_visual_coords(text, Position::new(head_row, head_pos.col), tab_width);
+            let new_anchor = pos_at_visual_coords(text, Position::new(anchor_row, anchor_pos.col), tab_width);
+            let new_head = pos_at_visual_coords(text, Position::new(head_row, head_pos.col), tab_width);
 
             // Skip lines that are too short
             if visual_coords_at_pos(text, new_anchor, tab_width).col == anchor_pos.col
@@ -533,9 +515,7 @@ impl SelectionOps for EditorContext {
         let doc = self.editor.document_mut(doc_id).expect("doc exists");
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
-        if let Some(new_selection) =
-            helix_core::selection::select_on_matches(text, &selection, &regex)
-        {
+        if let Some(new_selection) = helix_core::selection::select_on_matches(text, &selection, &regex) {
             doc.set_selection(view_id, new_selection);
         }
     }
@@ -574,8 +554,7 @@ impl SelectionOps for EditorContext {
         let last_line = text.len_lines().saturating_sub(1);
         let last_line_start = text.line_to_char(last_line);
 
-        let new_selection =
-            selection.transform(|range| helix_core::Range::new(range.anchor, last_line_start));
+        let new_selection = selection.transform(|range| helix_core::Range::new(range.anchor, last_line_start));
 
         doc.set_selection(view_id, new_selection);
     }
@@ -629,10 +608,8 @@ impl SelectionOps for EditorContext {
                 }
                 let mut start = range.from();
                 let mut end = range.to();
-                start = helix_core::movement::skip_while(text, start, char::is_whitespace)
-                    .unwrap_or(start);
-                end = helix_core::movement::backwards_skip_while(text, end, char::is_whitespace)
-                    .unwrap_or(end);
+                start = helix_core::movement::skip_while(text, start, char::is_whitespace).unwrap_or(start);
+                end = helix_core::movement::backwards_skip_while(text, end, char::is_whitespace).unwrap_or(end);
                 Some(helix_core::Range::new(start, end).with_direction(range.direction()))
             })
             .collect();
@@ -653,8 +630,7 @@ impl SelectionOps for EditorContext {
         if let Some(syntax) = doc.syntax() {
             let text = doc.text().slice(..);
             let current_selection = doc.selection(view.id);
-            let selection =
-                helix_core::object::expand_selection(syntax, text, current_selection.clone());
+            let selection = helix_core::object::expand_selection(syntax, text, current_selection.clone());
             if *current_selection != selection {
                 view.object_selections.push(current_selection.clone());
                 doc.set_selection(view.id, selection);
@@ -675,8 +651,7 @@ impl SelectionOps for EditorContext {
         }
         if let Some(syntax) = doc.syntax() {
             let text = doc.text().slice(..);
-            let selection =
-                helix_core::object::shrink_selection(syntax, text, current_selection.clone());
+            let selection = helix_core::object::shrink_selection(syntax, text, current_selection.clone());
             doc.set_selection(view.id, selection);
         }
     }
@@ -916,16 +891,8 @@ mod tests {
         ctx.select_inside_pair(doc_id, view_id, 'z');
         let (_view, doc) = helix_view::current_ref!(ctx.editor);
         let sel = doc.selection(view_id).primary();
-        assert_eq!(
-            sel.from(),
-            4,
-            "unknown alpha char should not change selection"
-        );
-        assert_eq!(
-            sel.to(),
-            5,
-            "unknown alpha char should not change selection"
-        );
+        assert_eq!(sel.from(), 4, "unknown alpha char should not change selection");
+        assert_eq!(sel.to(), 5, "unknown alpha char should not change selection");
     }
 
     // --- extend_selection ---
@@ -1173,10 +1140,7 @@ mod tests {
         let text = doc.text().slice(..);
         let last_line = text.len_lines().saturating_sub(1);
         let last_line_start = text.line_to_char(last_line);
-        assert_eq!(
-            sel.head, last_line_start,
-            "head should move to last line start"
-        );
+        assert_eq!(sel.head, last_line_start, "head should move to last line start");
     }
 
     // --- extend_goto_first_nonwhitespace ---
@@ -1218,10 +1182,7 @@ mod tests {
         ctx.split_selection_on_newline(doc_id, view_id);
         let (_view, doc) = helix_view::current_ref!(ctx.editor);
         let sel = doc.selection(view_id);
-        assert!(
-            sel.len() >= 3,
-            "should split on newlines into at least 3 parts"
-        );
+        assert!(sel.len() >= 3, "should split on newlines into at least 3 parts");
     }
 
     // --- expand_selection / shrink_selection ---
@@ -1276,10 +1237,7 @@ mod tests {
 
         // History should be cleared after encountering stale entry
         let (view, _doc) = helix_view::current_ref!(ctx.editor);
-        assert!(
-            view.object_selections.is_empty(),
-            "stale history should be cleared"
-        );
+        assert!(view.object_selections.is_empty(), "stale history should be cleared");
     }
 
     // --- copy_selection_on_line (multi-cursor) ---

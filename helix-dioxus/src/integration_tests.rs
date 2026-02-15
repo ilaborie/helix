@@ -15,11 +15,7 @@ use crate::test_helpers::{assert_state, assert_text, doc_view, key, special_key,
 
 /// Dispatch a key through the keymap and return matched commands.
 /// Returns empty vec for Pending/AwaitChar/NotFound/Cancelled results.
-fn keymap_dispatch(
-    ctx: &mut EditorContext,
-    mode: Mode,
-    key: &helix_view::input::KeyEvent,
-) -> Vec<EditorCommand> {
+fn keymap_dispatch(ctx: &mut EditorContext, mode: Mode, key: &helix_view::input::KeyEvent) -> Vec<EditorCommand> {
     match ctx.keymaps.get(mode, *key) {
         DhxKeymapResult::Matched(cmds) => cmds,
         _ => vec![],
@@ -31,16 +27,10 @@ fn dispatch_commands(ctx: &mut crate::state::EditorContext, commands: &[EditorCo
     let (doc_id, view_id) = doc_view(ctx);
     for cmd in commands {
         match cmd {
-            EditorCommand::MoveLeft => {
-                ctx.move_cursor(doc_id, view_id, crate::state::Direction::Left)
-            }
-            EditorCommand::MoveRight => {
-                ctx.move_cursor(doc_id, view_id, crate::state::Direction::Right)
-            }
+            EditorCommand::MoveLeft => ctx.move_cursor(doc_id, view_id, crate::state::Direction::Left),
+            EditorCommand::MoveRight => ctx.move_cursor(doc_id, view_id, crate::state::Direction::Right),
             EditorCommand::MoveUp => ctx.move_cursor(doc_id, view_id, crate::state::Direction::Up),
-            EditorCommand::MoveDown => {
-                ctx.move_cursor(doc_id, view_id, crate::state::Direction::Down)
-            }
+            EditorCommand::MoveDown => ctx.move_cursor(doc_id, view_id, crate::state::Direction::Down),
             EditorCommand::MoveWordForward => ctx.move_word_forward(doc_id, view_id),
             EditorCommand::MoveWordBackward => ctx.move_word_backward(doc_id, view_id),
             EditorCommand::GotoFirstLine => ctx.goto_first_line(doc_id, view_id),
@@ -241,53 +231,28 @@ fn select_mode_entry_and_exit() {
 
 #[test]
 fn picker_direct_mode_typing_filters() {
-    let cmds = handle_picker_mode(
-        &key('a'),
-        DialogSearchMode::Direct,
-        false,
-        PickerMode::default(),
-    );
+    let cmds = handle_picker_mode(&key('a'), DialogSearchMode::Direct, false, PickerMode::default());
     crate::assert_single_command!(cmds, EditorCommand::PickerInput('a'));
 }
 
 #[test]
 fn picker_vim_mode_jk_navigates() {
-    let cmds = handle_picker_mode(
-        &key('j'),
-        DialogSearchMode::VimStyle,
-        false,
-        PickerMode::default(),
-    );
+    let cmds = handle_picker_mode(&key('j'), DialogSearchMode::VimStyle, false, PickerMode::default());
     crate::assert_single_command!(cmds, EditorCommand::PickerDown);
 
-    let cmds = handle_picker_mode(
-        &key('k'),
-        DialogSearchMode::VimStyle,
-        false,
-        PickerMode::default(),
-    );
+    let cmds = handle_picker_mode(&key('k'), DialogSearchMode::VimStyle, false, PickerMode::default());
     crate::assert_single_command!(cmds, EditorCommand::PickerUp);
 }
 
 #[test]
 fn picker_vim_mode_slash_focuses_search() {
-    let cmds = handle_picker_mode(
-        &key('/'),
-        DialogSearchMode::VimStyle,
-        false,
-        PickerMode::default(),
-    );
+    let cmds = handle_picker_mode(&key('/'), DialogSearchMode::VimStyle, false, PickerMode::default());
     crate::assert_single_command!(cmds, EditorCommand::PickerFocusSearch);
 }
 
 #[test]
 fn picker_vim_mode_typing_filters_when_focused() {
-    let cmds = handle_picker_mode(
-        &key('a'),
-        DialogSearchMode::VimStyle,
-        true,
-        PickerMode::default(),
-    );
+    let cmds = handle_picker_mode(&key('a'), DialogSearchMode::VimStyle, true, PickerMode::default());
     crate::assert_single_command!(cmds, EditorCommand::PickerInput('a'));
 }
 
@@ -579,7 +544,10 @@ fn move_line_down_test_error_rs_content() {
     };
 
     // Line count must not change (no extra empty line)
-    assert_eq!(before_len, after_len, "line count changed from {before_len} to {after_len}");
+    assert_eq!(
+        before_len, after_len,
+        "line count changed from {before_len} to {after_len}"
+    );
 
     assert_text(
         &ctx,

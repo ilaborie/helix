@@ -11,6 +11,7 @@ use crate::state::EditorContext;
 /// Note: This function converts the Rope to a String for case-insensitive searching.
 /// The byte-to-char conversion is O(n) per match. For large documents with many matches,
 /// consider using a streaming approach or pre-computing a byte-to-char index.
+#[must_use]
 pub fn collect_search_match_lines(text: &Rope, pattern: &str) -> Vec<usize> {
     if pattern.is_empty() {
         return Vec::new();
@@ -75,7 +76,7 @@ impl EditorContext {
             text.slice(start..end).to_string()
         };
 
-        self.last_search = word.clone();
+        self.last_search.clone_from(&word);
         self.search_backwards = false;
         self.do_search(doc_id, view_id, &word, false);
     }
@@ -98,12 +99,7 @@ impl SearchOps for EditorContext {
         self.last_search = self.search_input.clone();
 
         // Perform the search
-        self.do_search(
-            doc_id,
-            view_id,
-            &self.last_search.clone(),
-            self.search_backwards,
-        );
+        self.do_search(doc_id, view_id, &self.last_search.clone(), self.search_backwards);
 
         self.search_mode = false;
         self.search_input.clear();
@@ -147,9 +143,7 @@ impl SearchOps for EditorContext {
             // Search forwards from cursor + 1 char
             let start_char = (cursor_char + 1).min(text.len_chars());
             let start_byte = text.char_to_byte(start_char);
-            text_str[start_byte..]
-                .find(pattern)
-                .map(|pos| pos + start_byte)
+            text_str[start_byte..].find(pattern).map(|pos| pos + start_byte)
         };
 
         // Determine final byte position (with wrap-around if needed)
@@ -205,9 +199,7 @@ impl SearchOps for EditorContext {
         } else {
             let start_char = (cursor_char + 1).min(text.len_chars());
             let start_byte = text.char_to_byte(start_char);
-            text_str[start_byte..]
-                .find(&pattern)
-                .map(|pos| pos + start_byte)
+            text_str[start_byte..].find(&pattern).map(|pos| pos + start_byte)
         };
 
         let final_byte_pos = found_byte_pos.or_else(|| {
@@ -254,9 +246,7 @@ impl SearchOps for EditorContext {
         } else {
             let start_char = (cursor_char + 1).min(text.len_chars());
             let start_byte = text.char_to_byte(start_char);
-            text_str[start_byte..]
-                .find(&pattern)
-                .map(|pos| pos + start_byte)
+            text_str[start_byte..].find(&pattern).map(|pos| pos + start_byte)
         };
 
         let final_byte_pos = found_byte_pos.or_else(|| {
@@ -359,10 +349,7 @@ mod tests {
         ctx.execute_search(doc_id, view_id);
         assert_state(&ctx, "hello #[world|]#\n");
         assert!(!ctx.search_mode, "search mode should be exited");
-        assert!(
-            ctx.search_input.is_empty(),
-            "search input should be cleared"
-        );
+        assert!(ctx.search_input.is_empty(), "search input should be cleared");
         assert_eq!(ctx.last_search, "world", "last_search should be saved");
     }
 
@@ -441,11 +428,7 @@ mod tests {
         use helix_core::ropey::Rope;
         let text = Rope::from("aaa aaa aaa\n");
         let lines = super::collect_search_match_lines(&text, "aaa");
-        assert_eq!(
-            lines,
-            vec![0],
-            "multiple matches on same line should deduplicate"
-        );
+        assert_eq!(lines, vec![0], "multiple matches on same line should deduplicate");
     }
 
     // --- extend_search_next / extend_search_prev ---

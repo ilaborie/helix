@@ -2,12 +2,14 @@
 //!
 //! Renders the document content with syntax highlighting and cursor display.
 
+use std::fmt::Write as _;
+
 use dioxus::prelude::*;
 use lucide_dioxus::{Bookmark, Lightbulb};
 
 use crate::components::{
-    diagnostics_for_line, first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker,
-    DiagnosticUnderline, ErrorLens, Scrollbar,
+    diagnostics_for_line, first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker, DiagnosticUnderline,
+    ErrorLens, Scrollbar,
 };
 use crate::hooks::use_editor_snapshot;
 use crate::lsp::DiagnosticSnapshot;
@@ -50,8 +52,7 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                         let key = format!("ind-{line_num}-{version}-{show_lightbulb}-{}-{has_jump}", severity.is_some());
                         // Use diagnostic severity color if available, otherwise warning
                         let lightbulb_color = severity
-                            .map(|s| s.css_color())
-                            .unwrap_or("var(--warning)");
+                            .map_or("var(--warning)", |s| s.css_color());
                         rsx! {
                             div {
                                 key: "{key}",
@@ -143,6 +144,7 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                         let primary_diag = first_diagnostic_for_line(diagnostics, line_num).cloned();
 
                         // Check if the next line is empty and has a diagnostic we should show here
+                        #[allow(clippy::indexing_slicing)] // idx + 1 is bounds-checked on the line above
                         let next_line_diag = if idx + 1 < snapshot.lines.len() {
                             let next_line = &snapshot.lines[idx + 1];
                             let next_content = next_line.content.trim();
@@ -198,7 +200,7 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
 /// Individual line component with cursor and syntax highlighting rendering.
 ///
 /// - `diagnostics`: All diagnostics for THIS line (used for underlines)
-/// - `error_lens_diagnostic`: The diagnostic to show as ErrorLens (may be from next empty line)
+/// - `error_lens_diagnostic`: The diagnostic to show as `ErrorLens` (may be from next empty line)
 #[component]
 fn Line(
     line: LineSnapshot,
@@ -287,6 +289,7 @@ fn Line(
 }
 
 /// Render content with syntax highlighting tokens, cursors, and selection.
+#[allow(clippy::indexing_slicing)] // Indices are bounded by len checks and .min(len) guards
 fn render_styled_content(
     chars: &[char],
     tokens: &[TokenSpan],
@@ -381,7 +384,7 @@ fn render_styled_content(
         // Selected spans don't need explicit background since line already has it
 
         if let Some(token) = active_token {
-            style.push_str(&format!("color: {};", token.color));
+            let _ = write!(style, "color: {};", token.color);
         }
 
         // Add the span (with id and class for cursor to enable scrollIntoView + CSS animation)
@@ -419,9 +422,7 @@ fn render_styled_content(
                     rsx! { span { key: "{cursor_end_key}", id: "editor-cursor", class: "{primary_cursor_class}", " " } },
                 );
             } else {
-                spans.push(
-                    rsx! { span { key: "{cursor_end_key}", class: "{secondary_cursor_class}", " " } },
-                );
+                spans.push(rsx! { span { key: "{cursor_end_key}", class: "{secondary_cursor_class}", " " } });
             }
         }
     }

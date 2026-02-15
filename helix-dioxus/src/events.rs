@@ -1,12 +1,12 @@
 //! Event registration for helix-dioxus.
 //!
-//! Events must be registered with helix_event before hooks can be registered for them.
+//! Events must be registered with `helix_event` before hooks can be registered for them.
 //! This module registers the helix-view events that helix-dioxus uses.
 
 use helix_event::register_event;
 use helix_view::events::{
-    ConfigDidChange, DiagnosticsDidChange, DocumentDidChange, DocumentDidClose, DocumentDidOpen,
-    DocumentFocusLost, LanguageServerExited, LanguageServerInitialized, SelectionDidChange,
+    ConfigDidChange, DiagnosticsDidChange, DocumentDidChange, DocumentDidClose, DocumentDidOpen, DocumentFocusLost,
+    LanguageServerExited, LanguageServerInitialized, SelectionDidChange,
 };
 
 /// Register all events used by helix-dioxus.

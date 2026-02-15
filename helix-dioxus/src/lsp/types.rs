@@ -110,8 +110,7 @@ impl CompletionItemKind {
     pub fn short_name(&self) -> &'static str {
         match self {
             Self::Text => "txt",
-            Self::Method => "fn",
-            Self::Function => "fn",
+            Self::Method | Self::Function => "fn",
             Self::Constructor => "new",
             Self::Field => "fld",
             Self::Variable => "var",
@@ -143,11 +142,9 @@ impl CompletionItemKind {
         match self {
             Self::Function | Self::Method | Self::Constructor => "var(--accent)",
             Self::Variable | Self::Field | Self::Property => "var(--error)",
-            Self::Class | Self::Struct | Self::Interface => "var(--warning)",
-            Self::Module | Self::Folder => "var(--purple)",
-            Self::Keyword => "var(--purple)",
+            Self::Class | Self::Struct | Self::Interface | Self::Enum => "var(--warning)",
+            Self::Module | Self::Folder | Self::Keyword => "var(--purple)",
             Self::Constant | Self::EnumMember => "var(--orange)",
-            Self::Enum => "var(--warning)",
             Self::Snippet => "var(--success)",
             _ => "var(--text)",
         }
@@ -543,9 +540,7 @@ pub enum LspResponse {
     /// Format edits received (applied directly).
     FormatApplied,
     /// Format selection result with transaction to apply.
-    FormatResult {
-        transaction: helix_core::Transaction,
-    },
+    FormatResult { transaction: helix_core::Transaction },
     /// Document highlights received (for selecting references).
     DocumentHighlights(Vec<helix_lsp::lsp::DocumentHighlight>),
     /// Workspace edit applied (from code action).

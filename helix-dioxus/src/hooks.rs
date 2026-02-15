@@ -9,6 +9,7 @@ use crate::AppState;
 ///
 /// Reads the `version` signal (triggering re-renders on change),
 /// then fetches the latest `EditorSnapshot` from `AppState`.
+#[must_use]
 pub fn use_editor_snapshot(version: ReadSignal<usize>) -> (AppState, EditorSnapshot) {
     let _ = version();
     let app_state = use_context::<AppState>();

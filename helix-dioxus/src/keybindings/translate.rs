@@ -1,18 +1,19 @@
 //! Keyboard input handling and translation.
 //!
-//! Translates Dioxus keyboard events to helix KeyEvent format.
+//! Translates Dioxus keyboard events to helix `KeyEvent` format.
 
 use dioxus::html::keyboard_types::Code;
 use dioxus::prelude::*;
 use helix_view::input::{KeyCode, KeyEvent, KeyModifiers};
 
-/// Translate a Dioxus keyboard event to a helix KeyEvent.
+/// Translate a Dioxus keyboard event to a helix `KeyEvent`.
 ///
 /// Normalizes SHIFT for character keys: Dioxus reports `Shift` in modifiers
 /// for all shifted characters (`:`, `D`, `!`, etc.), but helix's keymap
 /// stores them as plain `Char(':')` / `Char('D')` with no SHIFT modifier
 /// (the shift is already encoded in the character). We strip SHIFT for
 /// `Char` codes so the trie lookup matches correctly.
+#[must_use]
 pub fn translate_key_event(evt: &KeyboardEvent) -> Option<KeyEvent> {
     let code = translate_key_code(evt)?;
     let mut modifiers = translate_modifiers(evt);
@@ -27,7 +28,7 @@ pub fn translate_key_event(evt: &KeyboardEvent) -> Option<KeyEvent> {
     Some(KeyEvent { code, modifiers })
 }
 
-/// Translate Dioxus key to helix KeyCode.
+/// Translate Dioxus key to helix `KeyCode`.
 fn translate_key_code(evt: &KeyboardEvent) -> Option<KeyCode> {
     use dioxus::prelude::Key;
 
@@ -151,7 +152,7 @@ fn key_code_from_physical(code: Code, shift: bool) -> Option<KeyCode> {
     Some(KeyCode::Char(ch))
 }
 
-/// Translate Dioxus modifiers to helix KeyModifiers.
+/// Translate Dioxus modifiers to helix `KeyModifiers`.
 fn translate_modifiers(evt: &KeyboardEvent) -> KeyModifiers {
     let mods = evt.modifiers();
     let mut result = KeyModifiers::NONE;
@@ -178,66 +179,30 @@ mod tests {
 
     #[test]
     fn physical_key_letters() {
-        assert_eq!(
-            key_code_from_physical(Code::KeyO, false),
-            Some(KeyCode::Char('o'))
-        );
-        assert_eq!(
-            key_code_from_physical(Code::KeyI, false),
-            Some(KeyCode::Char('i'))
-        );
-        assert_eq!(
-            key_code_from_physical(Code::KeyA, false),
-            Some(KeyCode::Char('a'))
-        );
-        assert_eq!(
-            key_code_from_physical(Code::KeyZ, false),
-            Some(KeyCode::Char('z'))
-        );
+        assert_eq!(key_code_from_physical(Code::KeyO, false), Some(KeyCode::Char('o')));
+        assert_eq!(key_code_from_physical(Code::KeyI, false), Some(KeyCode::Char('i')));
+        assert_eq!(key_code_from_physical(Code::KeyA, false), Some(KeyCode::Char('a')));
+        assert_eq!(key_code_from_physical(Code::KeyZ, false), Some(KeyCode::Char('z')));
     }
 
     #[test]
     fn physical_key_shift_uppercases() {
-        assert_eq!(
-            key_code_from_physical(Code::KeyC, true),
-            Some(KeyCode::Char('C'))
-        );
-        assert_eq!(
-            key_code_from_physical(Code::KeyS, true),
-            Some(KeyCode::Char('S'))
-        );
+        assert_eq!(key_code_from_physical(Code::KeyC, true), Some(KeyCode::Char('C')));
+        assert_eq!(key_code_from_physical(Code::KeyS, true), Some(KeyCode::Char('S')));
     }
 
     #[test]
     fn physical_key_digits() {
-        assert_eq!(
-            key_code_from_physical(Code::Digit0, false),
-            Some(KeyCode::Char('0'))
-        );
-        assert_eq!(
-            key_code_from_physical(Code::Digit9, false),
-            Some(KeyCode::Char('9'))
-        );
+        assert_eq!(key_code_from_physical(Code::Digit0, false), Some(KeyCode::Char('0')));
+        assert_eq!(key_code_from_physical(Code::Digit9, false), Some(KeyCode::Char('9')));
     }
 
     #[test]
     fn physical_key_punctuation() {
-        assert_eq!(
-            key_code_from_physical(Code::Period, false),
-            Some(KeyCode::Char('.'))
-        );
-        assert_eq!(
-            key_code_from_physical(Code::Semicolon, false),
-            Some(KeyCode::Char(';'))
-        );
-        assert_eq!(
-            key_code_from_physical(Code::Backquote, false),
-            Some(KeyCode::Char('`'))
-        );
-        assert_eq!(
-            key_code_from_physical(Code::Minus, false),
-            Some(KeyCode::Char('-'))
-        );
+        assert_eq!(key_code_from_physical(Code::Period, false), Some(KeyCode::Char('.')));
+        assert_eq!(key_code_from_physical(Code::Semicolon, false), Some(KeyCode::Char(';')));
+        assert_eq!(key_code_from_physical(Code::Backquote, false), Some(KeyCode::Char('`')));
+        assert_eq!(key_code_from_physical(Code::Minus, false), Some(KeyCode::Char('-')));
     }
 
     #[test]

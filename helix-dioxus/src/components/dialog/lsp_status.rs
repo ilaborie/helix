@@ -13,11 +13,7 @@ use crate::AppState;
 
 /// LSP status dialog component.
 #[component]
-pub fn LspStatusDialog(
-    servers: Vec<LspServerSnapshot>,
-    selected: usize,
-    on_change: EventHandler<()>,
-) -> Element {
+pub fn LspStatusDialog(servers: Vec<LspServerSnapshot>, selected: usize, on_change: EventHandler<()>) -> Element {
     let app_state = use_context::<AppState>();
 
     rsx! {
@@ -99,11 +95,7 @@ pub fn LspStatusDialog(
 
 /// A single row in the LSP server list.
 #[component]
-fn LspServerRow(
-    server: LspServerSnapshot,
-    is_selected: bool,
-    on_restart: EventHandler<MouseEvent>,
-) -> Element {
+fn LspServerRow(server: LspServerSnapshot, is_selected: bool, on_restart: EventHandler<MouseEvent>) -> Element {
     let status_color = server.status.css_color();
     let row_class = if is_selected {
         "lsp-server-row lsp-server-row-selected"

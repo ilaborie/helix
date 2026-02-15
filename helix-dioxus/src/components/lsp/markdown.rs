@@ -31,10 +31,8 @@ fn escape_html(text: &str) -> String {
 /// are passed to the callback for syntax highlighting. The callback receives
 /// `(code_text, language)` and should return `Some(highlighted_html)` with
 /// pre-escaped HTML spans, or `None` to fall back to plain text.
-pub fn markdown_to_html(
-    md: &str,
-    highlight_code: Option<&dyn Fn(&str, &str) -> Option<String>>,
-) -> String {
+#[allow(clippy::type_complexity)] // dyn Fn callback type is inherently complex
+pub fn markdown_to_html(md: &str, highlight_code: Option<&dyn Fn(&str, &str) -> Option<String>>) -> String {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_STRIKETHROUGH);
     let parser = Parser::new_ext(md, options);
@@ -44,10 +42,7 @@ pub fn markdown_to_html(
     let mut in_html_code = false;
     let events: Vec<_> = parser
         .filter_map(|event| match event {
-            Event::Html(tag)
-                if tag.starts_with("<code")
-                    && matches!(tag.chars().nth(5), Some(' ' | '>')) =>
-            {
+            Event::Html(tag) if tag.starts_with("<code") && matches!(tag.chars().nth(5), Some(' ' | '>')) => {
                 in_html_code = true;
                 None
             }
@@ -87,9 +82,9 @@ pub fn markdown_to_html(
                         processed_events.push(Event::Html(html.into()));
                     } else {
                         // Fallback: emit original events (unhighlighted)
-                        processed_events.push(Event::Start(Tag::CodeBlock(
-                            CodeBlockKind::Fenced(code_block_lang.clone().into()),
-                        )));
+                        processed_events.push(Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(
+                            code_block_lang.clone().into(),
+                        ))));
                         processed_events.push(Event::Text(code_block_text.clone().into()));
                         processed_events.push(Event::End(TagEnd::CodeBlock));
                     }
@@ -118,6 +113,7 @@ pub fn markdown_to_html(
 ///
 /// Returns `Some(html)` with `<span style="color: #hex">...</span>` wrapped tokens,
 /// or `None` if the language is not recognized or parsing fails.
+#[allow(clippy::cast_possible_truncation)] // rope byte length fits in u32 for typical code blocks
 pub fn highlight_code_block(
     code: &str,
     language: &str,
@@ -158,7 +154,7 @@ pub fn highlight_code_block(
             let escaped = escape_html(&text);
 
             if let Some(fg) = current_style.fg {
-                if let Some(css_color) = color_to_css(&fg) {
+                if let Some(css_color) = color_to_css(fg) {
                     html.push_str("<span style=\"color: ");
                     html.push_str(&css_color);
                     html.push_str("\">");
@@ -184,8 +180,7 @@ pub fn highlight_code_block(
             HighlightEvent::Push => current_style,
         };
 
-        current_style =
-            highlights.fold(base, |acc, highlight| acc.patch(theme.highlight(highlight)));
+        current_style = highlights.fold(base, |acc, highlight| acc.patch(theme.highlight(highlight)));
     }
 
     Some(html)
@@ -326,7 +321,10 @@ mod tests {
         };
 
         let result = markdown_to_html("```\nplain code\n```", Some(&highlighter));
-        assert!(!called.get(), "Highlighter should not be called for unlabeled code blocks");
+        assert!(
+            !called.get(),
+            "Highlighter should not be called for unlabeled code blocks"
+        );
         assert!(result.contains("plain code"));
     }
 
@@ -352,7 +350,10 @@ mod tests {
 
     #[test]
     fn test_escape_html_special_chars() {
-        assert_eq!(escape_html("<b>&\"hello\"</b>"), "&lt;b&gt;&amp;&quot;hello&quot;&lt;/b&gt;");
+        assert_eq!(
+            escape_html("<b>&\"hello\"</b>"),
+            "&lt;b&gt;&amp;&quot;hello&quot;&lt;/b&gt;"
+        );
     }
 
     #[test]

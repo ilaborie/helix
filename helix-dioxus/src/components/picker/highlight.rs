@@ -22,10 +22,7 @@ pub fn HighlightedText(text: String, indices: Vec<usize>, base_color: String) ->
     let mut current_start = 0;
     let mut in_highlight = false;
 
-    let emit_segment = |start: usize,
-                        slice: &[char],
-                        highlight: bool,
-                        segments: &mut Vec<Element>| {
+    let emit_segment = |start: usize, slice: &[char], highlight: bool, segments: &mut Vec<Element>| {
         let segment_text: String = slice.iter().collect();
         if highlight {
             segments.push(rsx! {

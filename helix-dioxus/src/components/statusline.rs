@@ -110,12 +110,9 @@ pub fn StatusLine(version: ReadSignal<usize>, on_change: EventHandler<()>) -> El
     };
 
     let modified_indicator = if snapshot.is_modified { " [+]" } else { "" };
+    let file_display = format!("{file_name}{modified_indicator}");
 
-    let percentage = if total_lines > 0 {
-        (line * 100) / total_lines
-    } else {
-        0
-    };
+    let percentage = if total_lines > 0 { (line * 100) / total_lines } else { 0 };
 
     rsx! {
         div {
@@ -131,7 +128,7 @@ pub fn StatusLine(version: ReadSignal<usize>, on_change: EventHandler<()>) -> El
             // File name
             div {
                 class: "statusline-filename",
-                "{file_name}{modified_indicator}"
+                "{file_display}"
             }
 
             // Diagnostic counts (if any)

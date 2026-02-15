@@ -13,33 +13,20 @@ use crate::lsp::{CodeActionPreviewState, CodeActionSnapshot};
 /// Get the icon and color for a code action kind.
 fn action_kind_style(kind: Option<&str>, is_preferred: bool) -> (&'static str, Element) {
     if is_preferred {
-        return (
-            "var(--warning)",
-            rsx! { Star { size: 12, color: "currentColor" } },
-        );
+        return ("var(--warning)", rsx! { Star { size: 12, color: "currentColor" } });
     }
 
     match kind {
-        Some(k) if k.starts_with("quickfix") => (
-            "var(--success)",
-            rsx! { Wrench { size: 12, color: "currentColor" } },
-        ),
+        Some(k) if k.starts_with("quickfix") => ("var(--success)", rsx! { Wrench { size: 12, color: "currentColor" } }),
         Some(k) if k.starts_with("refactor.extract") => (
             "var(--accent)",
             rsx! { PackagePlus { size: 12, color: "currentColor" } },
         ),
-        Some(k) if k.starts_with("refactor") => (
-            "var(--purple)",
-            rsx! { FileCode { size: 12, color: "currentColor" } },
-        ),
-        Some(k) if k.starts_with("source") => (
-            "var(--hint)",
-            rsx! { FileCode { size: 12, color: "currentColor" } },
-        ),
-        _ => (
-            "var(--text)",
-            rsx! { Lightbulb { size: 12, color: "currentColor" } },
-        ),
+        Some(k) if k.starts_with("refactor") => {
+            ("var(--purple)", rsx! { FileCode { size: 12, color: "currentColor" } })
+        }
+        Some(k) if k.starts_with("source") => ("var(--hint)", rsx! { FileCode { size: 12, color: "currentColor" } }),
+        _ => ("var(--text)", rsx! { Lightbulb { size: 12, color: "currentColor" } }),
     }
 }
 
@@ -66,10 +53,7 @@ fn CodeActionItem(action: CodeActionSnapshot, is_selected: bool) -> Element {
     let (kind_color, icon) = action_kind_style(action.kind.as_deref(), action.is_preferred);
 
     // Check if this is a quickfix action
-    let is_quickfix = action
-        .kind
-        .as_deref()
-        .is_some_and(|k| k.starts_with("quickfix"));
+    let is_quickfix = action.kind.as_deref().is_some_and(|k| k.starts_with("quickfix"));
 
     let mut item_class = String::new();
     if is_disabled {

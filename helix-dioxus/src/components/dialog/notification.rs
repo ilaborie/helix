@@ -28,7 +28,7 @@ pub fn NotificationContainer(notifications: Vec<NotificationSnapshot>) -> Elemen
                     on_dismiss: {
                         let app_state = app_state.clone();
                         let id = notification.id;
-                        move |_| {
+                        move |()| {
                             app_state.send_command(crate::state::EditorCommand::DismissNotification(id));
                         }
                     },

@@ -12,11 +12,7 @@ use super::types::{CodeActionPreview, DiffChangeKind, DiffHunk, DiffLine, FileDi
 /// Edits are sorted by position (reverse order) and applied back-to-front
 /// to avoid offset invalidation.
 #[must_use]
-pub fn apply_text_edits(
-    original: &str,
-    edits: &[lsp::TextEdit],
-    encoding: OffsetEncoding,
-) -> String {
+pub fn apply_text_edits(original: &str, edits: &[lsp::TextEdit], encoding: OffsetEncoding) -> String {
     if edits.is_empty() {
         return original.to_string();
     }
@@ -44,11 +40,7 @@ pub fn apply_text_edits(
 }
 
 /// Convert an LSP `Position` to a byte offset in the given rope.
-fn lsp_position_to_byte_offset(
-    rope: &helix_core::Rope,
-    pos: lsp::Position,
-    encoding: OffsetEncoding,
-) -> usize {
+fn lsp_position_to_byte_offset(rope: &helix_core::Rope, pos: lsp::Position, encoding: OffsetEncoding) -> usize {
     let line = pos.line as usize;
     if line >= rope.len_lines() {
         return rope.len_bytes();
@@ -262,12 +254,9 @@ pub fn compute_preview(
                         })
                         .collect();
 
-                    if let Some(diff) = compute_single_file_diff(
-                        &edit.text_document.uri,
-                        &text_edits,
-                        encoding,
-                        &file_reader,
-                    ) {
+                    if let Some(diff) =
+                        compute_single_file_diff(&edit.text_document.uri, &text_edits, encoding, &file_reader)
+                    {
                         for hunk in &diff.hunks {
                             for line in &hunk.lines {
                                 match line.kind {
@@ -296,12 +285,9 @@ pub fn compute_preview(
                             })
                             .collect();
 
-                        if let Some(diff) = compute_single_file_diff(
-                            &edit.text_document.uri,
-                            &text_edits,
-                            encoding,
-                            &file_reader,
-                        ) {
+                        if let Some(diff) =
+                            compute_single_file_diff(&edit.text_document.uri, &text_edits, encoding, &file_reader)
+                        {
                             for hunk in &diff.hunks {
                                 for line in &hunk.lines {
                                     match line.kind {
@@ -348,10 +334,7 @@ fn compute_single_file_diff(
     let file_path = uri
         .to_file_path()
         .ok()
-        .and_then(|path| {
-            path.file_name()
-                .map(|name| name.to_string_lossy().into_owned())
-        })
+        .and_then(|path| path.file_name().map(|name| name.to_string_lossy().into_owned()))
         .unwrap_or_else(|| uri.to_string());
 
     Some(FileDiff { file_path, hunks })

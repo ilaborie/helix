@@ -9,6 +9,7 @@ use crate::state::{PickerPreview, PreviewLine, TokenSpan};
 
 /// Render syntax-highlighted tokens for a preview line.
 /// Simplified version of `render_styled_content` without cursor/selection logic.
+#[allow(clippy::indexing_slicing)] // Char indices are bounded by len checks above each slice
 fn render_preview_tokens(content: &str, tokens: &[TokenSpan]) -> Element {
     let chars: Vec<char> = content.chars().collect();
     let len = chars.len();
@@ -70,6 +71,7 @@ fn render_line_content(line: &PreviewLine, search_pattern: Option<&str>) -> Elem
 }
 
 /// Render preview tokens with search matches highlighted.
+#[allow(clippy::indexing_slicing)] // Char indices are bounded by len/min checks throughout
 fn render_with_search_highlight(content: &str, tokens: &[TokenSpan], pattern: &str) -> Element {
     let chars: Vec<char> = content.chars().collect();
     let len = chars.len();

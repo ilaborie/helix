@@ -44,15 +44,18 @@ impl EditorContext {
 
             let target = match direction {
                 Direction::Forward => {
-                    let next = doc.diagnostics().iter().find(|d| {
-                        d.line > cursor_line || (d.line == cursor_line && d.range.start > cursor)
-                    });
+                    let next = doc
+                        .diagnostics()
+                        .iter()
+                        .find(|d| d.line > cursor_line || (d.line == cursor_line && d.range.start > cursor));
                     next.or_else(|| doc.diagnostics().first())
                 }
                 Direction::Backward => {
-                    let prev = doc.diagnostics().iter().rev().find(|d| {
-                        d.line < cursor_line || (d.line == cursor_line && d.range.start < cursor)
-                    });
+                    let prev = doc
+                        .diagnostics()
+                        .iter()
+                        .rev()
+                        .find(|d| d.line < cursor_line || (d.line == cursor_line && d.range.start < cursor));
                     prev.or_else(|| doc.diagnostics().last())
                 }
             };
@@ -71,9 +74,8 @@ impl EditorContext {
 
     /// Move cursor to a specific character position.
     fn goto_char(&mut self, doc_id: DocumentId, view_id: ViewId, pos: usize) {
-        let doc = match self.editor.document_mut(doc_id) {
-            Some(d) => d,
-            None => return,
+        let Some(doc) = self.editor.document_mut(doc_id) else {
+            return;
         };
 
         let text = doc.text();

@@ -18,6 +18,7 @@ pub trait ShellOps {
 }
 
 impl ShellOps for EditorContext {
+    #[allow(clippy::indexing_slicing)] // shell[] access is guarded by len >= 2 check above
     fn execute_shell_command(&mut self, doc_id: DocumentId, view_id: helix_view::ViewId) {
         let command_str = self.shell_input.trim().to_string();
         if command_str.is_empty() {
@@ -35,9 +36,8 @@ impl ShellOps for EditorContext {
             return;
         }
 
-        let doc = match self.editor.document(doc_id) {
-            Some(doc) => doc,
-            None => return,
+        let Some(doc) = self.editor.document(doc_id) else {
+            return;
         };
         let text = doc.text().clone();
         let selection = doc.selection(view_id).clone();
@@ -50,7 +50,7 @@ impl ShellOps for EditorContext {
         let mut offset = 0_isize;
         let mut shell_output: Option<helix_core::Tendril> = None;
 
-        for range in selection.iter() {
+        for range in &selection {
             let from = range.from();
             let to = range.to();
             let selection_text: String = text.slice(from..to).into();
@@ -127,9 +127,8 @@ impl ShellOps for EditorContext {
 
             let (change_from, change_to, deleted_len) = match behavior {
                 ShellBehavior::Replace => (from, to, range.len()),
-                ShellBehavior::Insert => (from, from, 0),
+                ShellBehavior::Insert | ShellBehavior::Ignore => (from, from, 0),
                 ShellBehavior::Append => (to, to, 0),
-                ShellBehavior::Ignore => (from, from, 0),
             };
 
             // Compute new selection range with offset tracking (matching helix-term)

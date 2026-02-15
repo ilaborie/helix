@@ -13,13 +13,11 @@ use dioxus::prelude::*;
 pub fn icon_svg_for_filename(name: &str) -> &'static str {
     // Special filenames (case-insensitive)
     match name.to_lowercase().as_str() {
-        "dockerfile" | "dockerfile.dev" | "dockerfile.prod" | "containerfile" => {
-            return svgs::DOCKER
-        }
+        "dockerfile" | "dockerfile.dev" | "dockerfile.prod" | "containerfile" => return svgs::DOCKER,
         "makefile" | "gnumakefile" => return svgs::MAKEFILE,
         ".gitignore" | ".gitattributes" | ".gitmodules" => return svgs::GIT,
-        "cargo.lock" | "package-lock.json" | "yarn.lock" | "pnpm-lock.yaml"
-        | "composer.lock" | "gemfile.lock" | "flake.lock" => return svgs::LOCK,
+        "cargo.lock" | "package-lock.json" | "yarn.lock" | "pnpm-lock.yaml" | "composer.lock" | "gemfile.lock"
+        | "flake.lock" => return svgs::LOCK,
         _ => {}
     }
 
@@ -93,10 +91,7 @@ pub fn FileTypeIcon(name: String, #[props(default = 16)] size: u32) -> Element {
 
 /// Dioxus component that renders a folder icon (open or closed).
 #[component]
-pub fn FolderTypeIcon(
-    #[props(default = false)] is_open: bool,
-    #[props(default = 16)] size: u32,
-) -> Element {
+pub fn FolderTypeIcon(#[props(default = false)] is_open: bool, #[props(default = 16)] size: u32) -> Element {
     let svg = folder_icon_svg(is_open);
     rsx! {
         span {

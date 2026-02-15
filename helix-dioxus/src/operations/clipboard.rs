@@ -29,11 +29,7 @@ impl ClipboardOps for EditorContext {
         let selected_text: String = text.slice(primary.from()..primary.to()).into();
 
         // Write to the target register
-        if let Err(e) = self
-            .editor
-            .registers
-            .write(register, vec![selected_text.clone()])
-        {
+        if let Err(e) = self.editor.registers.write(register, vec![selected_text.clone()]) {
             log::warn!("Failed to write to register '{register}': {e}");
         }
 
@@ -42,10 +38,7 @@ impl ClipboardOps for EditorContext {
             self.clipboard.clone_from(&selected_text);
         }
 
-        log::info!(
-            "Yanked {} characters to register '{register}'",
-            selected_text.len(),
-        );
+        log::info!("Yanked {} characters to register '{register}'", selected_text.len(),);
     }
 
     /// Yank only the primary selection to the selected register.
@@ -61,11 +54,7 @@ impl ClipboardOps for EditorContext {
 
         let selected_text: String = text.slice(primary.from()..primary.to()).into();
 
-        if let Err(e) = self
-            .editor
-            .registers
-            .write(register, vec![selected_text.clone()])
-        {
+        if let Err(e) = self.editor.registers.write(register, vec![selected_text.clone()]) {
             log::warn!("Failed to write to register '{register}': {e}");
         }
 
@@ -92,13 +81,7 @@ impl ClipboardOps for EditorContext {
             .registers
             .read(register, &self.editor)
             .and_then(|mut values| values.next().map(std::borrow::Cow::into_owned))
-            .or_else(|| {
-                if register == '+' {
-                    Some(self.clipboard.clone())
-                } else {
-                    None
-                }
-            })
+            .or_else(|| (register == '+').then(|| self.clipboard.clone()))
             .unwrap_or_default();
 
         if clipboard_text.is_empty() {
@@ -127,22 +110,15 @@ impl ClipboardOps for EditorContext {
         };
 
         let value_len = clipboard_text.chars().count();
-        let new_range =
-            helix_core::Range::new(insert_pos, insert_pos + value_len).with_direction(direction);
+        let new_range = helix_core::Range::new(insert_pos, insert_pos + value_len).with_direction(direction);
         let new_selection = helix_core::Selection::single(new_range.anchor, new_range.head);
 
         let insert_selection = helix_core::Selection::point(insert_pos);
-        let transaction = helix_core::Transaction::insert(
-            doc.text(),
-            &insert_selection,
-            clipboard_text.into(),
-        )
-        .with_selection(new_selection);
+        let transaction = helix_core::Transaction::insert(doc.text(), &insert_selection, clipboard_text.into())
+            .with_selection(new_selection);
         doc.apply(&transaction, view_id);
 
-        log::info!(
-            "Pasted {value_len} chars from register '{register}' at pos {insert_pos}, linewise={is_linewise}",
-        );
+        log::info!("Pasted {value_len} chars from register '{register}' at pos {insert_pos}, linewise={is_linewise}",);
     }
 
     /// Replace selection with text from the selected register (without updating that register).
@@ -155,13 +131,7 @@ impl ClipboardOps for EditorContext {
             .registers
             .read(register, &self.editor)
             .and_then(|mut values| values.next().map(std::borrow::Cow::into_owned))
-            .or_else(|| {
-                if register == '+' {
-                    Some(self.clipboard.clone())
-                } else {
-                    None
-                }
-            })
+            .or_else(|| (register == '+').then(|| self.clipboard.clone()))
             .unwrap_or_default();
 
         if clipboard_text.is_empty() {
@@ -172,14 +142,9 @@ impl ClipboardOps for EditorContext {
         let selection = doc.selection(view_id).clone();
 
         // Replace selection content with register text
-        let transaction =
-            helix_core::Transaction::change_by_selection(doc.text(), &selection, |range| {
-                (
-                    range.from(),
-                    range.to(),
-                    Some(clipboard_text.clone().into()),
-                )
-            });
+        let transaction = helix_core::Transaction::change_by_selection(doc.text(), &selection, |range| {
+            (range.from(), range.to(), Some(clipboard_text.clone().into()))
+        });
 
         doc.apply(&transaction, view_id);
     }
@@ -217,11 +182,7 @@ impl ClipboardOps for EditorContext {
 
         // Yank to target register (skip for '_' black hole register)
         if register != '_' {
-            if let Err(e) = self
-                .editor
-                .registers
-                .write(register, vec![selected_text.clone()])
-            {
+            if let Err(e) = self.editor.registers.write(register, vec![selected_text.clone()]) {
                 log::warn!("Failed to write to register '{register}': {e}");
             }
             // Sync internal clipboard when using '+' register
@@ -371,10 +332,7 @@ mod tests {
             .registers
             .read('"', &ctx.editor)
             .and_then(|mut v| v.next().map(|s| s.into_owned()));
-        assert!(
-            content.is_none(),
-            "should not have written to default register"
-        );
+        assert!(content.is_none(), "should not have written to default register");
     }
 
     #[test]
@@ -447,9 +405,7 @@ mod tests {
         use crate::operations::SelectionOps;
 
         // Simulate the test_error.rs scenario: cursor on println line
-        let mut ctx = test_context(
-            "fn main() {\n    #[p|]#rintln!(\"Hello\");\n    let x: String = 1;\n}\n",
-        );
+        let mut ctx = test_context("fn main() {\n    #[p|]#rintln!(\"Hello\");\n    let x: String = 1;\n}\n");
         let (doc_id, view_id) = doc_view(&ctx);
 
         // Step 1: extend_to_line_bounds

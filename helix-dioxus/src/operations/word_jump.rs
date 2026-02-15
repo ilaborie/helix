@@ -24,10 +24,10 @@ pub trait WordJumpOps {
 }
 
 impl WordJumpOps for EditorContext {
+    #[allow(clippy::indexing_slicing)] // indices bounded by max_labels = alphabet.len()^2
     fn compute_word_jump_labels(&mut self, doc_id: DocumentId, view_id: ViewId) {
-        let doc = match self.editor.document(doc_id) {
-            Some(doc) => doc,
-            None => return,
+        let Some(doc) = self.editor.document(doc_id) else {
+            return;
         };
         let text = doc.text();
         let total_chars = text.len_chars();
@@ -133,12 +133,9 @@ impl WordJumpOps for EditorContext {
 
     fn execute_word_jump(&mut self, ch: char) {
         let ch_lower = ch.to_ascii_lowercase();
-        let first = match self.word_jump_first_idx {
-            Some(f) => f,
-            None => {
-                self.cancel_word_jump();
-                return;
-            }
+        let Some(first) = self.word_jump_first_idx else {
+            self.cancel_word_jump();
+            return;
         };
 
         // Find the label with matching [first, second]
@@ -160,15 +157,10 @@ impl WordJumpOps for EditorContext {
                     // Extend selection to the word
                     let selection = doc.selection(view_id).clone();
                     let primary = selection.primary();
-                    let new_range =
-                        helix_core::Range::new(primary.anchor, char_pos.min(text.len_chars()));
-                    let new_selection = selection.clone().transform(|range| {
-                        if range == primary {
-                            new_range
-                        } else {
-                            range
-                        }
-                    });
+                    let new_range = helix_core::Range::new(primary.anchor, char_pos.min(text.len_chars()));
+                    let new_selection = selection
+                        .clone()
+                        .transform(|range| if range == primary { new_range } else { range });
                     doc.set_selection(view_id, new_selection);
                 } else {
                     doc.set_selection(view_id, Selection::point(char_pos));
@@ -317,26 +309,18 @@ mod tests {
     #[test]
     fn filter_first_char_dims_non_matching() {
         // Need 27+ words so labels span 'a_' and 'b_' prefixes
-        let text =
-            "aa bb cc dd ee ff gg hh ii jj kk ll mm nn oo pp qq rr ss tt uu vv ww xx yy zz aaa";
+        let text = "aa bb cc dd ee ff gg hh ii jj kk ll mm nn oo pp qq rr ss tt uu vv ww xx yy zz aaa";
         let mut ctx = test_context(&format!("#[|{text}]#\n"));
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.compute_word_jump_labels(doc_id, view_id);
-        assert!(
-            ctx.word_jump_labels.len() > 26,
-            "need >26 labels for multi-prefix"
-        );
+        assert!(ctx.word_jump_labels.len() > 26, "need >26 labels for multi-prefix");
 
         ctx.filter_word_jump_first_char('b');
 
         // Labels starting with 'b' are undimmed, others dimmed
         for label in &ctx.word_jump_labels {
             if label.label[0] == 'b' {
-                assert!(
-                    !label.dimmed,
-                    "label {:?} should not be dimmed",
-                    label.label
-                );
+                assert!(!label.dimmed, "label {:?} should not be dimmed", label.label);
             } else {
                 assert!(label.dimmed, "label {:?} should be dimmed", label.label);
             }
@@ -469,10 +453,7 @@ mod tests {
         ctx.compute_word_jump_labels(doc_id, view_id);
 
         let label_count = ctx.word_jump_labels.len();
-        assert!(
-            label_count < 27,
-            "must have <27 labels for this regression test"
-        );
+        assert!(label_count < 27, "must have <27 labels for this regression test");
         assert!(label_count >= 2, "need at least 2 labels");
 
         // All labels start with 'a'

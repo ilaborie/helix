@@ -23,7 +23,7 @@ pub fn GenericPicker(
     selected: usize,
     filter: String,
     total: usize,
-    /// Number of items after filtering (may differ from items.len() due to windowing).
+    /// Number of items after filtering (may differ from `items.len()` due to windowing).
     filtered_count: usize,
     /// Start index of the windowed items in the full filtered list.
     window_offset: usize,

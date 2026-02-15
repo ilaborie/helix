@@ -30,11 +30,7 @@ pub fn BufferBar(version: ReadSignal<usize>, on_change: EventHandler<()>) -> Ele
     // Calculate visible range (auto-scroll to current buffer is handled in state.rs)
     let visible_start = scroll_offset.min(buffers.len().saturating_sub(1));
     let visible_end = (visible_start + MAX_VISIBLE_TABS).min(buffers.len());
-    let visible_buffers: Vec<&BufferInfo> = buffers
-        .get(visible_start..visible_end)
-        .unwrap_or(&[])
-        .iter()
-        .collect();
+    let visible_buffers: Vec<&BufferInfo> = buffers.get(visible_start..visible_end).unwrap_or(&[]).iter().collect();
 
     // Determine if we need scroll buttons
     let needs_left_scroll = scroll_offset > 0;
@@ -67,7 +63,7 @@ pub fn BufferBar(version: ReadSignal<usize>, on_change: EventHandler<()>) -> Ele
                     BufferTab {
                         key: "{buffer.id:?}",
                         buffer: buffer.clone(),
-                        on_action: move |_| {
+                        on_action: move |()| {
                             on_change.call(());
                         },
                     }
@@ -96,8 +92,8 @@ fn BufferTab(buffer: BufferInfo, on_action: EventHandler<()>) -> Element {
     let app_state_switch = app_state.clone();
     let app_state_close = app_state.clone();
 
-    let on_action_switch = on_action.clone();
-    let on_action_close = on_action.clone();
+    let on_action_switch = on_action;
+    let on_action_close = on_action;
 
     let doc_id = buffer.id;
     let doc_id_close = buffer.id;

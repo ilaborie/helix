@@ -84,9 +84,7 @@ pub fn Scrollbar(
         let click_y = evt.element_coordinates().y;
 
         // Use JavaScript to get editor-view height (parent container)
-        let height = document::eval(
-            r#"document.querySelector('.editor-view')?.getBoundingClientRect().height || 0"#,
-        );
+        let height = document::eval(r"document.querySelector('.editor-view')?.getBoundingClientRect().height || 0");
 
         // Clone for the async block
         let app_state_clone = track_app_state.clone();
@@ -142,9 +140,7 @@ pub fn Scrollbar(
         let delta_y = current_y - drag_start_y();
 
         // Use JavaScript to get editor-view height (parent container)
-        let height = document::eval(
-            r#"document.querySelector('.editor-view')?.getBoundingClientRect().height || 0"#,
-        );
+        let height = document::eval(r"document.querySelector('.editor-view')?.getBoundingClientRect().height || 0");
 
         let app_state_clone = mousemove_app_state.clone();
         let start_ratio = drag_start_scroll_ratio();
@@ -164,8 +160,7 @@ pub fn Scrollbar(
                         clippy::cast_possible_truncation,
                         clippy::cast_sign_loss
                     )]
-                    let target_line =
-                        (new_ratio * (total_lines.saturating_sub(viewport_lines)) as f64) as usize;
+                    let target_line = (new_ratio * (total_lines.saturating_sub(viewport_lines)) as f64) as usize;
 
                     app_state_clone.send_command(EditorCommand::ScrollToLine(target_line));
                     app_state_clone.process_commands_sync();

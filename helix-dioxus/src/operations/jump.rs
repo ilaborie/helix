@@ -66,10 +66,7 @@ impl JumpOps for EditorContext {
 
     fn save_selection(&mut self) {
         self.push_jump();
-        self.show_notification(
-            "Position saved to jump list".to_string(),
-            NotificationSeverity::Info,
-        );
+        self.show_notification("Position saved to jump list".to_string(), NotificationSeverity::Info);
     }
 
     fn clear_jumplist(&mut self) {
@@ -95,24 +92,13 @@ impl JumpOps for EditorContext {
                 let line = text.char_to_line(cursor);
                 let col = cursor - text.line_to_char(line);
 
-                let path_display = doc
-                    .path()
-                    .map(|p| {
-                        p.strip_prefix(&cwd)
-                            .unwrap_or(p)
-                            .to_string_lossy()
-                            .to_string()
-                    })
-                    .unwrap_or_else(|| doc.display_name().to_string());
+                let path_display = doc.path().map_or_else(
+                    || doc.display_name().to_string(),
+                    |p| p.strip_prefix(&cwd).unwrap_or(p).to_string_lossy().to_string(),
+                );
 
                 // Get line content for secondary text
-                let line_content = text
-                    .line(line)
-                    .to_string()
-                    .trim()
-                    .chars()
-                    .take(80)
-                    .collect::<String>();
+                let line_content = text.line(line).to_string().trim().chars().take(80).collect::<String>();
 
                 Some((
                     *doc_id,
@@ -128,16 +114,14 @@ impl JumpOps for EditorContext {
         let items: Vec<PickerItem> = entries
             .iter()
             .enumerate()
-            .map(
-                |(idx, (_doc_id, _sel, path, line, col, content))| PickerItem {
-                    id: idx.to_string(),
-                    display: format!("{path}:{line}:{col}"),
-                    icon: PickerIcon::JumpEntry,
-                    match_indices: vec![],
-                    secondary: Some(content.clone()),
-                    depth: 0,
-                },
-            )
+            .map(|(idx, (_doc_id, _sel, path, line, col, content))| PickerItem {
+                id: idx.to_string(),
+                display: format!("{path}:{line}:{col}"),
+                icon: PickerIcon::JumpEntry,
+                match_indices: vec![],
+                secondary: Some(content.clone()),
+                depth: 0,
+            })
             .collect();
 
         // Store entries for confirm handler
@@ -176,11 +160,7 @@ mod tests {
 
         let (view, _doc) = helix_view::current_ref!(ctx.editor);
         let jumps: Vec<_> = view.jumps.iter().collect();
-        assert!(
-            jumps.len() >= 2,
-            "expected at least 2 jumps, got {}",
-            jumps.len()
-        );
+        assert!(jumps.len() >= 2, "expected at least 2 jumps, got {}", jumps.len());
     }
 
     #[test]
@@ -290,9 +270,6 @@ mod tests {
         assert!(ctx.picker_visible);
         assert_eq!(ctx.picker_mode, PickerMode::JumpList);
         assert!(!ctx.picker_items.is_empty(), "picker should have items");
-        assert!(
-            !ctx.jumplist_entries.is_empty(),
-            "jumplist_entries should be populated"
-        );
+        assert!(!ctx.jumplist_entries.is_empty(), "jumplist_entries should be populated");
     }
 }

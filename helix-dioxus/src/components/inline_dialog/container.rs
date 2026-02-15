@@ -37,7 +37,7 @@ impl Default for DialogConstraints {
 
 impl DialogConstraints {
     /// Generate CSS style string for the constraints.
-    fn to_style(&self) -> String {
+    fn to_style(self) -> String {
         let mut parts = Vec::new();
         if let Some(min_w) = self.min_width {
             parts.push(format!("min-width: {min_w}px"));
@@ -64,11 +64,7 @@ const MAX_LEFT: usize = 600;
 /// Returns `(top, left, grow_upward)`. When `grow_upward` is true, the caller
 /// should apply `transform: translateY(-100%)` so the dialog extends upward
 /// from the anchor point.
-fn calculate_position(
-    cursor_line: usize,
-    cursor_col: usize,
-    position: DialogPosition,
-) -> (usize, usize, bool) {
+fn calculate_position(cursor_line: usize, cursor_col: usize, position: DialogPosition) -> (usize, usize, bool) {
     // For Above: grow upward from cursor line (unless near top → flip to below).
     // For Below: grow downward from cursor + 1 line.
     let grow_upward = matches!(position, DialogPosition::Above) && cursor_line > 2;

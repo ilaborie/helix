@@ -81,8 +81,7 @@ impl EditingOps for EditorContext {
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone().cursors(text);
 
-        let transaction =
-            helix_core::Transaction::insert(doc.text(), &selection, c.to_string().into());
+        let transaction = helix_core::Transaction::insert(doc.text(), &selection, c.to_string().into());
         doc.apply(&transaction, view_id);
     }
 
@@ -111,8 +110,7 @@ impl EditingOps for EditorContext {
         // Insert newline + indentation at cursor position
         let insert_selection = helix_core::Selection::point(cursor);
         let insert_text = format!("\n{indent}");
-        let transaction =
-            helix_core::Transaction::insert(doc.text(), &insert_selection, insert_text.into());
+        let transaction = helix_core::Transaction::insert(doc.text(), &insert_selection, insert_text.into());
         doc.apply(&transaction, view_id);
 
         // Position cursor at end of indentation on the new line
@@ -179,8 +177,7 @@ impl EditingOps for EditorContext {
 
         // Insert newline + indentation
         let insert_text = format!("\n{indent}");
-        let transaction =
-            helix_core::Transaction::insert(doc.text(), &insert_selection, insert_text.into());
+        let transaction = helix_core::Transaction::insert(doc.text(), &insert_selection, insert_text.into());
         doc.apply(&transaction, view_id);
 
         // Position cursor at end of indentation on the new line
@@ -202,8 +199,7 @@ impl EditingOps for EditorContext {
         // Insert indentation + newline at start of current line
         let insert_selection = helix_core::Selection::point(line_start);
         let insert_text = format!("{indent}\n");
-        let transaction =
-            helix_core::Transaction::insert(doc.text(), &insert_selection, insert_text.into());
+        let transaction = helix_core::Transaction::insert(doc.text(), &insert_selection, insert_text.into());
         doc.apply(&transaction, view_id);
 
         // Move cursor to the end of indentation on the new line (which is now at line_start)
@@ -240,8 +236,7 @@ impl EditingOps for EditorContext {
         let selection = doc.selection(view_id).clone();
 
         // Use helix_core::comment::toggle_line_comments
-        let transaction =
-            helix_core::comment::toggle_line_comments(doc.text(), &selection, comment_token);
+        let transaction = helix_core::comment::toggle_line_comments(doc.text(), &selection, comment_token);
 
         doc.apply(&transaction, view_id);
     }
@@ -262,8 +257,7 @@ impl EditingOps for EditorContext {
         let selection = doc.selection(view_id).clone();
 
         // Use helix_core::comment::toggle_block_comments
-        let transaction =
-            helix_core::comment::toggle_block_comments(doc.text(), &selection, tokens);
+        let transaction = helix_core::comment::toggle_block_comments(doc.text(), &selection, tokens);
 
         doc.apply(&transaction, view_id);
     }
@@ -418,11 +412,7 @@ impl EditingOps for EditorContext {
 
         // Yank to target register (skip for '_' black hole)
         if register != '_' {
-            if let Err(e) = self
-                .editor
-                .registers
-                .write(register, vec![selected_text.clone()])
-            {
+            if let Err(e) = self.editor.registers.write(register, vec![selected_text.clone()]) {
                 log::warn!("Failed to write to register '{register}': {e}");
             }
             if register == '+' {
@@ -464,15 +454,14 @@ impl EditingOps for EditorContext {
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
 
-        let transaction =
-            helix_core::Transaction::change_by_selection(doc.text(), &selection, |range| {
-                let replacement: String = text
-                    .slice(range.from()..range.to())
-                    .chars()
-                    .map(|c| if c == '\n' || c == '\r' { c } else { ch })
-                    .collect();
-                (range.from(), range.to(), Some(replacement.into()))
-            });
+        let transaction = helix_core::Transaction::change_by_selection(doc.text(), &selection, |range| {
+            let replacement: String = text
+                .slice(range.from()..range.to())
+                .chars()
+                .map(|c| if c == '\n' || c == '\r' { c } else { ch })
+                .collect();
+            (range.from(), range.to(), Some(replacement.into()))
+        });
 
         doc.apply(&transaction, view_id);
     }
@@ -547,21 +536,20 @@ impl EditingOps for EditorContext {
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
 
-        let transaction =
-            helix_core::Transaction::change_by_selection(doc.text(), &selection, |range| {
-                let toggled: String = text
-                    .slice(range.from()..range.to())
-                    .chars()
-                    .map(|c| {
-                        if c.is_uppercase() {
-                            c.to_lowercase().next().unwrap_or(c)
-                        } else {
-                            c.to_uppercase().next().unwrap_or(c)
-                        }
-                    })
-                    .collect();
-                (range.from(), range.to(), Some(toggled.into()))
-            });
+        let transaction = helix_core::Transaction::change_by_selection(doc.text(), &selection, |range| {
+            let toggled: String = text
+                .slice(range.from()..range.to())
+                .chars()
+                .map(|c| {
+                    if c.is_uppercase() {
+                        c.to_lowercase().next().unwrap_or(c)
+                    } else {
+                        c.to_uppercase().next().unwrap_or(c)
+                    }
+                })
+                .collect();
+            (range.from(), range.to(), Some(toggled.into()))
+        });
 
         doc.apply(&transaction, view_id);
     }
@@ -572,15 +560,14 @@ impl EditingOps for EditorContext {
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
 
-        let transaction =
-            helix_core::Transaction::change_by_selection(doc.text(), &selection, |range| {
-                let lower: String = text
-                    .slice(range.from()..range.to())
-                    .chars()
-                    .flat_map(char::to_lowercase)
-                    .collect();
-                (range.from(), range.to(), Some(lower.into()))
-            });
+        let transaction = helix_core::Transaction::change_by_selection(doc.text(), &selection, |range| {
+            let lower: String = text
+                .slice(range.from()..range.to())
+                .chars()
+                .flat_map(char::to_lowercase)
+                .collect();
+            (range.from(), range.to(), Some(lower.into()))
+        });
 
         doc.apply(&transaction, view_id);
     }
@@ -591,15 +578,14 @@ impl EditingOps for EditorContext {
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
 
-        let transaction =
-            helix_core::Transaction::change_by_selection(doc.text(), &selection, |range| {
-                let upper: String = text
-                    .slice(range.from()..range.to())
-                    .chars()
-                    .flat_map(char::to_uppercase)
-                    .collect();
-                (range.from(), range.to(), Some(upper.into()))
-            });
+        let transaction = helix_core::Transaction::change_by_selection(doc.text(), &selection, |range| {
+            let upper: String = text
+                .slice(range.from()..range.to())
+                .chars()
+                .flat_map(char::to_uppercase)
+                .collect();
+            (range.from(), range.to(), Some(upper.into()))
+        });
 
         doc.apply(&transaction, view_id);
     }
@@ -611,25 +597,24 @@ impl EditingOps for EditorContext {
         let doc = self.editor.document_mut(doc_id).expect("doc exists");
         let selection = doc.selection(view_id).clone();
 
-        let transaction =
-            helix_core::Transaction::change_by_selection(doc.text(), &selection, |range| {
-                let from = range.from();
-                let to = range.to();
-                let replacement = format!("{open}{}{close}", doc.text().slice(from..to));
-                (from, to, Some(replacement.into()))
-            });
+        let transaction = helix_core::Transaction::change_by_selection(doc.text(), &selection, |range| {
+            let from = range.from();
+            let to = range.to();
+            let replacement = format!("{open}{}{close}", doc.text().slice(from..to));
+            (from, to, Some(replacement.into()))
+        });
 
         doc.apply(&transaction, view_id);
     }
 
     /// Delete surround pair.
+    #[allow(clippy::indexing_slicing)] // Bounds checked: pair.len() == 2 ensures indices 0, 1 are valid
     fn surround_delete(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char) {
         let doc = self.editor.document_mut(doc_id).expect("doc exists");
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
 
-        let surround_result =
-            helix_core::surround::get_surround_pos(doc.syntax(), text, &selection, Some(ch), 1);
+        let surround_result = helix_core::surround::get_surround_pos(doc.syntax(), text, &selection, Some(ch), 1);
 
         let Ok(positions) = surround_result else {
             return;
@@ -655,6 +640,7 @@ impl EditingOps for EditorContext {
     }
 
     /// Replace surround pair.
+    #[allow(clippy::indexing_slicing)] // Bounds checked: pair.len() == 2 ensures indices 0, 1 are valid
     fn surround_replace(&mut self, doc_id: DocumentId, view_id: ViewId, old: char, new: char) {
         let (new_open, new_close) = surround_pair(new);
 
@@ -662,8 +648,7 @@ impl EditingOps for EditorContext {
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
 
-        let surround_result =
-            helix_core::surround::get_surround_pos(doc.syntax(), text, &selection, Some(old), 1);
+        let surround_result = helix_core::surround::get_surround_pos(doc.syntax(), text, &selection, Some(old), 1);
 
         let Ok(positions) = surround_result else {
             return;
@@ -765,8 +750,7 @@ impl EditingOps for EditorContext {
         };
 
         let insert_selection = helix_core::Selection::point(insert_pos);
-        let transaction =
-            helix_core::Transaction::insert(doc.text(), &insert_selection, "\n".into());
+        let transaction = helix_core::Transaction::insert(doc.text(), &insert_selection, "\n".into());
         doc.apply(&transaction, view_id);
     }
 
@@ -780,8 +764,7 @@ impl EditingOps for EditorContext {
         let line_start = text.line_to_char(line);
 
         let insert_selection = helix_core::Selection::point(line_start);
-        let transaction =
-            helix_core::Transaction::insert(doc.text(), &insert_selection, "\n".into());
+        let transaction = helix_core::Transaction::insert(doc.text(), &insert_selection, "\n".into());
         doc.apply(&transaction, view_id);
     }
 
@@ -795,22 +778,18 @@ impl EditingOps for EditorContext {
         let mut new_ranges = helix_core::SmallVec::<[helix_core::Range; 1]>::new();
         let mut cumulative_diff: i128 = 0;
 
-        for range in selection.iter() {
+        for range in &selection {
             let selected_text: std::borrow::Cow<str> = range.fragment(text);
+            #[allow(clippy::cast_sign_loss)] // cumulative_diff adjusts position; result is always non-negative
             let new_from = ((range.from() as i128) + cumulative_diff) as usize;
-            let incremented = [
-                helix_core::increment::integer,
-                helix_core::increment::date_time,
-            ]
-            .iter()
-            .find_map(|incrementor| incrementor(selected_text.as_ref(), amount));
+            let incremented = [helix_core::increment::integer, helix_core::increment::date_time]
+                .iter()
+                .find_map(|incrementor| incrementor(selected_text.as_ref(), amount));
 
             match incremented {
                 None => {
-                    let new_range = helix_core::Range::new(
-                        new_from,
-                        ((range.to() as i128) + cumulative_diff) as usize,
-                    );
+                    #[allow(clippy::cast_sign_loss)] // cumulative_diff adjusts position; result is always non-negative
+                    let new_range = helix_core::Range::new(new_from, ((range.to() as i128) + cumulative_diff) as usize);
                     new_ranges.push(new_range);
                 }
                 Some(new_text) => {
@@ -845,13 +824,7 @@ impl EditingOps for EditorContext {
             .registers
             .read(register, &self.editor)
             .and_then(|mut values| values.next().map(std::borrow::Cow::into_owned))
-            .or_else(|| {
-                if register == '+' {
-                    Some(self.clipboard.clone())
-                } else {
-                    None
-                }
-            })
+            .or_else(|| (register == '+').then(|| self.clipboard.clone()))
             .unwrap_or_default();
 
         if content.is_empty() {
@@ -873,10 +846,7 @@ impl EditingOps for EditorContext {
 
         let doc = self.editor.document(doc_id).expect("doc exists");
 
-        let Some(language_server) = doc
-            .language_servers_with_feature(LanguageServerFeature::Format)
-            .next()
-        else {
+        let Some(language_server) = doc.language_servers_with_feature(LanguageServerFeature::Format).next() else {
             log::info!("No configured language server supports formatting");
             return;
         };
@@ -886,11 +856,9 @@ impl EditingOps for EditorContext {
         let future = language_server.text_document_formatting(
             doc.identifier(),
             lsp::FormattingOptions {
+                #[allow(clippy::cast_possible_truncation)] // tab_width is always small (1-8)
                 tab_size: doc.tab_width() as u32,
-                insert_spaces: matches!(
-                    doc.indent_style,
-                    helix_core::indent::IndentStyle::Spaces(_)
-                ),
+                insert_spaces: matches!(doc.indent_style, helix_core::indent::IndentStyle::Spaces(_)),
                 ..Default::default()
             },
             None,
@@ -907,11 +875,7 @@ impl EditingOps for EditorContext {
         tokio::spawn(async move {
             match future.await {
                 Ok(Some(edits)) => {
-                    let transaction = helix_lsp::util::generate_transaction_from_edits(
-                        &text,
-                        edits,
-                        offset_encoding,
-                    );
+                    let transaction = helix_lsp::util::generate_transaction_from_edits(&text, edits, offset_encoding);
                     let _ = tx.send(crate::state::EditorCommand::LspResponse(
                         crate::lsp::LspResponse::FormatResult { transaction },
                     ));
@@ -949,18 +913,15 @@ impl EditingOps for EditorContext {
 
         let offset_encoding = language_server.offset_encoding();
         let selection = doc.selection(view_id).clone();
-        let range =
-            helix_lsp::util::range_to_lsp_range(doc.text(), selection.primary(), offset_encoding);
+        let range = helix_lsp::util::range_to_lsp_range(doc.text(), selection.primary(), offset_encoding);
 
         let future = language_server.text_document_range_formatting(
             doc.identifier(),
             range,
             lsp::FormattingOptions {
+                #[allow(clippy::cast_possible_truncation)] // tab_width is always small (1-8)
                 tab_size: doc.tab_width() as u32,
-                insert_spaces: matches!(
-                    doc.indent_style,
-                    helix_core::indent::IndentStyle::Spaces(_)
-                ),
+                insert_spaces: matches!(doc.indent_style, helix_core::indent::IndentStyle::Spaces(_)),
                 ..Default::default()
             },
             None,
@@ -977,11 +938,7 @@ impl EditingOps for EditorContext {
         tokio::spawn(async move {
             match future.await {
                 Ok(Some(edits)) => {
-                    let transaction = helix_lsp::util::generate_transaction_from_edits(
-                        &text,
-                        edits,
-                        offset_encoding,
-                    );
+                    let transaction = helix_lsp::util::generate_transaction_from_edits(&text, edits, offset_encoding);
                     let _ = tx.send(crate::state::EditorCommand::LspResponse(
                         crate::lsp::LspResponse::FormatResult { transaction },
                     ));
@@ -993,7 +950,7 @@ impl EditingOps for EditorContext {
     }
 
     /// Align selections by inserting spaces to align cursors in columns.
-    #[allow(deprecated)]
+    #[allow(deprecated, clippy::indexing_slicing)] // Indices are bounded by iteration logic: col < column_widths.len(), row < offs.len()
     fn align_selections(&mut self, doc_id: DocumentId, view_id: ViewId) {
         use helix_core::visual_coords_at_pos;
 
@@ -1006,7 +963,7 @@ impl EditingOps for EditorContext {
         let mut last_line = text.len_lines() + 1;
         let mut col = 0;
 
-        for range in selection.iter() {
+        for range in &selection {
             let coords = visual_coords_at_pos(text, range.head, tab_width);
             let anchor_coords = visual_coords_at_pos(text, range.anchor, tab_width);
 
@@ -1026,7 +983,7 @@ impl EditingOps for EditorContext {
         }
 
         let mut changes = Vec::with_capacity(selection.len());
-        let len = column_widths.first().map(Vec::len).unwrap_or(0);
+        let len = column_widths.first().map_or(0, Vec::len);
         let mut offs = vec![0usize; len];
 
         for col in column_widths {
@@ -1497,10 +1454,7 @@ mod tests {
         assert_text(&ctx, " world\n");
         // Verify nothing was yanked to default register
         let reg_content = ctx.editor.registers.read('"', &ctx.editor);
-        assert!(
-            reg_content.is_none(),
-            "should not have written to default register"
-        );
+        assert!(reg_content.is_none(), "should not have written to default register");
     }
 
     // --- delete_word_forward ---

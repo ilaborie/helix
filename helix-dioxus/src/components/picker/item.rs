@@ -2,9 +2,9 @@
 
 use dioxus::prelude::*;
 use lucide_dioxus::{
-    Blocks, Bookmark, Braces, ChevronRight, CircleX, Code, Component, FileCode, FileDiff,
-    FileMinus, FilePen, FilePlus, FileX, Hash, Info, Layers, Lightbulb, Link2, Package, Palette,
-    Smile, SquareFunction, Terminal, TextSearch, TriangleAlert, Variable,
+    Blocks, Bookmark, Braces, ChevronRight, CircleX, Code, Component, FileCode, FileDiff, FileMinus, FilePen, FilePlus,
+    FileX, Hash, Info, Layers, Lightbulb, Link2, Package, Palette, Smile, SquareFunction, Terminal, TextSearch,
+    TriangleAlert, Variable,
 };
 
 use crate::components::file_icons::{FileTypeIcon, FolderTypeIcon};
@@ -27,44 +27,31 @@ pub fn PickerItemRow(
 
     // Icon color based on type (using CSS variables)
     let icon_color = match item.icon {
-        PickerIcon::Folder | PickerIcon::FolderOpen => "var(--accent)",
-        PickerIcon::BufferModified => "var(--warning)",
-        // Symbol colors
-        PickerIcon::SymbolFunction | PickerIcon::SymbolMethod => "var(--accent)",
-        PickerIcon::SymbolClass
+        PickerIcon::Folder
+        | PickerIcon::FolderOpen
+        | PickerIcon::SymbolFunction
+        | PickerIcon::SymbolMethod
+        | PickerIcon::Reference
+        | PickerIcon::VcsRenamed => "var(--accent)",
+        PickerIcon::BufferModified
+        | PickerIcon::SymbolClass
         | PickerIcon::SymbolStruct
         | PickerIcon::SymbolEnum
-        | PickerIcon::SymbolInterface => "var(--warning)",
-        PickerIcon::SymbolVariable | PickerIcon::SymbolField => "var(--error)",
-        PickerIcon::SymbolConstant => "var(--orange)",
-        PickerIcon::SymbolModule => "var(--purple)",
-        PickerIcon::SymbolOther => "var(--text)",
-        // Diagnostic colors by severity
-        PickerIcon::DiagnosticError => "var(--error)",
-        PickerIcon::DiagnosticWarning => "var(--warning)",
+        | PickerIcon::SymbolInterface
+        | PickerIcon::DiagnosticWarning
+        | PickerIcon::VcsModified
+        | PickerIcon::Emoji => "var(--warning)",
+        PickerIcon::SymbolVariable
+        | PickerIcon::SymbolField
+        | PickerIcon::DiagnosticError
+        | PickerIcon::VcsConflict
+        | PickerIcon::VcsDeleted => "var(--error)",
+        PickerIcon::SymbolConstant | PickerIcon::JumpEntry => "var(--orange)",
+        PickerIcon::SymbolModule | PickerIcon::Definition | PickerIcon::Register | PickerIcon::Theme => "var(--purple)",
+        PickerIcon::SymbolOther | PickerIcon::File | PickerIcon::Buffer => "var(--text)",
         PickerIcon::DiagnosticInfo => "var(--info)",
-        PickerIcon::DiagnosticHint => "var(--hint)",
-        // Search result
-        PickerIcon::SearchResult => "var(--success)",
-        // Location icons
-        PickerIcon::Reference => "var(--accent)",
-        PickerIcon::Definition | PickerIcon::Register => "var(--purple)",
-        // Command panel
-        PickerIcon::Command => "var(--hint)",
-        // Jump list
-        PickerIcon::JumpEntry => "var(--orange)",
-        // Theme
-        PickerIcon::Theme => "var(--purple)",
-        // VCS icons
-        PickerIcon::VcsAdded => "var(--success)",
-        PickerIcon::VcsModified => "var(--warning)",
-        PickerIcon::VcsConflict => "var(--error)",
-        PickerIcon::VcsDeleted => "var(--error)",
-        PickerIcon::VcsRenamed => "var(--accent)",
-        // Emoji
-        PickerIcon::Emoji => "var(--warning)",
-        // Default colors
-        PickerIcon::File | PickerIcon::Buffer => "var(--text)",
+        PickerIcon::DiagnosticHint | PickerIcon::Command => "var(--hint)",
+        PickerIcon::SearchResult | PickerIcon::VcsAdded => "var(--success)",
     };
 
     // Text color - use neutral for diagnostics so highlighting is visible

@@ -5,9 +5,7 @@ use std::path::{Path, PathBuf};
 use helix_view::document::DocumentSavedEvent;
 use helix_view::DocumentId;
 
-use crate::state::{
-    BufferInfo, ConfirmationAction, ConfirmationDialogSnapshot, EditorContext, NotificationSeverity,
-};
+use crate::state::{BufferInfo, ConfirmationAction, ConfirmationDialogSnapshot, EditorContext, NotificationSeverity};
 
 /// Build a `ConfirmationDialogSnapshot` with common structure.
 fn build_confirmation_dialog(
@@ -53,8 +51,7 @@ pub trait BufferOps {
 impl BufferOps for EditorContext {
     /// Switch to a specific buffer.
     fn switch_to_buffer(&mut self, doc_id: DocumentId) {
-        self.editor
-            .switch(doc_id, helix_view::editor::Action::Replace);
+        self.editor.switch(doc_id, helix_view::editor::Action::Replace);
     }
 
     /// Close a buffer.
@@ -74,9 +71,7 @@ impl BufferOps for EditorContext {
                     let file_name = doc.display_name().to_string();
                     self.confirmation_dialog = build_confirmation_dialog(
                         "Close Buffer",
-                        &format!(
-                            "\"{file_name}\" has unsaved changes. Do you want to close it anyway?"
-                        ),
+                        &format!("\"{file_name}\" has unsaved changes. Do you want to close it anyway?"),
                         "Close",
                         None,
                         ConfirmationAction::CloseBuffer,
@@ -91,6 +86,7 @@ impl BufferOps for EditorContext {
     }
 
     /// Cycle through buffers.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)] // Buffer count is small; index arithmetic is safe
     fn cycle_buffer(&mut self, direction: i32) {
         let doc_ids: Vec<DocumentId> = self.editor.documents.keys().copied().collect();
         if doc_ids.is_empty() {
@@ -99,10 +95,7 @@ impl BufferOps for EditorContext {
 
         let current_doc_id = self.editor.tree.get(self.editor.tree.focus).doc;
 
-        let current_idx = doc_ids
-            .iter()
-            .position(|&id| id == current_doc_id)
-            .unwrap_or(0);
+        let current_idx = doc_ids.iter().position(|&id| id == current_doc_id).unwrap_or(0);
 
         let len = doc_ids.len() as i32;
         let new_idx = ((current_idx as i32 + direction).rem_euclid(len)) as usize;
@@ -114,6 +107,8 @@ impl BufferOps for EditorContext {
 
     /// Get buffer bar snapshot for rendering.
     fn buffer_bar_snapshot(&mut self) -> (Vec<BufferInfo>, usize) {
+        const MAX_VISIBLE_TABS: usize = 8;
+
         let current_doc_id = self.editor.tree.get(self.editor.tree.focus).doc;
 
         let buffers: Vec<BufferInfo> = self
@@ -128,8 +123,7 @@ impl BufferOps for EditorContext {
             })
             .collect();
 
-        // Auto-scroll to make current buffer visible (max 8 visible tabs)
-        const MAX_VISIBLE_TABS: usize = 8;
+        // Auto-scroll to make current buffer visible
         if let Some(current_idx) = buffers.iter().position(|b| b.is_current) {
             if current_idx < self.buffer_bar_scroll {
                 // Current buffer is to the left of visible area
@@ -148,14 +142,11 @@ impl BufferOps for EditorContext {
         let path = helix_stdx::path::canonicalize(path);
         match self.editor.open(&path, helix_view::editor::Action::Replace) {
             Ok(_) => {
-                log::info!("Opened file: {path:?}");
+                log::info!("Opened file: {}", path.display());
             }
             Err(e) => {
-                log::error!("Failed to open file {path:?}: {e}");
-                self.show_notification(
-                    format!("Failed to open file: {e}"),
-                    NotificationSeverity::Error,
-                );
+                log::error!("Failed to open file {}: {e}", path.display());
+                self.show_notification(format!("Failed to open file: {e}"), NotificationSeverity::Error);
             }
         }
     }
@@ -189,10 +180,7 @@ impl BufferOps for EditorContext {
                 } else {
                     event.path.to_string_lossy().into_owned()
                 };
-                self.show_notification(
-                    format!("Saved to {display_path}"),
-                    NotificationSeverity::Success,
-                );
+                self.show_notification(format!("Saved to {display_path}"), NotificationSeverity::Success);
             }
             Err(e) => {
                 self.show_notification(format!("Save failed: {e}"), NotificationSeverity::Error);
@@ -205,12 +193,9 @@ impl BufferOps for EditorContext {
     fn try_quit(&mut self, force: bool) {
         let view_id = self.editor.tree.focus;
         let view = self.editor.tree.get(view_id);
-        let doc = match self.editor.document(view.doc) {
-            Some(doc) => doc,
-            None => {
-                self.should_quit = true;
-                return;
-            }
+        let Some(doc) = self.editor.document(view.doc) else {
+            self.should_quit = true;
+            return;
         };
 
         if doc.is_modified() && !force {
@@ -254,18 +239,12 @@ impl BufferOps for EditorContext {
             if let Some(path) = doc.path().cloned() {
                 match self.editor.open(&path, helix_view::editor::Action::Replace) {
                     Ok(_) => {
-                        log::info!("Reloaded document from {path:?}");
-                        self.show_notification(
-                            "File reloaded".to_string(),
-                            NotificationSeverity::Info,
-                        );
+                        log::info!("Reloaded document from {}", path.display());
+                        self.show_notification("File reloaded".to_string(), NotificationSeverity::Info);
                     }
                     Err(e) => {
                         log::error!("Failed to reload document: {e}");
-                        self.show_notification(
-                            format!("Failed to reload: {e}"),
-                            NotificationSeverity::Error,
-                        );
+                        self.show_notification(format!("Failed to reload: {e}"), NotificationSeverity::Error);
                     }
                 }
             } else {
@@ -287,10 +266,7 @@ impl BufferOps for EditorContext {
             .collect();
 
         if doc_ids.is_empty() {
-            self.show_notification(
-                "No modified buffers to save".to_string(),
-                NotificationSeverity::Info,
-            );
+            self.show_notification("No modified buffers to save".to_string(), NotificationSeverity::Info);
             return;
         }
 
@@ -318,10 +294,7 @@ impl BufferOps for EditorContext {
                 NotificationSeverity::Warning,
             );
         } else {
-            self.show_notification(
-                format!("Saved {saved_count} files"),
-                NotificationSeverity::Success,
-            );
+            self.show_notification(format!("Saved {saved_count} files"), NotificationSeverity::Success);
         }
     }
 
@@ -329,18 +302,13 @@ impl BufferOps for EditorContext {
     fn quit_all(&mut self, force: bool) {
         // Check for unsaved changes in any buffer
         if !force {
-            let has_unsaved = self
-                .editor
-                .documents()
-                .any(helix_view::Document::is_modified);
+            let has_unsaved = self.editor.documents().any(helix_view::Document::is_modified);
             if has_unsaved {
                 // Count modified buffers
                 let modified_count = self.editor.documents().filter(|d| d.is_modified()).count();
                 self.confirmation_dialog = build_confirmation_dialog(
                     "Unsaved Changes",
-                    &format!(
-                        "{modified_count} buffer(s) have unsaved changes. What would you like to do?"
-                    ),
+                    &format!("{modified_count} buffer(s) have unsaved changes. What would you like to do?"),
                     "Save All & Quit",
                     Some("Discard All"),
                     ConfirmationAction::SaveAndQuit,
@@ -358,10 +326,7 @@ impl BufferOps for EditorContext {
     fn buffer_close_all(&mut self, force: bool) {
         // Check for unsaved changes if not forcing
         if !force {
-            let has_unsaved = self
-                .editor
-                .documents()
-                .any(helix_view::Document::is_modified);
+            let has_unsaved = self.editor.documents().any(helix_view::Document::is_modified);
             if has_unsaved {
                 self.show_notification(
                     "Some buffers have unsaved changes. Use :bca! to force close.".to_string(),
@@ -371,11 +336,7 @@ impl BufferOps for EditorContext {
             }
         }
 
-        let doc_ids: Vec<_> = self
-            .editor
-            .documents()
-            .map(helix_view::Document::id)
-            .collect();
+        let doc_ids: Vec<_> = self.editor.documents().map(helix_view::Document::id).collect();
         for doc_id in doc_ids {
             let _ = self.editor.close_document(doc_id, force);
         }
@@ -406,10 +367,7 @@ impl BufferOps for EditorContext {
         }
 
         if closed_count > 0 {
-            self.show_notification(
-                format!("Closed {closed_count} buffer(s)"),
-                NotificationSeverity::Info,
-            );
+            self.show_notification(format!("Closed {closed_count} buffer(s)"), NotificationSeverity::Info);
         }
     }
 
@@ -418,10 +376,7 @@ impl BufferOps for EditorContext {
         match std::env::set_current_dir(path) {
             Ok(()) => {
                 if let Ok(cwd) = std::env::current_dir() {
-                    self.show_notification(
-                        format!("Changed to {}", cwd.display()),
-                        NotificationSeverity::Info,
-                    );
+                    self.show_notification(format!("Changed to {}", cwd.display()), NotificationSeverity::Info);
                 }
             }
             Err(e) => {
@@ -437,10 +392,7 @@ impl BufferOps for EditorContext {
                 self.show_notification(cwd.display().to_string(), NotificationSeverity::Info);
             }
             Err(e) => {
-                self.show_notification(
-                    format!("Failed to get cwd: {e}"),
-                    NotificationSeverity::Error,
-                );
+                self.show_notification(format!("Failed to get cwd: {e}"), NotificationSeverity::Error);
             }
         }
     }
@@ -474,7 +426,7 @@ impl EditorContext {
 
         // Block on the async save
         let event = futures::executor::block_on(save_future)?;
-        log::info!("Saved to {:?}", event.path);
+        log::info!("Saved to {}", event.path.display());
         Ok(event)
     }
 }

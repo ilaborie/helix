@@ -17,17 +17,16 @@ pub fn parse_args() -> StartupAction {
         return parse_multiple_args(&args);
     }
 
-    // Single argument
-    parse_single_arg(&args[0])
+    // Single argument — len == 1 after the checks above
+    let Some(arg) = args.first() else {
+        unreachable!("args is non-empty after is_empty check");
+    };
+    parse_single_arg(arg)
 }
 
 /// Parse multiple command-line arguments.
 fn parse_multiple_args(args: &[String]) -> StartupAction {
-    let files: Vec<PathBuf> = args
-        .iter()
-        .map(PathBuf::from)
-        .filter(|path| path.is_file())
-        .collect();
+    let files: Vec<PathBuf> = args.iter().map(PathBuf::from).filter(|path| path.is_file()).collect();
 
     if files.is_empty() {
         log::warn!("No valid files in arguments");
@@ -65,12 +64,7 @@ fn parse_single_arg(arg: &str) -> StartupAction {
 fn parse_glob_pattern(pattern: &str) -> StartupAction {
     let files: Vec<PathBuf> = glob::glob(pattern)
         .ok()
-        .map(|paths| {
-            paths
-                .filter_map(Result::ok)
-                .filter(|path| path.is_file())
-                .collect()
-        })
+        .map(|paths| paths.filter_map(Result::ok).filter(|path| path.is_file()).collect())
         .unwrap_or_default();
 
     if files.is_empty() {

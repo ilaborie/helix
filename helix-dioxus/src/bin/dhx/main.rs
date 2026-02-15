@@ -5,6 +5,7 @@ mod tracing_setup;
 
 use anyhow::Result;
 
+#[allow(clippy::print_stderr)] // pre-logging: tracing not yet initialized
 fn main() -> Result<()> {
     // Load GUI-specific config (dhx.toml)
     let config = helix_dioxus::DhxConfig::load_default().unwrap_or_else(|err| {

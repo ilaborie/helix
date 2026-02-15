@@ -107,8 +107,7 @@ impl MovementOps for EditorContext {
         let selection = doc.selection(view_id).clone();
 
         // Helix's selection-first model: movements create selections
-        let new_selection =
-            selection.transform(|range| helix_core::movement::move_next_word_start(text, range, 1));
+        let new_selection = selection.transform(|range| helix_core::movement::move_next_word_start(text, range, 1));
 
         doc.set_selection(view_id, new_selection);
     }
@@ -118,8 +117,7 @@ impl MovementOps for EditorContext {
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
 
-        let new_selection =
-            selection.transform(|range| helix_core::movement::move_prev_word_start(text, range, 1));
+        let new_selection = selection.transform(|range| helix_core::movement::move_prev_word_start(text, range, 1));
 
         doc.set_selection(view_id, new_selection);
     }
@@ -129,8 +127,7 @@ impl MovementOps for EditorContext {
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
 
-        let new_selection =
-            selection.transform(|range| helix_core::movement::move_next_word_end(text, range, 1));
+        let new_selection = selection.transform(|range| helix_core::movement::move_next_word_end(text, range, 1));
 
         doc.set_selection(view_id, new_selection);
     }
@@ -140,8 +137,8 @@ impl MovementOps for EditorContext {
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
 
-        let new_selection = selection
-            .transform(|range| helix_core::movement::move_next_long_word_start(text, range, 1));
+        let new_selection =
+            selection.transform(|range| helix_core::movement::move_next_long_word_start(text, range, 1));
 
         doc.set_selection(view_id, new_selection);
     }
@@ -151,8 +148,7 @@ impl MovementOps for EditorContext {
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
 
-        let new_selection = selection
-            .transform(|range| helix_core::movement::move_next_long_word_end(text, range, 1));
+        let new_selection = selection.transform(|range| helix_core::movement::move_next_long_word_end(text, range, 1));
 
         doc.set_selection(view_id, new_selection);
     }
@@ -162,8 +158,8 @@ impl MovementOps for EditorContext {
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
 
-        let new_selection = selection
-            .transform(|range| helix_core::movement::move_prev_long_word_start(text, range, 1));
+        let new_selection =
+            selection.transform(|range| helix_core::movement::move_prev_long_word_start(text, range, 1));
 
         doc.set_selection(view_id, new_selection);
     }
@@ -236,27 +232,27 @@ impl MovementOps for EditorContext {
     }
 
     fn page_up(&mut self, doc_id: DocumentId, view_id: ViewId) {
-        self.move_vertical_by(doc_id, view_id, -(PAGE_SIZE as isize));
+        self.move_vertical_by(doc_id, view_id, -PAGE_SIZE.cast_signed());
     }
 
     fn page_down(&mut self, doc_id: DocumentId, view_id: ViewId) {
-        self.move_vertical_by(doc_id, view_id, PAGE_SIZE as isize);
+        self.move_vertical_by(doc_id, view_id, PAGE_SIZE.cast_signed());
     }
 
     fn half_page_up(&mut self, doc_id: DocumentId, view_id: ViewId) {
-        self.move_vertical_by(doc_id, view_id, -(HALF_PAGE_SIZE as isize));
+        self.move_vertical_by(doc_id, view_id, -HALF_PAGE_SIZE.cast_signed());
     }
 
     fn half_page_down(&mut self, doc_id: DocumentId, view_id: ViewId) {
-        self.move_vertical_by(doc_id, view_id, HALF_PAGE_SIZE as isize);
+        self.move_vertical_by(doc_id, view_id, HALF_PAGE_SIZE.cast_signed());
     }
 
     fn scroll_up(&mut self, doc_id: DocumentId, view_id: ViewId, lines: usize) {
-        self.scroll_by(doc_id, view_id, -(lines as isize));
+        self.scroll_by(doc_id, view_id, -lines.cast_signed());
     }
 
     fn scroll_down(&mut self, doc_id: DocumentId, view_id: ViewId, lines: usize) {
-        self.scroll_by(doc_id, view_id, lines as isize);
+        self.scroll_by(doc_id, view_id, lines.cast_signed());
     }
 
     fn scroll_to_line(&mut self, doc_id: DocumentId, view_id: ViewId, target_line: usize) {
@@ -329,11 +325,7 @@ impl MovementOps for EditorContext {
 
     fn goto_last_modified_file(&mut self) {
         let view = helix_view::view!(self.editor);
-        let alternate_file = view
-            .last_modified_docs
-            .into_iter()
-            .flatten()
-            .find(|&id| id != view.doc);
+        let alternate_file = view.last_modified_docs.into_iter().flatten().find(|&id| id != view.doc);
         if let Some(alt) = alternate_file {
             self.editor.switch(alt, helix_view::editor::Action::Replace);
         } else {
@@ -378,9 +370,8 @@ impl MovementOps for EditorContext {
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
 
-        let new_selection = selection.transform(|range| {
-            helix_core::movement::move_next_paragraph(text, range, 1, Movement::Move)
-        });
+        let new_selection =
+            selection.transform(|range| helix_core::movement::move_next_paragraph(text, range, 1, Movement::Move));
 
         doc.set_selection(view_id, new_selection);
     }
@@ -390,83 +381,42 @@ impl MovementOps for EditorContext {
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
 
-        let new_selection = selection.transform(|range| {
-            helix_core::movement::move_prev_paragraph(text, range, 1, Movement::Move)
-        });
+        let new_selection =
+            selection.transform(|range| helix_core::movement::move_prev_paragraph(text, range, 1, Movement::Move));
 
         doc.set_selection(view_id, new_selection);
     }
 
     fn next_function(&mut self, doc_id: DocumentId, view_id: ViewId) {
-        self.goto_ts_object(
-            doc_id,
-            view_id,
-            "function",
-            helix_core::movement::Direction::Forward,
-        );
+        self.goto_ts_object(doc_id, view_id, "function", helix_core::movement::Direction::Forward);
     }
 
     fn prev_function(&mut self, doc_id: DocumentId, view_id: ViewId) {
-        self.goto_ts_object(
-            doc_id,
-            view_id,
-            "function",
-            helix_core::movement::Direction::Backward,
-        );
+        self.goto_ts_object(doc_id, view_id, "function", helix_core::movement::Direction::Backward);
     }
 
     fn next_class(&mut self, doc_id: DocumentId, view_id: ViewId) {
-        self.goto_ts_object(
-            doc_id,
-            view_id,
-            "class",
-            helix_core::movement::Direction::Forward,
-        );
+        self.goto_ts_object(doc_id, view_id, "class", helix_core::movement::Direction::Forward);
     }
 
     fn prev_class(&mut self, doc_id: DocumentId, view_id: ViewId) {
-        self.goto_ts_object(
-            doc_id,
-            view_id,
-            "class",
-            helix_core::movement::Direction::Backward,
-        );
+        self.goto_ts_object(doc_id, view_id, "class", helix_core::movement::Direction::Backward);
     }
 
     fn next_parameter(&mut self, doc_id: DocumentId, view_id: ViewId) {
-        self.goto_ts_object(
-            doc_id,
-            view_id,
-            "parameter",
-            helix_core::movement::Direction::Forward,
-        );
+        self.goto_ts_object(doc_id, view_id, "parameter", helix_core::movement::Direction::Forward);
     }
 
     fn prev_parameter(&mut self, doc_id: DocumentId, view_id: ViewId) {
-        self.goto_ts_object(
-            doc_id,
-            view_id,
-            "parameter",
-            helix_core::movement::Direction::Backward,
-        );
+        self.goto_ts_object(doc_id, view_id, "parameter", helix_core::movement::Direction::Backward);
     }
 
     fn next_comment(&mut self, doc_id: DocumentId, view_id: ViewId) {
-        self.goto_ts_object(
-            doc_id,
-            view_id,
-            "comment",
-            helix_core::movement::Direction::Forward,
-        );
+        self.goto_ts_object(doc_id, view_id, "comment", helix_core::movement::Direction::Forward);
     }
 
     fn prev_comment(&mut self, doc_id: DocumentId, view_id: ViewId) {
-        self.goto_ts_object(
-            doc_id,
-            view_id,
-            "comment",
-            helix_core::movement::Direction::Backward,
-        );
+        self.goto_ts_object(doc_id, view_id, "comment", helix_core::movement::Direction::Backward);
     }
 
     /// Move cursor to column 1 on the current line (g| in Helix).
@@ -486,14 +436,7 @@ impl EditorContext {
     ///
     /// - `forward`: search direction (true = right, false = left)
     /// - `till`: if true, stop one position before the character
-    pub(crate) fn find_char(
-        &mut self,
-        doc_id: DocumentId,
-        view_id: ViewId,
-        ch: char,
-        forward: bool,
-        till: bool,
-    ) {
+    pub(crate) fn find_char(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char, forward: bool, till: bool) {
         // Remember this motion for repeat (;) and reverse (,)
         self.last_find_char = Some((ch, forward, till));
 
@@ -594,7 +537,7 @@ impl EditorContext {
             let new_line = if delta < 0 {
                 line.saturating_sub(delta.unsigned_abs())
             } else {
-                (line + delta as usize).min(last_line)
+                (line + delta.cast_unsigned()).min(last_line)
             };
             let new_line_len = text.line(new_line).len_chars().saturating_sub(1);
             let new_cursor = text.line_to_char(new_line) + col.min(new_line_len);
@@ -616,7 +559,7 @@ impl EditorContext {
         let new_line = if delta < 0 {
             current_line.saturating_sub(delta.unsigned_abs())
         } else {
-            (current_line + delta as usize).min(last_line)
+            (current_line + delta.cast_unsigned()).min(last_line)
         };
 
         offset.anchor = text.line_to_char(new_line);
@@ -624,6 +567,7 @@ impl EditorContext {
     }
 
     /// Move cursor to a window position (top/center/bottom).
+    #[allow(clippy::needless_pass_by_value)] // Align is a foreign enum from helix-view, keeping by-value for consistency
     fn goto_window(&mut self, align: Align) {
         let config = self.editor.config();
         let (view, doc) = helix_view::current!(self.editor);
@@ -635,14 +579,13 @@ impl EditorContext {
         let visual_line = match align {
             Align::Top => view_offset.vertical_offset + scrolloff,
             Align::Center => view_offset.vertical_offset + (last_visual_line / 2),
-            Align::Bottom => {
-                view_offset.vertical_offset + last_visual_line.saturating_sub(scrolloff)
-            }
+            Align::Bottom => view_offset.vertical_offset + last_visual_line.saturating_sub(scrolloff),
         };
         let visual_line = visual_line
             .max(view_offset.vertical_offset + scrolloff)
             .min(view_offset.vertical_offset + last_visual_line.saturating_sub(scrolloff));
 
+        #[allow(clippy::cast_possible_truncation)] // visual_line is bounded by view height, always fits in u16
         if let Some(pos) = view.pos_at_visual_coords(doc, visual_line as u16, 0, false) {
             let text = doc.text().slice(..);
             let selection = doc
@@ -669,16 +612,14 @@ impl EditorContext {
             let root = syntax.tree().root_node();
 
             let selection = doc.selection(view_id).clone().transform(|range| {
-                let new_range = helix_core::movement::goto_treesitter_object(
-                    text, range, object, dir, &root, syntax, &loader, 1,
-                );
+                let new_range =
+                    helix_core::movement::goto_treesitter_object(text, range, object, dir, &root, syntax, &loader, 1);
                 new_range.with_direction(dir)
             });
 
             doc.set_selection(view_id, selection);
         } else {
-            self.editor
-                .set_status("Syntax-tree is not available in current buffer");
+            self.editor.set_status("Syntax-tree is not available in current buffer");
         }
     }
 }
@@ -922,11 +863,7 @@ mod tests {
         let sel = doc.selection(view.id).primary();
         let text = doc.text().slice(..);
         let cursor_line = text.char_to_line(sel.cursor(text));
-        assert_eq!(
-            cursor_line,
-            text.len_lines() - 1,
-            "cursor should be on last line"
-        );
+        assert_eq!(cursor_line, text.len_lines() - 1, "cursor should be on last line");
     }
 
     // --- goto_first_nonwhitespace ---
@@ -977,10 +914,7 @@ mod tests {
         let sel = doc.selection(view.id).primary();
         let text = doc.text().slice(..);
         let cursor_line = text.char_to_line(sel.cursor(text));
-        assert_eq!(
-            cursor_line, HALF_PAGE_SIZE,
-            "should move down HALF_PAGE_SIZE lines"
-        );
+        assert_eq!(cursor_line, HALF_PAGE_SIZE, "should move down HALF_PAGE_SIZE lines");
     }
 
     // --- next_paragraph / prev_paragraph ---
@@ -995,10 +929,7 @@ mod tests {
         let text = doc.text().slice(..);
         let cursor_line = text.char_to_line(sel.cursor(text));
         // Should jump to or past the blank line (line 2)
-        assert!(
-            cursor_line >= 2,
-            "should be at or past blank line: {cursor_line}"
-        );
+        assert!(cursor_line >= 2, "should be at or past blank line: {cursor_line}");
     }
 
     #[test]
@@ -1011,10 +942,7 @@ mod tests {
         let text = doc.text().slice(..);
         let cursor_line = text.char_to_line(sel.cursor(text));
         // Should jump back to or before the blank line
-        assert!(
-            cursor_line <= 2,
-            "should be at or before blank line: {cursor_line}"
-        );
+        assert!(cursor_line <= 2, "should be at or before blank line: {cursor_line}");
     }
 
     // --- extend_find_char ---

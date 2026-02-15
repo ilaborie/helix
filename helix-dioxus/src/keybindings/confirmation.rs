@@ -7,6 +7,7 @@ use helix_view::input::{KeyCode, KeyEvent};
 use crate::state::EditorCommand;
 
 /// Handle input in confirmation dialog mode.
+#[must_use]
 pub fn handle_confirmation_mode(key: &KeyEvent) -> Vec<EditorCommand> {
     match key.code {
         // y/Y or Enter confirms the primary action

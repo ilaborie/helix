@@ -10,6 +10,7 @@ use crate::state::{centered_window, CommandCompletionItem};
 const MAX_VISIBLE: usize = 10;
 
 /// Command completion popup shown above the command prompt.
+#[allow(clippy::indexing_slicing)] // start..end bounds are computed from centered_window which guarantees valid range
 #[component]
 pub fn CommandCompletionPopup(items: Vec<CommandCompletionItem>, selected: usize) -> Element {
     let total = items.len();
@@ -63,6 +64,7 @@ pub fn CommandCompletionPopup(items: Vec<CommandCompletionItem>, selected: usize
 }
 
 /// Render a command name with fuzzy-match indices highlighted.
+#[allow(clippy::indexing_slicing)] // Char indices are bounded by the chars vec length
 fn render_highlighted_name(name: &str, indices: &[usize]) -> Element {
     if indices.is_empty() {
         return rsx! { span { "{name}" } };

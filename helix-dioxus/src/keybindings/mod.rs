@@ -21,8 +21,7 @@ use crate::state::EditorCommand;
 
 pub use command::handle_command_mode;
 pub use completion::{
-    handle_code_actions_mode, handle_completion_mode, handle_location_picker_mode,
-    handle_lsp_dialog_mode,
+    handle_code_actions_mode, handle_completion_mode, handle_location_picker_mode, handle_lsp_dialog_mode,
 };
 pub use confirmation::handle_confirmation_mode;
 pub use input_dialog::handle_input_dialog_mode;

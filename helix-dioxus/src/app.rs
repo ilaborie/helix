@@ -6,16 +6,14 @@ use dioxus::prelude::*;
 use helix_view::input::KeyCode;
 
 use crate::components::{
-    BufferBar, CodeActionsMenu, CommandCompletionPopup, CommandPrompt, CompletionPopup,
-    ConfirmationDialog, EditorView, GenericPicker, HoverPopup, InputDialog, KeybindingHelpBar,
-    LocationPicker, LspStatusDialog, NotificationContainer, RegexPrompt, SearchPrompt, ShellPrompt,
-    SignatureHelpPopup, StatusLine,
+    BufferBar, CodeActionsMenu, CommandCompletionPopup, CommandPrompt, CompletionPopup, ConfirmationDialog, EditorView,
+    GenericPicker, HoverPopup, InputDialog, KeybindingHelpBar, LocationPicker, LspStatusDialog, NotificationContainer,
+    RegexPrompt, SearchPrompt, ShellPrompt, SignatureHelpPopup, StatusLine,
 };
 use crate::keybindings::{
-    handle_code_actions_mode, handle_command_mode, handle_completion_mode,
-    handle_confirmation_mode, handle_input_dialog_mode, handle_location_picker_mode,
-    handle_lsp_dialog_mode, handle_picker_mode, handle_regex_mode, handle_search_mode,
-    handle_shell_mode, translate_key_event,
+    handle_code_actions_mode, handle_command_mode, handle_completion_mode, handle_confirmation_mode,
+    handle_input_dialog_mode, handle_location_picker_mode, handle_lsp_dialog_mode, handle_picker_mode,
+    handle_regex_mode, handle_search_mode, handle_shell_mode, translate_key_event,
 };
 use crate::keymap::command::AwaitCharKind;
 use crate::keymap::DhxKeymapResult;
@@ -178,19 +176,17 @@ pub fn App() -> Element {
 
                 // Word jump has its own UI flow (visual labels) — keep separate
                 match pending_key() {
-                    PendingKeySequence::WordJumpFirstChar => {
-                        match key_event.code {
-                            KeyCode::Esc => {
-                                pending_key.set(PendingKeySequence::None);
-                                vec![EditorCommand::CancelWordJump]
-                            }
-                            KeyCode::Char(ch) => {
-                                pending_key.set(PendingKeySequence::None);
-                                vec![EditorCommand::WordJumpFirstChar(ch)]
-                            }
-                            _ => vec![],
+                    PendingKeySequence::WordJumpFirstChar => match key_event.code {
+                        KeyCode::Esc => {
+                            pending_key.set(PendingKeySequence::None);
+                            vec![EditorCommand::CancelWordJump]
                         }
-                    }
+                        KeyCode::Char(ch) => {
+                            pending_key.set(PendingKeySequence::None);
+                            vec![EditorCommand::WordJumpFirstChar(ch)]
+                        }
+                        _ => vec![],
+                    },
                     PendingKeySequence::WordJumpSecondChar => {
                         pending_key.set(PendingKeySequence::None);
                         match key_event.code {
@@ -273,8 +269,7 @@ pub fn App() -> Element {
     let snapshot = app_state.get_snapshot();
 
     // Convert absolute 1-indexed cursor position to viewport-relative 0-indexed
-    let viewport_cursor_line = (snapshot.cursor_line.saturating_sub(1))
-        .saturating_sub(snapshot.visible_start);
+    let viewport_cursor_line = (snapshot.cursor_line.saturating_sub(1)).saturating_sub(snapshot.visible_start);
     let viewport_cursor_col = snapshot.cursor_col;
 
     // Font CSS must be injected AFTER the stylesheet so custom properties override defaults
@@ -300,7 +295,7 @@ pub fn App() -> Element {
             // Buffer bar at the top
             BufferBar {
                 version: version,
-                on_change: move |_| {
+                on_change: move |()| {
                     version += 1;
                 },
             }
@@ -358,7 +353,7 @@ pub fn App() -> Element {
             // Status line at the bottom
             StatusLine {
                 version: version,
-                on_change: move |_| {
+                on_change: move |()| {
                     version += 1;
                 },
             }
@@ -438,7 +433,7 @@ pub fn App() -> Element {
                 LspStatusDialog {
                     servers: snapshot.lsp_servers.clone(),
                     selected: snapshot.lsp_server_selected,
-                    on_change: move |_| {
+                    on_change: move |()| {
                         version += 1;
                     },
                 }
@@ -457,7 +452,7 @@ pub fn App() -> Element {
             if snapshot.confirmation_dialog_visible {
                 ConfirmationDialog {
                     dialog: snapshot.confirmation_dialog.clone(),
-                    on_change: move |_| {
+                    on_change: move |()| {
                         version += 1;
                     },
                 }

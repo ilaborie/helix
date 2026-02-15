@@ -67,11 +67,7 @@ pub fn ErrorLens(diagnostic: DiagnosticSnapshot) -> Element {
 /// Renders an underline for a diagnostic range.
 /// This is rendered as a decoration under the text.
 #[component]
-pub fn DiagnosticUnderline(
-    start_col: usize,
-    end_col: usize,
-    severity: DiagnosticSeverity,
-) -> Element {
+pub fn DiagnosticUnderline(start_col: usize, end_col: usize, severity: DiagnosticSeverity) -> Element {
     let width = end_col.saturating_sub(start_col).max(1);
     let left_offset = start_col;
 
@@ -96,10 +92,8 @@ pub fn DiagnosticUnderline(
 
 /// Get the highest severity diagnostic for a line.
 /// Used to determine which icon to show in the gutter when multiple diagnostics exist.
-pub fn highest_severity_for_line(
-    diagnostics: &[DiagnosticSnapshot],
-    line: usize,
-) -> Option<DiagnosticSeverity> {
+#[must_use]
+pub fn highest_severity_for_line(diagnostics: &[DiagnosticSnapshot], line: usize) -> Option<DiagnosticSeverity> {
     diagnostics
         .iter()
         .filter(|diag| diag.line == line)
@@ -109,10 +103,8 @@ pub fn highest_severity_for_line(
 
 /// Get the first diagnostic message for a line (for Error Lens).
 /// Returns the highest severity diagnostic message.
-pub fn first_diagnostic_for_line(
-    diagnostics: &[DiagnosticSnapshot],
-    line: usize,
-) -> Option<&DiagnosticSnapshot> {
+#[must_use]
+pub fn first_diagnostic_for_line(diagnostics: &[DiagnosticSnapshot], line: usize) -> Option<&DiagnosticSnapshot> {
     diagnostics
         .iter()
         .filter(|diag| diag.line == line)
@@ -121,12 +113,7 @@ pub fn first_diagnostic_for_line(
 
 /// Get all diagnostics for a line (for underlines).
 /// Returns all diagnostics on the given line.
-pub fn diagnostics_for_line(
-    diagnostics: &[DiagnosticSnapshot],
-    line: usize,
-) -> Vec<&DiagnosticSnapshot> {
-    diagnostics
-        .iter()
-        .filter(|diag| diag.line == line)
-        .collect()
+#[must_use]
+pub fn diagnostics_for_line(diagnostics: &[DiagnosticSnapshot], line: usize) -> Vec<&DiagnosticSnapshot> {
+    diagnostics.iter().filter(|diag| diag.line == line).collect()
 }

@@ -17,31 +17,24 @@ pub trait ThemeOps {
 }
 
 /// Extract RGB components from a Color, returning (r, g, b) or None.
-fn color_to_rgb(color: &Color) -> Option<(u8, u8, u8)> {
+fn color_to_rgb(color: Color) -> Option<(u8, u8, u8)> {
     match color {
-        Color::Rgb(r, g, b) => Some((*r, *g, *b)),
+        Color::Rgb(r, g, b) => Some((r, g, b)),
         Color::Black => Some((0, 0, 0)),
-        Color::Red => Some((224, 108, 117)),
-        Color::Green => Some((152, 195, 121)),
-        Color::Yellow => Some((229, 192, 123)),
-        Color::Blue => Some((97, 175, 239)),
-        Color::Magenta => Some((198, 120, 221)),
-        Color::Cyan => Some((86, 182, 194)),
+        Color::Red | Color::LightRed => Some((224, 108, 117)),
+        Color::Green | Color::LightGreen => Some((152, 195, 121)),
+        Color::Yellow | Color::LightYellow => Some((229, 192, 123)),
+        Color::Blue | Color::LightBlue => Some((97, 175, 239)),
+        Color::Magenta | Color::LightMagenta => Some((198, 120, 221)),
+        Color::Cyan | Color::LightCyan => Some((86, 182, 194)),
         Color::Gray => Some((92, 99, 112)),
-        Color::White => Some((171, 178, 191)),
-        Color::LightRed => Some((224, 108, 117)),
-        Color::LightGreen => Some((152, 195, 121)),
-        Color::LightYellow => Some((229, 192, 123)),
-        Color::LightBlue => Some((97, 175, 239)),
-        Color::LightMagenta => Some((198, 120, 221)),
-        Color::LightCyan => Some((86, 182, 194)),
-        Color::LightGray => Some((171, 178, 191)),
+        Color::White | Color::LightGray => Some((171, 178, 191)),
         _ => None,
     }
 }
 
 /// Detect if a background color is "light" by checking perceived luminance.
-fn is_light_background(color: &Color) -> bool {
+fn is_light_background(color: Color) -> bool {
     if let Some((r, g, b)) = color_to_rgb(color) {
         // Perceived luminance formula (ITU-R BT.601)
         let luminance = 0.299 * f32::from(r) + 0.587 * f32::from(g) + 0.114 * f32::from(b);
@@ -52,7 +45,12 @@ fn is_light_background(color: &Color) -> bool {
 }
 
 /// Blend two colors: ratio of fg mixed with (1-ratio) of bg.
-fn blend_colors(fg: &Color, bg: &Color, ratio: f32) -> Option<String> {
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "f32 color values clamped to 0..=255 before cast"
+)]
+fn blend_colors(fg: Color, bg: Color, ratio: f32) -> Option<String> {
     let (fr, fg_g, fb) = color_to_rgb(fg)?;
     let (br, bg_g, bb) = color_to_rgb(bg)?;
     let r = (f32::from(fr) * ratio + f32::from(br) * (1.0 - ratio)) as u8;
@@ -141,12 +139,9 @@ const LIGHT_DEFAULTS: &[(&str, &str)] = &[
 
 impl ThemeOps for EditorContext {
     fn list_themes(&self) -> Vec<String> {
-        let mut names =
-            helix_view::theme::Loader::read_names(&helix_loader::config_dir().join("themes"));
+        let mut names = helix_view::theme::Loader::read_names(&helix_loader::config_dir().join("themes"));
         for rt_dir in helix_loader::runtime_dirs() {
-            names.extend(helix_view::theme::Loader::read_names(
-                &rt_dir.join("themes"),
-            ));
+            names.extend(helix_view::theme::Loader::read_names(&rt_dir.join("themes")));
         }
         names.push("default".to_string());
         names.push("base16_default".to_string());
@@ -170,17 +165,13 @@ impl ThemeOps for EditorContext {
         let mut vars = Vec::new();
 
         // Detect light vs dark from background color
-        let bg_color = theme.try_get("ui.background").and_then(|s| s.bg.clone());
-        let is_light = bg_color.as_ref().is_some_and(is_light_background);
+        let bg_color = theme.try_get("ui.background").and_then(|s| s.bg);
+        let is_light = bg_color.is_some_and(is_light_background);
         log::debug!(
             "theme_to_css_vars: theme='{}', bg_color={bg_color:?}, is_light={is_light}",
             theme.name(),
         );
-        let defaults = if is_light {
-            LIGHT_DEFAULTS
-        } else {
-            DARK_DEFAULTS
-        };
+        let defaults = if is_light { LIGHT_DEFAULTS } else { DARK_DEFAULTS };
 
         // Direct scope-to-CSS-var mappings: (scope, css_var, use_bg)
         let scope_mappings: &[(&str, &str, bool)] = &[
@@ -221,8 +212,8 @@ impl ThemeOps for EditorContext {
 
         for &(scope, css_var, use_bg) in scope_mappings {
             if let Some(style) = theme.try_get(scope) {
-                let color = if use_bg { &style.bg } else { &style.fg };
-                if let Some(ref c) = color {
+                let color = if use_bg { style.bg } else { style.fg };
+                if let Some(c) = color {
                     if let Some(css) = color_to_css(c) {
                         vars.push(format!("{css_var}: {css};"));
                         set_vars.insert(css_var);
@@ -234,7 +225,7 @@ impl ThemeOps for EditorContext {
         // Try to extract purple and orange from keyword/constant scopes
         if !set_vars.contains("--purple") {
             if let Some(style) = theme.try_get("keyword") {
-                if let Some(ref c) = style.fg {
+                if let Some(c) = style.fg {
                     if let Some(css) = color_to_css(c) {
                         vars.push(format!("--purple: {css};"));
                         set_vars.insert("--purple");
@@ -244,7 +235,7 @@ impl ThemeOps for EditorContext {
         }
         if !set_vars.contains("--orange") {
             if let Some(style) = theme.try_get("constant.numeric") {
-                if let Some(ref c) = style.fg {
+                if let Some(c) = style.fg {
                     if let Some(css) = color_to_css(c) {
                         vars.push(format!("--orange: {css};"));
                         set_vars.insert("--orange");
@@ -254,7 +245,7 @@ impl ThemeOps for EditorContext {
         }
 
         // Derive notification backgrounds by blending semantic colors with background
-        if let Some(ref bg) = bg_color {
+        if let Some(bg) = bg_color {
             let ratio = if is_light { 0.12 } else { 0.15 };
             let blends = [
                 ("diagnostic.error", "--notification-error-bg"),
@@ -264,7 +255,7 @@ impl ThemeOps for EditorContext {
             ];
             for (scope, css_var) in blends {
                 if let Some(style) = theme.try_get(scope) {
-                    if let Some(ref fg) = style.fg {
+                    if let Some(fg) = style.fg {
                         if let Some(blended) = blend_colors(fg, bg, ratio) {
                             vars.push(format!("{css_var}: {blended};"));
                             set_vars.insert(css_var);
@@ -276,12 +267,10 @@ impl ThemeOps for EditorContext {
 
         // Derive scrollbar thumb from text-dim color
         if let Some(style) = theme.try_get("ui.linenr") {
-            if let Some(ref c) = style.fg {
+            if let Some(c) = style.fg {
                 if let Some((r, g, b)) = color_to_rgb(c) {
                     vars.push(format!("--scrollbar-thumb: rgba({r}, {g}, {b}, 0.5);"));
-                    vars.push(format!(
-                        "--scrollbar-thumb-hover: rgba({r}, {g}, {b}, 0.65);"
-                    ));
+                    vars.push(format!("--scrollbar-thumb-hover: rgba({r}, {g}, {b}, 0.65);"));
                     set_vars.insert("--scrollbar-thumb");
                     set_vars.insert("--scrollbar-thumb-hover");
                 }
@@ -325,27 +314,27 @@ mod tests {
 
     #[test]
     fn is_light_background_detects_correctly() {
-        assert!(is_light_background(&Color::Rgb(250, 250, 250)));
-        assert!(is_light_background(&Color::Rgb(200, 200, 200)));
-        assert!(!is_light_background(&Color::Rgb(40, 44, 52)));
-        assert!(!is_light_background(&Color::Rgb(0, 0, 0)));
-        assert!(is_light_background(&Color::White));
-        assert!(!is_light_background(&Color::Black));
+        assert!(is_light_background(Color::Rgb(250, 250, 250)));
+        assert!(is_light_background(Color::Rgb(200, 200, 200)));
+        assert!(!is_light_background(Color::Rgb(40, 44, 52)));
+        assert!(!is_light_background(Color::Rgb(0, 0, 0)));
+        assert!(is_light_background(Color::White));
+        assert!(!is_light_background(Color::Black));
     }
 
     #[test]
     fn blend_colors_produces_valid_hex() {
         let fg = Color::Rgb(224, 108, 117);
         let bg = Color::Rgb(40, 44, 52);
-        let result = blend_colors(&fg, &bg, 0.15).expect("should produce a color");
+        let result = blend_colors(fg, bg, 0.15).expect("should produce a color");
         assert!(result.starts_with('#'));
         assert_eq!(result.len(), 7);
     }
 
     #[test]
     fn color_to_rgb_extracts_components() {
-        assert_eq!(color_to_rgb(&Color::Rgb(10, 20, 30)), Some((10, 20, 30)));
-        assert_eq!(color_to_rgb(&Color::Black), Some((0, 0, 0)));
-        assert!(color_to_rgb(&Color::Reset).is_none());
+        assert_eq!(color_to_rgb(Color::Rgb(10, 20, 30)), Some((10, 20, 30)));
+        assert_eq!(color_to_rgb(Color::Black), Some((0, 0, 0)));
+        assert!(color_to_rgb(Color::Reset).is_none());
     }
 }

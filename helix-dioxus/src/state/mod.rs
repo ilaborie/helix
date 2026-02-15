@@ -14,12 +14,10 @@ mod lsp_events;
 mod types;
 
 pub use types::{
-    centered_window, BufferInfo, CommandCompletionItem, ConfirmationAction,
-    ConfirmationDialogSnapshot, DiffLineType, Direction, EditorCommand, EditorSnapshot,
-    GlobalSearchResult, InputDialogKind, InputDialogSnapshot, LineSnapshot, NotificationSeverity,
-    NotificationSnapshot, PendingKeySequence, PickerIcon, PickerItem, PickerMode, PickerPreview,
-    PreviewLine, RegisterSnapshot, ScrollbarDiagnostic, ShellBehavior, StartupAction, TokenSpan,
-    WordJumpLabel,
+    centered_window, BufferInfo, CommandCompletionItem, ConfirmationAction, ConfirmationDialogSnapshot, DiffLineType,
+    Direction, EditorCommand, EditorSnapshot, GlobalSearchResult, InputDialogKind, InputDialogSnapshot, LineSnapshot,
+    NotificationSeverity, NotificationSnapshot, PendingKeySequence, PickerIcon, PickerItem, PickerMode, PickerPreview,
+    PreviewLine, RegisterSnapshot, ScrollbarDiagnostic, ShellBehavior, StartupAction, TokenSpan, WordJumpLabel,
 };
 
 use std::path::PathBuf;
@@ -32,17 +30,15 @@ use helix_lsp::lsp;
 use helix_view::document::Mode;
 
 use crate::lsp::{
-    convert_code_actions, convert_completion_response, convert_document_symbols,
-    convert_goto_response, convert_hover, convert_inlay_hints, convert_references_response,
-    convert_signature_help, convert_workspace_symbols, CompletionItemSnapshot,
-    DiagnosticPickerEntry, DiagnosticSeverity, DiagnosticSnapshot, HoverSnapshot,
-    InlayHintSnapshot, LocationSnapshot, LspResponse, LspServerSnapshot, LspServerStatus,
-    SignatureHelpSnapshot, StoredCodeAction, SymbolKind, SymbolSnapshot,
+    convert_code_actions, convert_completion_response, convert_document_symbols, convert_goto_response, convert_hover,
+    convert_inlay_hints, convert_references_response, convert_signature_help, convert_workspace_symbols,
+    CompletionItemSnapshot, DiagnosticPickerEntry, DiagnosticSeverity, DiagnosticSnapshot, HoverSnapshot,
+    InlayHintSnapshot, LocationSnapshot, LspResponse, LspServerSnapshot, LspServerStatus, SignatureHelpSnapshot,
+    StoredCodeAction, SymbolKind, SymbolSnapshot,
 };
 use crate::operations::{
-    collect_search_match_lines, BufferOps, CliOps, ClipboardOps, EditingOps, JumpOps, LspOps,
-    MacroOps, MovementOps, PickerOps, SearchOps, SelectionOps, ShellOps, ThemeOps, VcsOps,
-    WordJumpOps,
+    collect_search_match_lines, BufferOps, CliOps, ClipboardOps, EditingOps, JumpOps, LspOps, MacroOps, MovementOps,
+    PickerOps, SearchOps, SelectionOps, ShellOps, ThemeOps, VcsOps, WordJumpOps,
 };
 
 use lsp_events::LspEventOps;
@@ -132,8 +128,7 @@ pub struct EditorContext {
     /// This is checked proactively to show a lightbulb indicator.
     pub(crate) has_code_actions: bool,
     /// Cache of resolved code action previews, keyed by action index.
-    pub(crate) code_action_previews:
-        std::collections::HashMap<usize, crate::lsp::CodeActionPreviewState>,
+    pub(crate) code_action_previews: std::collections::HashMap<usize, crate::lsp::CodeActionPreviewState>,
     /// Last position where we checked for code actions (to avoid repeated checks).
     code_actions_check_position: Option<(helix_view::DocumentId, usize, usize)>,
     /// Whether location picker is visible.
@@ -423,7 +418,7 @@ impl EditorContext {
     }
 
     /// Invalidate the cached filtered picker items and preview.
-    /// Call this whenever picker_filter, picker_items, or picker_mode change.
+    /// Call this whenever `picker_filter`, `picker_items`, or `picker_mode` change.
     pub(crate) fn invalidate_picker_cache(&mut self) {
         self.cached_filtered_items = None;
         self.cached_preview = None;
@@ -488,28 +483,16 @@ impl EditorContext {
         let mode_before = self.editor.mode;
 
         // Record insert-mode editing commands (before dispatch)
-        if self.insert_recording
-            && !self.replaying_insert
-            && mode_before == Mode::Insert
-            && cmd.is_insert_recordable()
+        if self.insert_recording && !self.replaying_insert && mode_before == Mode::Insert && cmd.is_insert_recordable()
         {
             self.last_insert_keys.push(cmd.clone());
         }
 
         // Clone the command for potential use as insert entry (only for mode transitions)
-        let cmd_for_entry = if !self.replaying_insert && mode_before != Mode::Insert {
-            Some(cmd.clone())
-        } else {
-            None
-        };
+        let cmd_for_entry = (!self.replaying_insert && mode_before != Mode::Insert).then(|| cmd.clone());
 
         // Auto-close hover popup on user-initiated commands (not internal LSP responses)
-        if self.hover_visible
-            && !matches!(
-                cmd,
-                EditorCommand::TriggerHover | EditorCommand::LspResponse(_)
-            )
-        {
+        if self.hover_visible && !matches!(cmd, EditorCommand::TriggerHover | EditorCommand::LspResponse(_)) {
             self.hover_visible = false;
             self.hover_content = None;
         }
@@ -1000,8 +983,7 @@ impl EditorContext {
             }
             EditorCommand::PickerPageDown => {
                 let filtered_len = self.get_or_compute_filtered_items().len();
-                self.picker_selected =
-                    (self.picker_selected + 10).min(filtered_len.saturating_sub(1));
+                self.picker_selected = (self.picker_selected + 10).min(filtered_len.saturating_sub(1));
                 self.preview_selected_theme();
             }
             EditorCommand::PickerConfirmItem(idx) => {
@@ -1401,11 +1383,8 @@ impl EditorContext {
 
             // Theme
             EditorCommand::SetTheme(name) => {
-                if let Err(e) = self.apply_theme(&name) {
-                    self.show_notification(
-                        format!("Theme error: {e}"),
-                        NotificationSeverity::Error,
-                    );
+                if let Err(err) = self.apply_theme(&name) {
+                    self.show_notification(format!("Theme error: {err}"), NotificationSeverity::Error);
                 }
             }
             EditorCommand::ShowThemePicker => {
@@ -1567,7 +1546,7 @@ impl EditorContext {
                 }
             }
             LspResponse::DocumentHighlights(highlights) => {
-                self.apply_document_highlights(highlights);
+                self.apply_document_highlights(&highlights);
             }
             LspResponse::CodeActions(actions) => {
                 self.code_actions = actions;
@@ -1587,11 +1566,9 @@ impl EditorContext {
                     self.code_action_selected = 0;
                 }
             }
-            LspResponse::DiagnosticsUpdated => {
-                // Diagnostics are pulled from the document in snapshot()
-            }
-            LspResponse::FormatApplied | LspResponse::WorkspaceEditApplied => {
-                // Nothing to do - changes already applied
+            LspResponse::DiagnosticsUpdated | LspResponse::FormatApplied | LspResponse::WorkspaceEditApplied => {
+                // Nothing to do - diagnostics are pulled from snapshot(),
+                // and format/workspace-edit changes are already applied.
             }
             LspResponse::FormatResult { transaction } => {
                 let (view, doc) = helix_view::current!(self.editor);
@@ -1603,24 +1580,14 @@ impl EditorContext {
                 new_name,
             } => {
                 // Apply the workspace edit
-                if let Err(e) = self.editor.apply_workspace_edit(offset_encoding, &edit) {
-                    log::error!("Failed to apply rename edit: {e:?}");
-                    self.show_notification(
-                        format!("Rename failed: {e:?}"),
-                        NotificationSeverity::Error,
-                    );
+                if let Err(err) = self.editor.apply_workspace_edit(offset_encoding, &edit) {
+                    log::error!("Failed to apply rename edit: {err:?}");
+                    self.show_notification(format!("Rename failed: {err:?}"), NotificationSeverity::Error);
                 } else {
-                    self.show_notification(
-                        format!("Renamed to '{new_name}'"),
-                        NotificationSeverity::Success,
-                    );
+                    self.show_notification(format!("Renamed to '{new_name}'"), NotificationSeverity::Success);
                 }
             }
-            LspResponse::DocumentSymbols(symbols) => {
-                self.symbols = symbols;
-                self.populate_symbol_picker_items();
-            }
-            LspResponse::WorkspaceSymbols(symbols) => {
+            LspResponse::DocumentSymbols(symbols) | LspResponse::WorkspaceSymbols(symbols) => {
                 self.symbols = symbols;
                 self.populate_symbol_picker_items();
             }
@@ -1759,25 +1726,19 @@ impl EditorContext {
                             tokio::spawn(async move {
                                 match future.await {
                                     Ok(resolved) => {
-                                        let _ = tx.send(EditorCommand::LspResponse(
-                                            LspResponse::CodeActionResolved {
-                                                action_index,
-                                                workspace_edit: resolved.edit,
-                                                offset_encoding,
-                                            },
-                                        ));
+                                        let _ = tx.send(EditorCommand::LspResponse(LspResponse::CodeActionResolved {
+                                            action_index,
+                                            workspace_edit: resolved.edit,
+                                            offset_encoding,
+                                        }));
                                     }
                                     Err(err) => {
-                                        log::error!(
-                                            "Failed to resolve code action for preview: {err}"
-                                        );
-                                        let _ = tx.send(EditorCommand::LspResponse(
-                                            LspResponse::CodeActionResolved {
-                                                action_index,
-                                                workspace_edit: None,
-                                                offset_encoding,
-                                            },
-                                        ));
+                                        log::error!("Failed to resolve code action for preview: {err}");
+                                        let _ = tx.send(EditorCommand::LspResponse(LspResponse::CodeActionResolved {
+                                            action_index,
+                                            workspace_edit: None,
+                                            offset_encoding,
+                                        }));
                                     }
                                 }
                             });
@@ -1892,7 +1853,7 @@ impl EditorContext {
 
         // Get the current document's language server IDs for comparison
         let current_ls_ids: Vec<_> = current_doc
-            .map(|doc| doc.language_servers().map(|ls| ls.id()).collect())
+            .map(|doc| doc.language_servers().map(helix_lsp::Client::id).collect())
             .unwrap_or_default();
 
         // Iterate through all clients in the language server registry
@@ -1915,22 +1876,19 @@ impl EditorContext {
                 };
 
                 // Get progress message if available
-                let progress_message =
-                    self.lsp_progress
-                        .progress_map(client.id())
-                        .and_then(|tokens| {
-                            // Get the most recent progress with a message
-                            tokens.values().find_map(|status| {
-                                status.progress().and_then(|p| match p {
-                                    WorkDoneProgress::Begin(begin) => Some(begin.title.clone()),
-                                    WorkDoneProgress::Report(report) => {
-                                        // Prefer message over title if available
-                                        report.message.clone()
-                                    }
-                                    WorkDoneProgress::End(_) => None,
-                                })
-                            })
-                        });
+                let progress_message = self.lsp_progress.progress_map(client.id()).and_then(|tokens| {
+                    // Get the most recent progress with a message
+                    tokens.values().find_map(|status| {
+                        status.progress().and_then(|p| match p {
+                            WorkDoneProgress::Begin(begin) => Some(begin.title.clone()),
+                            WorkDoneProgress::Report(report) => {
+                                // Prefer message over title if available
+                                report.message.clone()
+                            }
+                            WorkDoneProgress::End(_) => None,
+                        })
+                    })
+                });
 
                 // Get supported languages from client capabilities
                 // Note: helix-lsp doesn't expose this directly, so we track it differently
@@ -1977,7 +1935,7 @@ impl EditorContext {
                 return;
             };
 
-            (doc.path().map(|p| p.to_path_buf()), lang_config)
+            (doc.path().cloned(), lang_config)
         };
 
         // Get editor config for workspace roots and snippets
@@ -1996,8 +1954,8 @@ impl EditorContext {
             Some(Ok(_client)) => {
                 log::info!("LSP server '{name}' restarted successfully");
             }
-            Some(Err(e)) => {
-                log::error!("Failed to restart LSP server '{name}': {e}");
+            Some(Err(err)) => {
+                log::error!("Failed to restart LSP server '{name}': {err}");
                 return;
             }
             None => {
@@ -2013,11 +1971,7 @@ impl EditorContext {
             .filter_map(|doc| {
                 doc.language_config().and_then(|config| {
                     let uses_this_server = config.language_servers.iter().any(|ls| ls.name == name);
-                    if uses_this_server {
-                        Some(doc.id())
-                    } else {
-                        None
-                    }
+                    uses_this_server.then(|| doc.id())
                 })
             })
             .collect();
@@ -2027,19 +1981,15 @@ impl EditorContext {
             self.editor.refresh_language_servers(*document_id);
         }
 
-        log::info!(
-            "Refreshed {} documents after restart",
-            document_ids_to_refresh.len()
-        );
+        log::info!("Refreshed {} documents after restart", document_ids_to_refresh.len());
     }
 
     /// Create a snapshot of the current editor state.
     pub fn snapshot(&mut self, viewport_lines: usize) -> EditorSnapshot {
         let view_id = self.editor.tree.focus;
         let view = self.editor.tree.get(view_id);
-        let doc = match self.editor.document(view.doc) {
-            Some(doc) => doc,
-            None => return EditorSnapshot::default(),
+        let Some(doc) = self.editor.document(view.doc) else {
+            return EditorSnapshot::default();
         };
 
         let mode = match self.editor.mode() {
@@ -2048,15 +1998,10 @@ impl EditorContext {
             Mode::Select => "SELECT",
         };
 
-        let file_name = doc
-            .path()
-            .map(|p| {
-                p.file_name()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .to_string()
-            })
-            .unwrap_or_else(|| "[scratch]".to_string());
+        let file_name = doc.path().map_or_else(
+            || "[scratch]".to_string(),
+            |p| p.file_name().unwrap_or_default().to_string_lossy().to_string(),
+        );
 
         let text = doc.text();
         let selection = doc.selection(view_id);
@@ -2076,7 +2021,11 @@ impl EditorContext {
 
         log::trace!(
             "snapshot: cursor={}, cursor_line={}, view_offset.anchor={}, visible_start={}, visible_end={}",
-            primary_cursor, cursor_line, view_offset.anchor, visible_start, visible_end
+            primary_cursor,
+            cursor_line,
+            view_offset.anchor,
+            visible_start,
+            visible_end
         );
 
         // Compute syntax highlighting tokens for visible lines
@@ -2086,15 +2035,12 @@ impl EditorContext {
         // Build a map of line_idx → Vec<col> for all cursors on visible lines.
         let mut cursor_positions_by_line: std::collections::HashMap<usize, Vec<usize>> =
             std::collections::HashMap::new();
-        for range in selection.iter() {
+        for range in selection {
             let cursor_char = range.cursor(text.slice(..));
             let line_idx = text.char_to_line(cursor_char);
             if line_idx >= visible_start && line_idx < visible_end {
                 let col = cursor_char - text.line_to_char(line_idx);
-                cursor_positions_by_line
-                    .entry(line_idx)
-                    .or_default()
-                    .push(col);
+                cursor_positions_by_line.entry(line_idx).or_default().push(col);
             }
         }
 
@@ -2115,16 +2061,9 @@ impl EditorContext {
             .enumerate()
             .map(|(idx, line_idx)| {
                 let line_content = text.line(line_idx).to_string();
-                let cursor_cols = cursor_positions_by_line
-                    .get(&line_idx)
-                    .cloned()
-                    .unwrap_or_default();
+                let cursor_cols = cursor_positions_by_line.get(&line_idx).cloned().unwrap_or_default();
                 let is_cursor_line = !cursor_cols.is_empty();
-                let primary_cursor_col = if line_idx == cursor_line {
-                    Some(cursor_col)
-                } else {
-                    None
-                };
+                let primary_cursor_col = (line_idx == cursor_line).then_some(cursor_col);
 
                 let selection_ranges: Vec<(usize, usize)> = if has_selection {
                     let line_start_char = text.line_to_char(line_idx);
@@ -2166,10 +2105,7 @@ impl EditorContext {
         let all_diagnostics = doc.diagnostics();
         let error_count = all_diagnostics
             .iter()
-            .filter(|d| {
-                d.severity
-                    .is_some_and(|s| s == helix_core::diagnostic::Severity::Error)
-            })
+            .filter(|d| d.severity.is_some_and(|s| s == helix_core::diagnostic::Severity::Error))
             .count();
         let warning_count = all_diagnostics
             .iter()
@@ -2269,21 +2205,15 @@ impl EditorContext {
                 let sel = self.picker_selected;
                 let filtered = self.get_or_compute_filtered_items();
                 let count = filtered.len();
-                let (s, e) = centered_window(sel, count, 15);
-                filtered.get(s..e).unwrap_or(&[]).to_vec()
+                let (win_start, win_end) = centered_window(sel, count, 15);
+                filtered.get(win_start..win_end).unwrap_or(&[]).to_vec()
             },
             picker_filter: self.picker_filter.clone(),
             picker_selected: self.picker_selected,
             picker_total: self.picker_items.len(),
-            picker_filtered_count: self
-                .cached_filtered_items
-                .as_ref()
-                .map_or(0, |v| v.len()),
+            picker_filtered_count: self.cached_filtered_items.as_ref().map_or(0, std::vec::Vec::len),
             picker_window_offset: {
-                let filtered_count = self
-                    .cached_filtered_items
-                    .as_ref()
-                    .map_or(0, |v| v.len());
+                let filtered_count = self.cached_filtered_items.as_ref().map_or(0, std::vec::Vec::len);
                 centered_window(self.picker_selected, filtered_count, 15).0
             },
             picker_mode: self.picker_mode,
@@ -2317,11 +2247,7 @@ impl EditorContext {
             inlay_hints: self.inlay_hints.clone(),
             inlay_hints_enabled: self.inlay_hints_enabled,
             code_actions_visible: self.code_actions_visible,
-            code_actions: self
-                .code_actions
-                .iter()
-                .map(|a| a.snapshot.clone())
-                .collect(),
+            code_actions: self.code_actions.iter().map(|a| a.snapshot.clone()).collect(),
             code_action_selected: self.code_action_selected,
             code_action_filter: self.code_action_filter.clone(),
             code_action_preview: {
@@ -2378,6 +2304,7 @@ impl EditorContext {
     }
 
     /// Collect diagnostics for visible lines from the document.
+    #[allow(clippy::unused_self)] // method semantics: may need self in the future
     fn collect_diagnostics(
         &self,
         doc: &helix_view::Document,
@@ -2421,10 +2348,7 @@ impl EditorContext {
                     start_col,
                     end_col,
                     message: diag.message.clone(),
-                    severity: diag
-                        .severity
-                        .map(DiagnosticSeverity::from)
-                        .unwrap_or_default(),
+                    severity: diag.severity.map(DiagnosticSeverity::from).unwrap_or_default(),
                     source: diag.source.clone(),
                     code: diag.code.as_ref().map(|c| match c {
                         helix_core::diagnostic::NumberOrString::Number(n) => n.to_string(),
@@ -2442,11 +2366,8 @@ impl EditorContext {
         visible_start: usize,
         visible_end: usize,
     ) -> Vec<Vec<TokenSpan>> {
-        let syntax = match doc.syntax() {
-            Some(s) => s,
-            None => {
-                return vec![Vec::new(); visible_end - visible_start];
-            }
+        let Some(syntax) = doc.syntax() else {
+            return vec![Vec::new(); visible_end - visible_start];
         };
 
         let loader = self.editor.syn_loader.load();
@@ -2463,10 +2384,7 @@ impl EditorContext {
     /// Compute the picker preview for the currently selected picker item.
     /// Resolve file path and target line for the currently selected picker item.
     /// Returns `None` for non-previewable items (folders, registers, commands).
-    fn resolve_preview_target(
-        &self,
-        selected_item: &PickerItem,
-    ) -> Option<(PathBuf, Option<usize>)> {
+    fn resolve_preview_target(&self, selected_item: &PickerItem) -> Option<(PathBuf, Option<usize>)> {
         use crate::operations::BufferOps;
 
         let scratch_path = || PathBuf::from("[scratch]");
@@ -2478,9 +2396,9 @@ impl EditorContext {
         let clamped_idx = |len: usize| -> usize { self.picker_selected.min(len.saturating_sub(1)) };
 
         match self.picker_mode {
-            PickerMode::DirectoryBrowser
-            | PickerMode::FileExplorer
-            | PickerMode::FilesRecursive => Some((PathBuf::from(&selected_item.id), None)),
+            PickerMode::DirectoryBrowser | PickerMode::FileExplorer | PickerMode::FilesRecursive => {
+                Some((PathBuf::from(&selected_item.id), None))
+            }
             PickerMode::ChangedFiles => {
                 let path = PathBuf::from(&selected_item.id);
                 // Try to find the first diff hunk line for preview focus
@@ -2490,7 +2408,7 @@ impl EditorContext {
                     .and_then(|doc| doc.diff_handle())
                     .and_then(|handle| {
                         let diff = handle.load();
-                        (diff.len() > 0).then(|| {
+                        (!diff.is_empty()).then(|| {
                             let hunk = diff.nth_hunk(0);
                             hunk.after.start as usize + 1 // 1-indexed
                         })
@@ -2502,10 +2420,7 @@ impl EditorContext {
                 let doc = self.editor.document(doc_id)?;
                 let path = doc.path().cloned().unwrap_or_else(scratch_path);
                 let view_id = self.editor.tree.focus;
-                let cursor = doc
-                    .selection(view_id)
-                    .primary()
-                    .cursor(doc.text().slice(..));
+                let cursor = doc.selection(view_id).primary().cursor(doc.text().slice(..));
                 let line = doc.text().char_to_line(cursor) + 1;
                 Some((path, Some(line)))
             }
@@ -2542,22 +2457,18 @@ impl EditorContext {
                 Some((PathBuf::from(&loc.path), Some(loc.line)))
             }
             PickerMode::JumpList => {
-                let (doc_id, sel) = self
-                    .jumplist_entries
-                    .get(clamped_idx(self.jumplist_entries.len()))?;
+                let (doc_id, sel) = self.jumplist_entries.get(clamped_idx(self.jumplist_entries.len()))?;
                 let doc = self.editor.document(*doc_id)?;
                 let path = doc.path().cloned().unwrap_or_else(scratch_path);
                 let cursor = sel.primary().cursor(doc.text().slice(..));
                 let line = doc.text().char_to_line(cursor) + 1;
                 Some((path, Some(line)))
             }
-            PickerMode::Registers
-            | PickerMode::Commands
-            | PickerMode::Themes
-            | PickerMode::Emojis => None,
+            PickerMode::Registers | PickerMode::Commands | PickerMode::Themes | PickerMode::Emojis => None,
         }
     }
 
+    #[allow(clippy::indexing_slicing)] // picker_selected is bounds-checked above via .get()
     fn compute_picker_preview(&mut self) -> Option<types::PickerPreview> {
         if !self.picker_visible || !self.picker_mode.supports_preview() {
             return None;
@@ -2567,10 +2478,7 @@ impl EditorContext {
         let selected_item = cached.get(self.picker_selected)?;
 
         // Skip folders in directory browser / file explorer
-        if matches!(
-            selected_item.icon,
-            PickerIcon::Folder | PickerIcon::FolderOpen
-        ) {
+        if matches!(selected_item.icon, PickerIcon::Folder | PickerIcon::FolderOpen) {
             return None;
         }
 
@@ -2607,27 +2515,26 @@ impl EditorContext {
         // For open documents we can borrow directly; for disk files we create them.
         let disk_rope;
         let disk_syntax;
-        let (rope_ref, syntax_ref): (&helix_core::Rope, Option<&helix_core::Syntax>) =
-            if let Some(doc) = open_doc {
-                (doc.text(), doc.syntax())
-            } else {
-                // Read from disk
-                let metadata = std::fs::metadata(&file_path).ok()?;
-                if metadata.len() > 1_048_576 {
-                    // Skip files > 1MB
-                    return None;
-                }
-                let content = std::fs::read_to_string(&file_path).ok()?;
-                disk_rope = helix_core::Rope::from_str(&content);
+        let (rope_ref, syntax_ref): (&helix_core::Rope, Option<&helix_core::Syntax>) = if let Some(doc) = open_doc {
+            (doc.text(), doc.syntax())
+        } else {
+            // Read from disk
+            let metadata = std::fs::metadata(&file_path).ok()?;
+            if metadata.len() > 1_048_576 {
+                // Skip files > 1MB
+                return None;
+            }
+            let content = std::fs::read_to_string(&file_path).ok()?;
+            disk_rope = helix_core::Rope::from_str(&content);
 
-                // Try to create syntax for highlighting
-                let loader = self.editor.syn_loader.load();
-                disk_syntax = loader.language_for_filename(&file_path).and_then(|lang| {
-                    helix_core::Syntax::new(disk_rope.slice(..), lang, &loader).ok()
-                });
+            // Try to create syntax for highlighting
+            let loader = self.editor.syn_loader.load();
+            disk_syntax = loader
+                .language_for_filename(&file_path)
+                .and_then(|lang| helix_core::Syntax::new(disk_rope.slice(..), lang, &loader).ok());
 
-                (&disk_rope, disk_syntax.as_ref())
-            };
+            (&disk_rope, disk_syntax.as_ref())
+        };
 
         let total_lines = rope_ref.len_lines();
         if total_lines == 0 {
@@ -2644,14 +2551,7 @@ impl EditorContext {
         // Compute syntax tokens for the window
         let line_tokens = if let Some(syntax) = syntax_ref {
             let loader = self.editor.syn_loader.load();
-            compute_tokens_for_rope(
-                rope_ref,
-                syntax,
-                &self.editor.theme,
-                &loader,
-                window_start,
-                window_end,
-            )
+            compute_tokens_for_rope(rope_ref, syntax, &self.editor.theme, &loader, window_start, window_end)
         } else {
             vec![Vec::new(); window_end - window_start]
         };
@@ -2706,15 +2606,12 @@ impl EditorContext {
         };
 
         // Get language server with completion support
-        let ls = match doc
+        let Some(ls) = doc
             .language_servers_with_feature(LanguageServerFeature::Completion)
             .next()
-        {
-            Some(ls) => ls,
-            None => {
-                log::info!("No language server supports completion");
-                return;
-            }
+        else {
+            log::info!("No language server supports completion");
+            return;
         };
 
         let offset_encoding = ls.offset_encoding();
@@ -2742,8 +2639,8 @@ impl EditorContext {
                 Ok(None) => {
                     log::info!("No completions received");
                 }
-                Err(e) => {
-                    log::error!("Completion request failed: {e}");
+                Err(err) => {
+                    log::error!("Completion request failed: {err}");
                 }
             }
         });
@@ -2803,15 +2700,9 @@ impl EditorContext {
         };
 
         // Get language server with hover support
-        let ls = match doc
-            .language_servers_with_feature(LanguageServerFeature::Hover)
-            .next()
-        {
-            Some(ls) => ls,
-            None => {
-                log::info!("No language server supports hover");
-                return;
-            }
+        let Some(ls) = doc.language_servers_with_feature(LanguageServerFeature::Hover).next() else {
+            log::info!("No language server supports hover");
+            return;
         };
 
         let offset_encoding = ls.offset_encoding();
@@ -2829,16 +2720,14 @@ impl EditorContext {
                 Ok(Some(hover)) => {
                     let snapshot = convert_hover(hover);
                     log::info!("Received hover info");
-                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::Hover(Some(
-                        snapshot,
-                    ))));
+                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::Hover(Some(snapshot))));
                 }
                 Ok(None) => {
                     log::info!("No hover info available");
                     let _ = tx.send(EditorCommand::LspResponse(LspResponse::Hover(None)));
                 }
-                Err(e) => {
-                    log::error!("Hover request failed: {e}");
+                Err(err) => {
+                    log::error!("Hover request failed: {err}");
                 }
             }
         });
@@ -2870,24 +2759,20 @@ impl EditorContext {
         offset_encoding: helix_lsp::OffsetEncoding,
         title: String,
     ) where
-        F: std::future::Future<Output = helix_lsp::Result<Option<lsp::GotoDefinitionResponse>>>
-            + Send
-            + 'static,
+        F: std::future::Future<Output = helix_lsp::Result<Option<lsp::GotoDefinitionResponse>>> + Send + 'static,
     {
         tokio::spawn(async move {
             match future.await {
                 Ok(Some(response)) => {
                     let locations = convert_goto_response(response, offset_encoding);
                     log::info!("Received {} {} locations", locations.len(), title);
-                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::GotoDefinition(
-                        locations,
-                    )));
+                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::GotoDefinition(locations)));
                 }
                 Ok(None) => {
                     log::info!("No {title} found");
                 }
-                Err(e) => {
-                    log::error!("{title} request failed: {e}");
+                Err(err) => {
+                    log::error!("{title} request failed: {err}");
                 }
             }
         });
@@ -2905,12 +2790,9 @@ impl EditorContext {
         };
 
         // Get language server with the feature
-        let ls = match doc.language_servers_with_feature(feature).next() {
-            Some(ls) => ls,
-            None => {
-                log::info!("No language server supports {feature:?}");
-                return;
-            }
+        let Some(ls) = doc.language_servers_with_feature(feature).next() else {
+            log::info!("No language server supports {feature:?}");
+            return;
         };
 
         let offset_encoding = ls.offset_encoding();
@@ -2958,15 +2840,12 @@ impl EditorContext {
         };
 
         // Get language server with references support
-        let ls = match doc
+        let Some(ls) = doc
             .language_servers_with_feature(LanguageServerFeature::GotoReference)
             .next()
-        {
-            Some(ls) => ls,
-            None => {
-                log::info!("No language server supports references");
-                return;
-            }
+        else {
+            log::info!("No language server supports references");
+            return;
         };
 
         let offset_encoding = ls.offset_encoding();
@@ -2984,15 +2863,13 @@ impl EditorContext {
                 Ok(Some(locations)) => {
                     let snapshots = convert_references_response(locations, offset_encoding);
                     log::info!("Received {} references", snapshots.len());
-                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::References(
-                        snapshots,
-                    )));
+                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::References(snapshots)));
                 }
                 Ok(None) => {
                     log::info!("No references found");
                 }
-                Err(e) => {
-                    log::error!("References request failed: {e}");
+                Err(err) => {
+                    log::error!("References request failed: {err}");
                 }
             }
         });
@@ -3041,7 +2918,7 @@ impl EditorContext {
         let path_str: String = text.slice(start..end).into();
 
         // Try resolving relative to buffer's directory, then CWD
-        let buffer_dir = doc.path().and_then(|p| p.parent().map(|p| p.to_path_buf()));
+        let buffer_dir = doc.path().and_then(|p| p.parent().map(std::path::Path::to_path_buf));
         let resolved = buffer_dir
             .as_ref()
             .map(|dir| dir.join(&path_str))
@@ -3056,7 +2933,7 @@ impl EditorContext {
     }
 
     /// Apply document highlights as a multi-selection on the current document.
-    fn apply_document_highlights(&mut self, highlights: Vec<lsp::DocumentHighlight>) {
+    fn apply_document_highlights(&mut self, highlights: &[lsp::DocumentHighlight]) {
         if highlights.is_empty() {
             return;
         }
@@ -3073,16 +2950,13 @@ impl EditorContext {
         let offset_encoding = doc
             .language_servers_with_feature(LanguageServerFeature::DocumentHighlight)
             .next()
-            .map(|ls| ls.offset_encoding())
-            .unwrap_or(helix_lsp::OffsetEncoding::Utf16);
+            .map_or(helix_lsp::OffsetEncoding::Utf16, helix_lsp::Client::offset_encoding);
 
         let ranges: Vec<helix_core::Range> = highlights
             .iter()
             .filter_map(|hl| {
-                let start =
-                    helix_lsp::util::lsp_pos_to_pos(doc.text(), hl.range.start, offset_encoding)?;
-                let end =
-                    helix_lsp::util::lsp_pos_to_pos(doc.text(), hl.range.end, offset_encoding)?;
+                let start = helix_lsp::util::lsp_pos_to_pos(doc.text(), hl.range.start, offset_encoding)?;
+                let end = helix_lsp::util::lsp_pos_to_pos(doc.text(), hl.range.end, offset_encoding)?;
                 Some(helix_core::Range::new(start, end))
             })
             .collect();
@@ -3095,10 +2969,7 @@ impl EditorContext {
         let selection = helix_core::Selection::new(ranges.into(), 0);
         doc.set_selection(view_id, selection);
 
-        log::info!(
-            "Selected {} references via document highlights",
-            highlights.len()
-        );
+        log::info!("Selected {} references via document highlights", highlights.len());
     }
 
     /// Trigger document highlights (select references) at cursor.
@@ -3112,15 +2983,12 @@ impl EditorContext {
             return;
         };
 
-        let ls = match doc
+        let Some(ls) = doc
             .language_servers_with_feature(LanguageServerFeature::DocumentHighlight)
             .next()
-        {
-            Some(ls) => ls,
-            None => {
-                log::info!("No language server supports document highlights");
-                return;
-            }
+        else {
+            log::info!("No language server supports document highlights");
+            return;
         };
 
         let offset_encoding = ls.offset_encoding();
@@ -3137,15 +3005,13 @@ impl EditorContext {
             match future.await {
                 Ok(Some(highlights)) => {
                     log::info!("Received {} document highlights", highlights.len());
-                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::DocumentHighlights(
-                        highlights,
-                    )));
+                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::DocumentHighlights(highlights)));
                 }
                 Ok(None) => {
                     log::info!("No document highlights found");
                 }
-                Err(e) => {
-                    log::error!("Document highlight request failed: {e}");
+                Err(err) => {
+                    log::error!("Document highlight request failed: {err}");
                 }
             }
         });
@@ -3166,20 +3032,16 @@ impl EditorContext {
         let view_id = self.editor.tree.focus;
 
         // Open the file
-        if let Err(e) = self
-            .editor
-            .open(&location.path, helix_view::editor::Action::Replace)
-        {
-            log::error!("Failed to open file {:?}: {}", location.path, e);
+        if let Err(err) = self.editor.open(&location.path, helix_view::editor::Action::Replace) {
+            log::error!("Failed to open file {}: {err}", location.path.display());
             return;
         }
 
         // Get the newly opened document
         let view = self.editor.tree.get(view_id);
         let doc_id = view.doc;
-        let doc = match self.editor.document_mut(doc_id) {
-            Some(d) => d,
-            None => return,
+        let Some(doc) = self.editor.document_mut(doc_id) else {
+            return;
         };
 
         // Calculate cursor position
@@ -3207,15 +3069,12 @@ impl EditorContext {
         };
 
         // Get language server with signature help support
-        let ls = match doc
+        let Some(ls) = doc
             .language_servers_with_feature(LanguageServerFeature::SignatureHelp)
             .next()
-        {
-            Some(ls) => ls,
-            None => {
-                log::info!("No language server supports signature help");
-                return;
-            }
+        else {
+            log::info!("No language server supports signature help");
+            return;
         };
 
         let offset_encoding = ls.offset_encoding();
@@ -3233,16 +3092,14 @@ impl EditorContext {
                 Ok(Some(help)) => {
                     let snapshot = convert_signature_help(help);
                     log::info!("Received signature help");
-                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::SignatureHelp(
-                        Some(snapshot),
-                    )));
+                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::SignatureHelp(Some(snapshot))));
                 }
                 Ok(None) => {
                     log::info!("No signature help available");
                     let _ = tx.send(EditorCommand::LspResponse(LspResponse::SignatureHelp(None)));
                 }
-                Err(e) => {
-                    log::error!("Signature help request failed: {e}");
+                Err(err) => {
+                    log::error!("Signature help request failed: {err}");
                 }
             }
         });
@@ -3270,12 +3127,12 @@ impl EditorContext {
         };
 
         let capabilities = ls.capabilities();
-        let trigger_chars = match &capabilities.signature_help_provider {
-            Some(lsp::SignatureHelpOptions {
-                trigger_characters: Some(triggers),
-                ..
-            }) => triggers,
-            _ => return false,
+        let Some(lsp::SignatureHelpOptions {
+            trigger_characters: Some(trigger_chars),
+            ..
+        }) = &capabilities.signature_help_provider
+        else {
+            return false;
         };
 
         if is_signature_help_trigger_char(c, trigger_chars) {
@@ -3307,15 +3164,12 @@ impl EditorContext {
         };
 
         // Get language server with code actions support
-        let ls = match doc
+        let Some(ls) = doc
             .language_servers_with_feature(LanguageServerFeature::CodeAction)
             .next()
-        {
-            Some(ls) => ls,
-            None => {
-                log::info!("No language server supports code actions");
-                return;
-            }
+        else {
+            log::info!("No language server supports code actions");
+            return;
         };
 
         let offset_encoding = ls.offset_encoding();
@@ -3328,6 +3182,7 @@ impl EditorContext {
         let cursor_col = cursor - line_start;
 
         // Create range for the cursor position
+        #[allow(clippy::cast_possible_truncation)]
         let range = lsp::Range {
             start: lsp::Position {
                 line: cursor_line as u32,
@@ -3340,13 +3195,14 @@ impl EditorContext {
         };
 
         // Get diagnostics at cursor position for context
+        #[allow(clippy::cast_possible_truncation)]
         let diagnostics: Vec<lsp::Diagnostic> = doc
             .diagnostics()
             .iter()
             .filter(|d| d.line == cursor_line)
-            .filter_map(|d| {
+            .map(|d| {
                 // Convert to LSP diagnostic (simplified)
-                Some(lsp::Diagnostic {
+                lsp::Diagnostic {
                     range: lsp::Range {
                         start: lsp::Position {
                             line: d.line as u32,
@@ -3360,16 +3216,12 @@ impl EditorContext {
                     message: d.message.clone(),
                     severity: d.severity.map(|s| match s {
                         helix_core::diagnostic::Severity::Error => lsp::DiagnosticSeverity::ERROR,
-                        helix_core::diagnostic::Severity::Warning => {
-                            lsp::DiagnosticSeverity::WARNING
-                        }
-                        helix_core::diagnostic::Severity::Info => {
-                            lsp::DiagnosticSeverity::INFORMATION
-                        }
+                        helix_core::diagnostic::Severity::Warning => lsp::DiagnosticSeverity::WARNING,
+                        helix_core::diagnostic::Severity::Info => lsp::DiagnosticSeverity::INFORMATION,
                         helix_core::diagnostic::Severity::Hint => lsp::DiagnosticSeverity::HINT,
                     }),
                     ..Default::default()
-                })
+                }
             })
             .collect();
 
@@ -3390,18 +3242,15 @@ impl EditorContext {
         tokio::spawn(async move {
             match future.await {
                 Ok(Some(actions)) => {
-                    let stored_actions =
-                        convert_code_actions(actions, language_server_id, offset_encoding);
+                    let stored_actions = convert_code_actions(actions, language_server_id, offset_encoding);
                     log::info!("Received {} code actions", stored_actions.len());
-                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::CodeActions(
-                        stored_actions,
-                    )));
+                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::CodeActions(stored_actions)));
                 }
                 Ok(None) => {
                     log::info!("No code actions available");
                 }
-                Err(e) => {
-                    log::error!("Code actions request failed: {e}");
+                Err(err) => {
+                    log::error!("Code actions request failed: {err}");
                 }
             }
         });
@@ -3411,7 +3260,7 @@ impl EditorContext {
     pub(crate) fn apply_code_action(&mut self) {
         // Get the selected action from the filtered list
         let filtered = self.filtered_code_actions();
-        let Some(action) = filtered.get(self.code_action_selected).cloned().cloned() else {
+        let Some(action) = filtered.get(self.code_action_selected).copied().cloned() else {
             self.code_actions_visible = false;
             self.code_actions.clear();
             self.code_action_selected = 0;
@@ -3440,21 +3289,16 @@ impl EditorContext {
                 // Resolve code action if edit or command is missing.
                 // Many LSP servers don't include the full edit in the initial response
                 // and require a "codeAction/resolve" request to get the workspace edit.
-                let resolved_code_action = if code_action.edit.is_none()
-                    || code_action.command.is_none()
-                {
+                let resolved_code_action = if code_action.edit.is_none() || code_action.command.is_none() {
                     if let Some(ls) = self.editor.language_server_by_id(action.language_server_id) {
                         if let Some(future) = ls.resolve_code_action(code_action) {
                             match helix_lsp::block_on(future) {
                                 Ok(resolved) => {
-                                    log::info!(
-                                        "Resolved code action, edit present: {}",
-                                        resolved.edit.is_some()
-                                    );
+                                    log::info!("Resolved code action, edit present: {}", resolved.edit.is_some());
                                     Some(resolved)
                                 }
-                                Err(e) => {
-                                    log::error!("Failed to resolve code action: {e}");
+                                Err(err) => {
+                                    log::error!("Failed to resolve code action: {err}");
                                     None
                                 }
                             }
@@ -3478,11 +3322,8 @@ impl EditorContext {
                         workspace_edit.changes.is_some(),
                         workspace_edit.document_changes.is_some()
                     );
-                    if let Err(e) = self
-                        .editor
-                        .apply_workspace_edit(action.offset_encoding, workspace_edit)
-                    {
-                        log::error!("Failed to apply workspace edit: {e:?}");
+                    if let Err(err) = self.editor.apply_workspace_edit(action.offset_encoding, workspace_edit) {
+                        log::error!("Failed to apply workspace edit: {err:?}");
                     }
                 } else {
                     log::warn!("Code action has no workspace edit after resolution");
@@ -3526,21 +3367,19 @@ impl EditorContext {
         self.code_actions_check_position = Some(current_pos);
 
         // Get language server with code actions support
-        let ls = match doc
+        let Some(ls) = doc
             .language_servers_with_feature(LanguageServerFeature::CodeAction)
             .next()
-        {
-            Some(ls) => ls,
-            None => {
-                self.has_code_actions = false;
-                return;
-            }
+        else {
+            self.has_code_actions = false;
+            return;
         };
 
         let offset_encoding = ls.offset_encoding();
         let language_server_id = ls.id();
 
         // Create range for the cursor position
+        #[allow(clippy::cast_possible_truncation)]
         let range = lsp::Range {
             start: lsp::Position {
                 line: cursor_line as u32,
@@ -3553,35 +3392,30 @@ impl EditorContext {
         };
 
         // Get diagnostics at cursor position for context
+        #[allow(clippy::cast_possible_truncation)]
         let diagnostics: Vec<lsp::Diagnostic> = doc
             .diagnostics()
             .iter()
             .filter(|d| d.line == cursor_line)
-            .filter_map(|d| {
-                Some(lsp::Diagnostic {
-                    range: lsp::Range {
-                        start: lsp::Position {
-                            line: d.line as u32,
-                            character: (d.range.start - line_start) as u32,
-                        },
-                        end: lsp::Position {
-                            line: d.line as u32,
-                            character: (d.range.end - line_start) as u32,
-                        },
+            .map(|d| lsp::Diagnostic {
+                range: lsp::Range {
+                    start: lsp::Position {
+                        line: d.line as u32,
+                        character: (d.range.start - line_start) as u32,
                     },
-                    message: d.message.clone(),
-                    severity: d.severity.map(|s| match s {
-                        helix_core::diagnostic::Severity::Error => lsp::DiagnosticSeverity::ERROR,
-                        helix_core::diagnostic::Severity::Warning => {
-                            lsp::DiagnosticSeverity::WARNING
-                        }
-                        helix_core::diagnostic::Severity::Info => {
-                            lsp::DiagnosticSeverity::INFORMATION
-                        }
-                        helix_core::diagnostic::Severity::Hint => lsp::DiagnosticSeverity::HINT,
-                    }),
-                    ..Default::default()
-                })
+                    end: lsp::Position {
+                        line: d.line as u32,
+                        character: (d.range.end - line_start) as u32,
+                    },
+                },
+                message: d.message.clone(),
+                severity: d.severity.map(|s| match s {
+                    helix_core::diagnostic::Severity::Error => lsp::DiagnosticSeverity::ERROR,
+                    helix_core::diagnostic::Severity::Warning => lsp::DiagnosticSeverity::WARNING,
+                    helix_core::diagnostic::Severity::Info => lsp::DiagnosticSeverity::INFORMATION,
+                    helix_core::diagnostic::Severity::Hint => lsp::DiagnosticSeverity::HINT,
+                }),
+                ..Default::default()
             })
             .collect();
 
@@ -3604,22 +3438,24 @@ impl EditorContext {
                 Ok(Some(actions)) => {
                     let has_actions = !actions.is_empty();
                     // Send response to update has_code_actions state
-                    let stored_actions =
-                        convert_code_actions(actions, language_server_id, offset_encoding);
-                    let _ = tx.send(EditorCommand::LspResponse(
-                        LspResponse::CodeActionsAvailable(has_actions, stored_actions),
-                    ));
+                    let stored_actions = convert_code_actions(actions, language_server_id, offset_encoding);
+                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::CodeActionsAvailable(
+                        has_actions,
+                        stored_actions,
+                    )));
                 }
                 Ok(None) => {
-                    let _ = tx.send(EditorCommand::LspResponse(
-                        LspResponse::CodeActionsAvailable(false, Vec::new()),
-                    ));
+                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::CodeActionsAvailable(
+                        false,
+                        Vec::new(),
+                    )));
                 }
-                Err(e) => {
-                    log::debug!("Code actions check failed: {e}");
-                    let _ = tx.send(EditorCommand::LspResponse(
-                        LspResponse::CodeActionsAvailable(false, Vec::new()),
-                    ));
+                Err(err) => {
+                    log::debug!("Code actions check failed: {err}");
+                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::CodeActionsAvailable(
+                        false,
+                        Vec::new(),
+                    )));
                 }
             }
         });
@@ -3641,15 +3477,12 @@ impl EditorContext {
         };
 
         // Get language server with inlay hints support
-        let ls = match doc
+        let Some(ls) = doc
             .language_servers_with_feature(LanguageServerFeature::InlayHints)
             .next()
-        {
-            Some(ls) => ls,
-            None => {
-                log::debug!("No language server supports inlay hints");
-                return;
-            }
+        else {
+            log::debug!("No language server supports inlay hints");
+            return;
         };
 
         let offset_encoding = ls.offset_encoding();
@@ -3657,11 +3490,9 @@ impl EditorContext {
         let total_lines = text.len_lines();
 
         // Request hints for whole document (could optimize for viewport later)
+        #[allow(clippy::cast_possible_truncation)]
         let range = lsp::Range {
-            start: lsp::Position {
-                line: 0,
-                character: 0,
-            },
+            start: lsp::Position { line: 0, character: 0 },
             end: lsp::Position {
                 line: total_lines as u32,
                 character: 0,
@@ -3681,15 +3512,13 @@ impl EditorContext {
                 Ok(Some(hints)) => {
                     let snapshots = convert_inlay_hints(hints, offset_encoding);
                     log::info!("Received {} inlay hints", snapshots.len());
-                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::InlayHints(
-                        snapshots,
-                    )));
+                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::InlayHints(snapshots)));
                 }
                 Ok(None) => {
                     log::debug!("No inlay hints available");
                 }
-                Err(e) => {
-                    log::error!("Inlay hints request failed: {e}");
+                Err(err) => {
+                    log::error!("Inlay hints request failed: {err}");
                 }
             }
         });
@@ -3725,10 +3554,7 @@ impl EditorContext {
         let doc_id = view.doc;
 
         let Some(doc) = self.editor.document(doc_id) else {
-            self.show_notification(
-                "No document for rename".to_string(),
-                NotificationSeverity::Error,
-            );
+            self.show_notification("No document for rename".to_string(), NotificationSeverity::Error);
             return;
         };
 
@@ -3758,11 +3584,7 @@ impl EditorContext {
     }
 
     /// Get the word under cursor.
-    fn get_word_under_cursor(
-        &self,
-        doc_id: helix_view::DocumentId,
-        view_id: helix_view::ViewId,
-    ) -> String {
+    fn get_word_under_cursor(&self, doc_id: helix_view::DocumentId, view_id: helix_view::ViewId) -> String {
         let Some(doc) = self.editor.document(doc_id) else {
             return String::new();
         };
@@ -3887,16 +3709,15 @@ impl EditorContext {
         self.confirmation_dialog = ConfirmationDialogSnapshot::default();
 
         match action {
-            ConfirmationAction::None => {}
             ConfirmationAction::SaveAndQuit => {
                 // User chose "Don't Save" - quit without saving
                 self.should_quit = true;
             }
-            ConfirmationAction::QuitWithoutSave | ConfirmationAction::CloseBuffer => {
+            ConfirmationAction::None
+            | ConfirmationAction::QuitWithoutSave
+            | ConfirmationAction::CloseBuffer
+            | ConfirmationAction::ReloadFile => {
                 // Deny on these actions means "cancel" - do nothing
-            }
-            ConfirmationAction::ReloadFile => {
-                // Don't reload - do nothing
             }
         }
     }
@@ -3922,14 +3743,11 @@ impl EditorContext {
             };
 
             // Get language server with rename support
-            let ls = match doc
+            let Some(ls) = doc
                 .language_servers_with_feature(LanguageServerFeature::RenameSymbol)
                 .next()
-            {
-                Some(ls) => ls,
-                None => {
-                    return;
-                }
+            else {
+                return;
             };
 
             let offset_encoding = ls.offset_encoding();
@@ -3969,10 +3787,10 @@ impl EditorContext {
                         severity: NotificationSeverity::Info,
                     });
                 }
-                Err(e) => {
-                    log::error!("Rename request failed: {e}");
+                Err(err) => {
+                    log::error!("Rename request failed: {err}");
                     let _ = tx.send(EditorCommand::ShowNotification {
-                        message: format!("Rename failed: {e}"),
+                        message: format!("Rename failed: {err}"),
                         severity: NotificationSeverity::Error,
                     });
                 }
@@ -3994,15 +3812,12 @@ impl EditorContext {
             };
 
             // Get language server with document symbols support
-            let ls = match doc
+            let Some(ls) = doc
                 .language_servers_with_feature(LanguageServerFeature::DocumentSymbols)
                 .next()
-            {
-                Some(ls) => ls,
-                None => {
-                    log::info!("No language server supports document symbols");
-                    return;
-                }
+            else {
+                log::info!("No language server supports document symbols");
+                return;
             };
 
             let doc_id_lsp = doc.identifier();
@@ -4030,15 +3845,13 @@ impl EditorContext {
                 Ok(Some(response)) => {
                     let symbols = convert_document_symbols(response);
                     log::info!("Received {} document symbols", symbols.len());
-                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::DocumentSymbols(
-                        symbols,
-                    )));
+                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::DocumentSymbols(symbols)));
                 }
                 Ok(None) => {
                     log::info!("No document symbols available");
                 }
-                Err(e) => {
-                    log::error!("Document symbols request failed: {e}");
+                Err(err) => {
+                    log::error!("Document symbols request failed: {err}");
                 }
             }
         });
@@ -4058,15 +3871,12 @@ impl EditorContext {
             };
 
             // Get language server with workspace symbols support
-            let ls = match doc
+            let Some(ls) = doc
                 .language_servers_with_feature(LanguageServerFeature::WorkspaceSymbols)
                 .next()
-            {
-                Some(ls) => ls,
-                None => {
-                    log::info!("No language server supports workspace symbols");
-                    return;
-                }
+            else {
+                log::info!("No language server supports workspace symbols");
+                return;
             };
 
             ls.id()
@@ -4087,11 +3897,7 @@ impl EditorContext {
     }
 
     /// Trigger a workspace symbols search with the given query.
-    fn trigger_workspace_symbols_search(
-        &self,
-        language_server_id: helix_lsp::LanguageServerId,
-        query: String,
-    ) {
+    fn trigger_workspace_symbols_search(&self, language_server_id: helix_lsp::LanguageServerId, query: String) {
         let Some(ls) = self.editor.language_server_by_id(language_server_id) else {
             return;
         };
@@ -4107,15 +3913,13 @@ impl EditorContext {
                 Ok(Some(response)) => {
                     let symbols = convert_workspace_symbols(response);
                     log::info!("Received {} workspace symbols", symbols.len());
-                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::WorkspaceSymbols(
-                        symbols,
-                    )));
+                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::WorkspaceSymbols(symbols)));
                 }
                 Ok(None) => {
                     log::info!("No workspace symbols available");
                 }
-                Err(e) => {
-                    log::error!("Workspace symbols request failed: {e}");
+                Err(err) => {
+                    log::error!("Workspace symbols request failed: {err}");
                 }
             }
         });
@@ -4151,7 +3955,7 @@ impl EditorContext {
                     message: d.message.clone(),
                     severity: d.severity.map(DiagnosticSeverity::from).unwrap_or_default(),
                     source: d.source.clone(),
-                    code: convert_diagnostic_code(&d.code),
+                    code: convert_diagnostic_code(d.code.as_ref()),
                 };
 
                 DiagnosticPickerEntry {
@@ -4176,10 +3980,7 @@ impl EditorContext {
         self.picker_selected = 0;
         self.picker_current_path = None;
 
-        log::info!(
-            "Showing {} document diagnostics",
-            self.picker_diagnostics.len()
-        );
+        log::info!("Showing {} document diagnostics", self.picker_diagnostics.len());
     }
 
     /// Show the workspace diagnostics picker.
@@ -4187,9 +3988,9 @@ impl EditorContext {
         // Collect diagnostics from all open documents
         let mut entries: Vec<DiagnosticPickerEntry> = Vec::new();
 
-        for (&doc_id, doc) in self.editor.documents.iter() {
+        for (&doc_id, doc) in &self.editor.documents {
             let text = doc.text();
-            let path = doc.path().map(|p| p.to_path_buf());
+            let path = doc.path().cloned();
 
             for d in doc.diagnostics() {
                 let line = text.char_to_line(d.range.start);
@@ -4204,7 +4005,7 @@ impl EditorContext {
                     message: d.message.clone(),
                     severity: d.severity.map(DiagnosticSeverity::from).unwrap_or_default(),
                     source: d.source.clone(),
-                    code: convert_diagnostic_code(&d.code),
+                    code: convert_diagnostic_code(d.code.as_ref()),
                 };
 
                 entries.push(DiagnosticPickerEntry {
@@ -4248,10 +4049,7 @@ impl EditorContext {
         self.picker_selected = 0;
         self.picker_current_path = None;
 
-        log::info!(
-            "Showing {} workspace diagnostics",
-            self.picker_diagnostics.len()
-        );
+        log::info!("Showing {} workspace diagnostics", self.picker_diagnostics.len());
     }
 
     /// Resume the last picker that was opened (Space ').
@@ -4305,10 +4103,7 @@ impl EditorContext {
                 // Truncate message to fit (accounting for prefix)
                 let max_msg_len = 70usize.saturating_sub(prefix.len());
                 let message = if entry.diagnostic.message.len() > max_msg_len {
-                    format!(
-                        "{}...",
-                        &entry.diagnostic.message[..max_msg_len.saturating_sub(3)]
-                    )
+                    format!("{}...", &entry.diagnostic.message[..max_msg_len.saturating_sub(3)])
                 } else {
                     entry.diagnostic.message.clone()
                 };
@@ -4320,8 +4115,7 @@ impl EditorContext {
                     Some(path) => {
                         let filename = path
                             .file_name()
-                            .map(|n| n.to_string_lossy().to_string())
-                            .unwrap_or_else(|| "unknown".to_string());
+                            .map_or_else(|| "unknown".to_string(), |n| n.to_string_lossy().to_string());
                         Some(format!("{}:{}", filename, entry.diagnostic.line))
                     }
                     None => Some(format!("Line {}", entry.diagnostic.line)),
@@ -4349,9 +4143,7 @@ impl EditorContext {
             .map(|(idx, sym)| {
                 let icon = symbol_kind_to_picker_icon(sym.kind);
                 let secondary = match (&sym.container_name, &sym.path) {
-                    (Some(container), Some(path)) => {
-                        Some(format!("{} · {}", container, path.display()))
-                    }
+                    (Some(container), Some(path)) => Some(format!("{} · {}", container, path.display())),
                     (Some(container), None) => Some(container.clone()),
                     (None, Some(path)) => Some(format!("{}", path.display())),
                     (None, None) => Some(format!("Line {}", sym.line)),
@@ -4370,7 +4162,7 @@ impl EditorContext {
     }
 }
 
-/// Convert SymbolKind to PickerIcon.
+/// Convert `SymbolKind` to `PickerIcon`.
 fn symbol_kind_to_picker_icon(kind: SymbolKind) -> PickerIcon {
     match kind {
         SymbolKind::Function => PickerIcon::SymbolFunction,
@@ -4382,14 +4174,12 @@ fn symbol_kind_to_picker_icon(kind: SymbolKind) -> PickerIcon {
         SymbolKind::Variable => PickerIcon::SymbolVariable,
         SymbolKind::Constant => PickerIcon::SymbolConstant,
         SymbolKind::Field | SymbolKind::Property => PickerIcon::SymbolField,
-        SymbolKind::Module | SymbolKind::Namespace | SymbolKind::Package => {
-            PickerIcon::SymbolModule
-        }
+        SymbolKind::Module | SymbolKind::Namespace | SymbolKind::Package => PickerIcon::SymbolModule,
         _ => PickerIcon::SymbolOther,
     }
 }
 
-/// Convert DiagnosticSeverity to PickerIcon.
+/// Convert `DiagnosticSeverity` to `PickerIcon`.
 fn get_diagnostic_icon(severity: DiagnosticSeverity) -> PickerIcon {
     match severity {
         DiagnosticSeverity::Error => PickerIcon::DiagnosticError,
@@ -4409,11 +4199,9 @@ fn get_severity_sort_key(severity: DiagnosticSeverity) -> u8 {
     }
 }
 
-/// Convert diagnostic code from NumberOrString to Option<String>.
-fn convert_diagnostic_code(
-    code: &Option<helix_core::diagnostic::NumberOrString>,
-) -> Option<String> {
-    code.as_ref().map(|c| match c {
+/// Convert diagnostic code from `NumberOrString` to Option<String>.
+fn convert_diagnostic_code(code: Option<&helix_core::diagnostic::NumberOrString>) -> Option<String> {
+    code.map(|c| match c {
         helix_core::diagnostic::NumberOrString::Number(n) => n.to_string(),
         helix_core::diagnostic::NumberOrString::String(s) => s.clone(),
     })
@@ -4421,6 +4209,7 @@ fn convert_diagnostic_code(
 
 /// Compute syntax highlighting tokens for a rope+syntax pair over a line range.
 /// Reusable by both the main editor view and picker preview.
+#[allow(clippy::indexing_slicing)] // line_slot is guaranteed within bounds by the visible_start..visible_end range
 fn compute_tokens_for_rope(
     text: &helix_core::Rope,
     syntax: &helix_core::Syntax,
@@ -4439,7 +4228,9 @@ fn compute_tokens_for_rope(
     } else {
         text.line_to_char(visible_end)
     };
+    #[allow(clippy::cast_possible_truncation)]
     let start_byte = text.char_to_byte(start_char) as u32;
+    #[allow(clippy::cast_possible_truncation)]
     let end_byte = text.char_to_byte(end_char) as u32;
 
     let mut highlighter = syntax.highlighter(text_slice, loader, start_byte..end_byte);
@@ -4458,12 +4249,11 @@ fn compute_tokens_for_rope(
 
         if span_end > pos {
             if let Some(fg) = current_style.fg {
-                if let Some(css_color) = color_to_css(&fg) {
+                if let Some(css_color) = color_to_css(fg) {
                     let span_start_char = text.byte_to_char(pos as usize);
                     let span_end_char = text.byte_to_char(span_end as usize);
                     let span_start_line = text.char_to_line(span_start_char);
-                    let span_end_line =
-                        text.char_to_line(span_end_char.saturating_sub(1).max(span_start_char));
+                    let span_end_line = text.char_to_line(span_end_char.saturating_sub(1).max(span_start_char));
 
                     for line_idx in span_start_line..=span_end_line {
                         if line_idx < visible_start || line_idx >= visible_end {
@@ -4504,43 +4294,34 @@ fn compute_tokens_for_rope(
             HighlightEvent::Push => current_style,
         };
 
-        current_style =
-            highlights.fold(base, |acc, highlight| acc.patch(theme.highlight(highlight)));
+        current_style = highlights.fold(base, |acc, highlight| acc.patch(theme.highlight(highlight)));
     }
 
     line_tokens
 }
 
 /// Convert a helix Color to a CSS color string.
-pub(crate) fn color_to_css(color: &helix_view::graphics::Color) -> Option<String> {
+pub(crate) fn color_to_css(color: helix_view::graphics::Color) -> Option<String> {
     use helix_view::graphics::Color;
     match color {
         Color::Rgb(r, g, b) => Some(format!("#{r:02x}{g:02x}{b:02x}")),
         Color::Reset => None,
         Color::Black => Some("#282c34".into()),
-        Color::Red => Some("#e06c75".into()),
-        Color::Green => Some("#98c379".into()),
-        Color::Yellow => Some("#e5c07b".into()),
-        Color::Blue => Some("#61afef".into()),
-        Color::Magenta => Some("#c678dd".into()),
-        Color::Cyan => Some("#56b6c2".into()),
+        Color::Red | Color::LightRed => Some("#e06c75".into()),
+        Color::Green | Color::LightGreen => Some("#98c379".into()),
+        Color::Yellow | Color::LightYellow => Some("#e5c07b".into()),
+        Color::Blue | Color::LightBlue => Some("#61afef".into()),
+        Color::Magenta | Color::LightMagenta => Some("#c678dd".into()),
+        Color::Cyan | Color::LightCyan => Some("#56b6c2".into()),
         Color::Gray => Some("#5c6370".into()),
-        Color::White => Some("#abb2bf".into()),
-        Color::LightRed => Some("#e06c75".into()),
-        Color::LightGreen => Some("#98c379".into()),
-        Color::LightYellow => Some("#e5c07b".into()),
-        Color::LightBlue => Some("#61afef".into()),
-        Color::LightMagenta => Some("#c678dd".into()),
-        Color::LightCyan => Some("#56b6c2".into()),
-        Color::LightGray => Some("#abb2bf".into()),
-        Color::Indexed(_) => Some("#abb2bf".into()),
+        Color::White | Color::LightGray | Color::Indexed(_) => Some("#abb2bf".into()),
     }
 }
 
 /// Create handlers for initialization and register essential hooks.
 fn create_handlers() -> helix_view::handlers::Handlers {
     use helix_view::handlers::completion::CompletionHandler;
-    use helix_view::handlers::*;
+    use helix_view::handlers::{word_index, Handlers};
     use tokio::sync::mpsc::channel;
 
     let (completion_tx, _) = channel(1);
@@ -4584,10 +4365,7 @@ fn read_toml_file(path: &std::path::Path) -> Option<toml::Value> {
 }
 
 /// Merge two optional TOML values, with `right` overriding `left`.
-fn merge_optional_toml(
-    left: Option<toml::Value>,
-    right: Option<toml::Value>,
-) -> Option<toml::Value> {
+fn merge_optional_toml(left: Option<toml::Value>, right: Option<toml::Value>) -> Option<toml::Value> {
     match (left, right) {
         (Some(g), Some(l)) => Some(helix_loader::merge_toml_values(g, l, 3)),
         (g, l) => g.or(l),
@@ -4605,9 +4383,8 @@ fn load_merged_config_toml() -> Option<toml::Value> {
 ///
 /// Workspace values override global. Falls back to defaults if neither file exists.
 pub(crate) fn load_editor_config() -> helix_view::editor::Config {
-    let merged = match load_merged_config_toml() {
-        Some(v) => v,
-        None => return helix_view::editor::Config::default(),
+    let Some(merged) = load_merged_config_toml() else {
+        return helix_view::editor::Config::default();
     };
 
     match merged.get("editor") {
@@ -4685,9 +4462,7 @@ fn parse_key_table_lenient(
         let child: DhxKeyTrie = match value.clone().try_into() {
             Ok(trie) => trie,
             Err(err) => {
-                log::warn!(
-                    "[keys.{mode_name}] skipping '{key_str}': {err}"
-                );
+                log::warn!("[keys.{mode_name}] skipping '{key_str}': {err}");
                 continue;
             }
         };
@@ -4709,10 +4484,7 @@ fn is_signature_help_trigger_char(c: char, trigger_characters: &[String]) -> boo
 /// Workspace theme overrides global. Returns `None` if no theme is specified.
 pub(crate) fn load_theme_name() -> Option<String> {
     let merged = load_merged_config_toml()?;
-    merged
-        .get("theme")
-        .and_then(toml::Value::as_str)
-        .map(String::from)
+    merged.get("theme").and_then(toml::Value::as_str).map(String::from)
 }
 
 #[cfg(test)]

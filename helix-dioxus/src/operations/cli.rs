@@ -3,9 +3,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::operations::{
-    BufferOps, EditingOps, JumpOps, PickerOps, ShellOps, TextManipulationOps, ThemeOps,
-};
+use crate::operations::{BufferOps, EditingOps, JumpOps, PickerOps, ShellOps, TextManipulationOps, ThemeOps};
 use crate::state::{EditorContext, NotificationSeverity, ShellBehavior};
 
 /// A command completion entry: name, aliases, and human-readable description.
@@ -17,6 +15,7 @@ pub struct CommandCompletion {
 }
 
 /// Return the static list of all known commands (single source of truth).
+#[must_use]
 pub fn command_completions() -> &'static [CommandCompletion] {
     static COMMANDS: &[CommandCompletion] = &[
         CommandCompletion {
@@ -263,6 +262,7 @@ pub trait CliOps {
 
 impl CliOps for EditorContext {
     /// Execute the current command input.
+    #[allow(clippy::indexing_slicing)] // parts[] access is guarded by splitn(2, ..) guarantees
     fn execute_command(&mut self) {
         let input = self.command_input.trim();
         if input.is_empty() {
@@ -406,10 +406,7 @@ impl CliOps for EditorContext {
                 Some(name) => {
                     let name = name.to_string();
                     if let Err(e) = self.apply_theme(&name) {
-                        self.show_notification(
-                            format!("Theme error: {e}"),
-                            NotificationSeverity::Error,
-                        );
+                        self.show_notification(format!("Theme error: {e}"), NotificationSeverity::Error);
                     }
                 }
                 None => {
@@ -437,10 +434,7 @@ impl CliOps for EditorContext {
                     self.execute_shell_command(doc_id, view_id);
                     self.shell_input.clear();
                 } else {
-                    self.show_notification(
-                        "Usage: :pipe <command>".to_string(),
-                        NotificationSeverity::Warning,
-                    );
+                    self.show_notification("Usage: :pipe <command>".to_string(), NotificationSeverity::Warning);
                 }
             }
             "insert-output" => {
@@ -482,10 +476,7 @@ impl CliOps for EditorContext {
                     self.execute_shell_command(doc_id, view_id);
                     self.shell_input.clear();
                 } else {
-                    self.show_notification(
-                        "Usage: :pipe-to <command>".to_string(),
-                        NotificationSeverity::Warning,
-                    );
+                    self.show_notification("Usage: :pipe-to <command>".to_string(), NotificationSeverity::Warning);
                 }
             }
             "run-shell-command" | "run" => {
@@ -535,16 +526,10 @@ impl CliOps for EditorContext {
                                     format!("Encoding set to {}", doc.encoding().name()),
                                     NotificationSeverity::Info,
                                 ),
-                                Err(err) => (
-                                    format!("Invalid encoding: {err}"),
-                                    NotificationSeverity::Error,
-                                ),
+                                Err(err) => (format!("Invalid encoding: {err}"), NotificationSeverity::Error),
                             }
                         }
-                        None => (
-                            doc.encoding().name().to_string(),
-                            NotificationSeverity::Info,
-                        ),
+                        None => (doc.encoding().name().to_string(), NotificationSeverity::Info),
                     }
                 };
                 self.show_notification(msg, severity);
@@ -623,17 +608,11 @@ impl CliOps for EditorContext {
                         let val = parts[1].trim().to_string();
                         self.set_option(&key, &val);
                     } else {
-                        self.show_notification(
-                            "Usage: :set <key> <value>".to_string(),
-                            NotificationSeverity::Warning,
-                        );
+                        self.show_notification("Usage: :set <key> <value>".to_string(), NotificationSeverity::Warning);
                     }
                 }
                 None => {
-                    self.show_notification(
-                        "Usage: :set <key> <value>".to_string(),
-                        NotificationSeverity::Warning,
-                    );
+                    self.show_notification("Usage: :set <key> <value>".to_string(), NotificationSeverity::Warning);
                 }
             },
             "toggle" => {
@@ -668,13 +647,7 @@ impl CliOps for EditorContext {
                     let server_names: Vec<String> = {
                         let (_view, doc) = helix_view::current_ref!(self.editor);
                         doc.language_config()
-                            .map(|config| {
-                                config
-                                    .language_servers
-                                    .iter()
-                                    .map(|ls| ls.name.clone())
-                                    .collect()
-                            })
+                            .map(|config| config.language_servers.iter().map(|ls| ls.name.clone()).collect())
                             .unwrap_or_default()
                     };
                     for name in &server_names {
@@ -702,10 +675,7 @@ impl CliOps for EditorContext {
 
             _ => {
                 log::warn!("Unknown command: {cmd}");
-                self.show_notification(
-                    format!("Unknown command: {cmd}"),
-                    NotificationSeverity::Error,
-                );
+                self.show_notification(format!("Unknown command: {cmd}"), NotificationSeverity::Error);
             }
         }
 
@@ -730,10 +700,7 @@ impl CliOps for EditorContext {
             }
             Err(err) => {
                 log::warn!("Failed to reload language config: {err}");
-                self.show_notification(
-                    format!("Language config error: {err}"),
-                    NotificationSeverity::Warning,
-                );
+                self.show_notification(format!("Language config error: {err}"), NotificationSeverity::Warning);
             }
         }
 
@@ -742,10 +709,7 @@ impl CliOps for EditorContext {
             if theme_name != self.editor.theme.name() {
                 if let Err(err) = self.apply_theme(&theme_name) {
                     log::warn!("Failed to apply theme '{theme_name}': {err}");
-                    self.show_notification(
-                        format!("Theme error: {err}"),
-                        NotificationSeverity::Warning,
-                    );
+                    self.show_notification(format!("Theme error: {err}"), NotificationSeverity::Warning);
                 }
             }
         }
@@ -784,10 +748,7 @@ impl CliOps for EditorContext {
 
         let pointer = format!("/{}", key.replace('.', "/"));
         let Some(field) = config.pointer_mut(&pointer) else {
-            self.show_notification(
-                format!("Unknown config key: {key}"),
-                NotificationSeverity::Error,
-            );
+            self.show_notification(format!("Unknown config key: {key}"), NotificationSeverity::Error);
             return;
         };
 
@@ -812,10 +773,7 @@ impl CliOps for EditorContext {
         let new_config: helix_view::editor::Config = match serde_json::from_value(config) {
             Ok(c) => c,
             Err(err) => {
-                self.show_notification(
-                    format!("Invalid config value: {err}"),
-                    NotificationSeverity::Error,
-                );
+                self.show_notification(format!("Invalid config value: {err}"), NotificationSeverity::Error);
                 return;
             }
         };
@@ -826,6 +784,7 @@ impl CliOps for EditorContext {
         self.show_notification(format!("Set {key} = {value}"), NotificationSeverity::Info);
     }
 
+    #[allow(clippy::indexing_slicing)] // parts[] access is guarded by splitn guarantees and len checks
     fn toggle_option(&mut self, args: &str) {
         let parts: Vec<&str> = args.splitn(2, ' ').collect();
         let key = parts[0].to_lowercase();
@@ -844,10 +803,7 @@ impl CliOps for EditorContext {
 
         let pointer = format!("/{}", key.replace('.', "/"));
         let Some(field) = config.pointer_mut(&pointer) else {
-            self.show_notification(
-                format!("Unknown config key: {key}"),
-                NotificationSeverity::Error,
-            );
+            self.show_notification(format!("Unknown config key: {key}"), NotificationSeverity::Error);
             return;
         };
 
@@ -886,10 +842,7 @@ impl CliOps for EditorContext {
         let new_config: helix_view::editor::Config = match serde_json::from_value(config) {
             Ok(c) => c,
             Err(err) => {
-                self.show_notification(
-                    format!("Invalid config value: {err}"),
-                    NotificationSeverity::Error,
-                );
+                self.show_notification(format!("Invalid config value: {err}"), NotificationSeverity::Error);
                 return;
             }
         };
@@ -903,10 +856,7 @@ impl CliOps for EditorContext {
 
         self.editor.config = Arc::new(arc_swap::ArcSwap::from_pointee(new_config));
         self.editor.refresh_config(&old_config);
-        self.show_notification(
-            format!("Toggled {key} = {display_val}"),
-            NotificationSeverity::Info,
-        );
+        self.show_notification(format!("Toggled {key} = {display_val}"), NotificationSeverity::Info);
     }
 }
 
@@ -944,11 +894,7 @@ mod tests {
     #[test]
     fn command_completions_have_descriptions() {
         for cmd in command_completions() {
-            assert!(
-                !cmd.description.is_empty(),
-                "Command '{}' has no description",
-                cmd.name
-            );
+            assert!(!cmd.description.is_empty(), "Command '{}' has no description", cmd.name);
         }
     }
 
