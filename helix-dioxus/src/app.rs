@@ -137,12 +137,12 @@ pub fn App() -> Element {
                 match current_pending {
                     PendingKeySequence::GPrefix => {
                         pending_key.set(PendingKeySequence::None);
-                        let cmds = if snapshot.mode == "SELECT" {
+                        
+                        if snapshot.mode == "SELECT" {
                             handle_select_g_prefix(&key_event)
                         } else {
                             handle_g_prefix(&key_event)
-                        };
-                        cmds
+                        }
                     }
                     PendingKeySequence::BracketNext => {
                         pending_key.set(PendingKeySequence::None);
@@ -473,6 +473,11 @@ pub fn App() -> Element {
     // Get snapshot for conditional rendering
     let snapshot = app_state.get_snapshot();
 
+    // Convert absolute 1-indexed cursor position to viewport-relative 0-indexed
+    let viewport_cursor_line = (snapshot.cursor_line.saturating_sub(1))
+        .saturating_sub(snapshot.visible_start);
+    let viewport_cursor_col = snapshot.cursor_col;
+
     rsx! {
         // Load external stylesheet
         document::Stylesheet { href: asset!("/assets/styles.css") }
@@ -575,8 +580,8 @@ pub fn App() -> Element {
                 CompletionPopup {
                     items: snapshot.completion_items.clone(),
                     selected: snapshot.completion_selected,
-                    cursor_line: snapshot.cursor_line,
-                    cursor_col: snapshot.cursor_col,
+                    cursor_line: viewport_cursor_line,
+                    cursor_col: viewport_cursor_col,
                 }
             }
 
@@ -585,8 +590,8 @@ pub fn App() -> Element {
                 if let Some(ref hover_html) = snapshot.hover_html {
                     HoverPopup {
                         hover_html: hover_html.clone(),
-                        cursor_line: snapshot.cursor_line,
-                        cursor_col: snapshot.cursor_col,
+                        cursor_line: viewport_cursor_line,
+                        cursor_col: viewport_cursor_col,
                     }
                 }
             }
@@ -596,8 +601,8 @@ pub fn App() -> Element {
                 if let Some(ref sig_help) = snapshot.signature_help {
                     SignatureHelpPopup {
                         signature_help: sig_help.clone(),
-                        cursor_line: snapshot.cursor_line,
-                        cursor_col: snapshot.cursor_col,
+                        cursor_line: viewport_cursor_line,
+                        cursor_col: viewport_cursor_col,
                     }
                 }
             }
@@ -607,8 +612,8 @@ pub fn App() -> Element {
                 CodeActionsMenu {
                     actions: snapshot.code_actions.clone(),
                     selected: snapshot.code_action_selected,
-                    cursor_line: snapshot.cursor_line,
-                    cursor_col: snapshot.cursor_col,
+                    cursor_line: viewport_cursor_line,
+                    cursor_col: viewport_cursor_col,
                     filter: snapshot.code_action_filter.clone(),
                     preview: snapshot.code_action_preview.clone(),
                 }
@@ -638,8 +643,8 @@ pub fn App() -> Element {
             if snapshot.input_dialog_visible {
                 InputDialog {
                     dialog: snapshot.input_dialog.clone(),
-                    cursor_line: snapshot.cursor_line,
-                    cursor_col: snapshot.cursor_col,
+                    cursor_line: viewport_cursor_line,
+                    cursor_col: viewport_cursor_col,
                 }
             }
 

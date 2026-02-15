@@ -57,30 +57,33 @@ const LINE_HEIGHT: usize = 21;
 const BUFFER_BAR_HEIGHT: usize = 40;
 const CHAR_WIDTH: usize = 8;
 const GUTTER_WIDTH: usize = 60;
-const MIN_TOP: usize = 40;
-const MAX_TOP: usize = 400;
 const MAX_LEFT: usize = 600;
 
 /// Calculate pixel position for the dialog.
+///
+/// Returns `(top, left, grow_upward)`. When `grow_upward` is true, the caller
+/// should apply `transform: translateY(-100%)` so the dialog extends upward
+/// from the anchor point.
 fn calculate_position(
     cursor_line: usize,
     cursor_col: usize,
     position: DialogPosition,
-) -> (usize, usize) {
-    let top = match position {
-        DialogPosition::Above => {
-            let base = cursor_line.saturating_sub(1) * LINE_HEIGHT + BUFFER_BAR_HEIGHT;
-            base.max(MIN_TOP)
-        }
-        DialogPosition::Below => {
-            let base = (cursor_line + 1) * LINE_HEIGHT + BUFFER_BAR_HEIGHT;
-            base.min(MAX_TOP)
-        }
+) -> (usize, usize, bool) {
+    // For Above: grow upward from cursor line (unless near top → flip to below).
+    // For Below: grow downward from cursor + 1 line.
+    let grow_upward = matches!(position, DialogPosition::Above) && cursor_line > 2;
+
+    let top = if grow_upward {
+        // Anchor at cursor line; CSS translateY(-100%) shifts dialog upward
+        cursor_line * LINE_HEIGHT + BUFFER_BAR_HEIGHT
+    } else {
+        // Below cursor (or flipped from Above when near top)
+        (cursor_line + 1) * LINE_HEIGHT + BUFFER_BAR_HEIGHT
     };
 
     let left = (cursor_col * CHAR_WIDTH + GUTTER_WIDTH).min(MAX_LEFT);
 
-    (top, left)
+    (top, left, grow_upward)
 }
 
 /// Base container for inline dialogs.
@@ -117,9 +120,14 @@ pub fn InlineDialogContainer(
     /// Child elements to render inside the dialog.
     children: Element,
 ) -> Element {
-    let (top, left) = calculate_position(cursor_line, cursor_col, position);
+    let (top, left, grow_upward) = calculate_position(cursor_line, cursor_col, position);
 
-    let position_style = format!("top: {top}px; left: {left}px;");
+    let transform = if grow_upward {
+        "transform: translateY(-100%);"
+    } else {
+        ""
+    };
+    let position_style = format!("top: {top}px; left: {left}px; {transform}");
     let constraint_style = constraints.to_style();
 
     let combined_style = if constraint_style.is_empty() {
@@ -145,26 +153,45 @@ mod tests {
 
     #[test]
     fn test_calculate_position_below() {
-        let (top, left) = calculate_position(5, 10, DialogPosition::Below);
+        // viewport-relative line 5, col 10
+        let (top, left, grow_upward) = calculate_position(5, 10, DialogPosition::Below);
         // (5 + 1) * 21 + 40 = 166
         assert_eq!(top, 166);
         // 10 * 8 + 60 = 140
         assert_eq!(left, 140);
+        assert!(!grow_upward);
     }
 
     #[test]
     fn test_calculate_position_above() {
-        let (top, left) = calculate_position(5, 10, DialogPosition::Above);
-        // (5 - 1) * 21 + 40 = 124
-        assert_eq!(top, 124);
+        // viewport-relative line 5, col 10 — grows upward
+        let (top, left, grow_upward) = calculate_position(5, 10, DialogPosition::Above);
+        // 5 * 21 + 40 = 145 (anchor at cursor line, CSS transform shifts up)
+        assert_eq!(top, 145);
         assert_eq!(left, 140);
+        assert!(grow_upward);
     }
 
     #[test]
-    fn test_calculate_position_capped() {
-        // Test max caps
-        let (top, left) = calculate_position(30, 100, DialogPosition::Below);
-        assert_eq!(top, MAX_TOP);
+    fn test_calculate_position_above_flips_to_below_near_top() {
+        // When cursor is at viewport line 0-2, Above flips to Below (no upward growth)
+        for line in 0..=2 {
+            let (top_above, _, grow_up) = calculate_position(line, 5, DialogPosition::Above);
+            let (top_below, _, _) = calculate_position(line, 5, DialogPosition::Below);
+            assert_eq!(
+                top_above, top_below,
+                "Above should flip to Below at viewport line {line}"
+            );
+            assert!(!grow_up, "Should not grow upward at viewport line {line}");
+        }
+        // Line 3 should grow upward (not flip)
+        let (_, _, grow_up) = calculate_position(3, 5, DialogPosition::Above);
+        assert!(grow_up, "Line 3 should grow upward");
+    }
+
+    #[test]
+    fn test_calculate_position_left_capped() {
+        let (_, left, _) = calculate_position(5, 100, DialogPosition::Below);
         assert_eq!(left, MAX_LEFT);
     }
 
