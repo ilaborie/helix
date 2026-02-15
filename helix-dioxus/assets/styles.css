@@ -288,6 +288,20 @@ body {
     justify-content: center;
 }
 
+/* ───── File type icons (Material Icon Theme) ───── */
+.file-type-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    pointer-events: none;
+}
+
+.file-type-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
 /* ───── Status line ───── */
 .statusline {
     display: flex;
@@ -727,7 +741,7 @@ kbd {
 .gutter-diff-bar {
     position: absolute;
     top: 0;
-    right: 0;
+    right: -6px;
     width: 3px;
     height: 100%;
     pointer-events: none;
@@ -737,7 +751,7 @@ kbd {
 .gutter-diff-deleted {
     position: absolute;
     bottom: -4px;
-    right: 0;
+    right: -6px;
     width: 0;
     height: 0;
     border-top: 4px solid transparent;

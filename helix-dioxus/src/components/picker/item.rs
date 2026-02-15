@@ -2,12 +2,12 @@
 
 use dioxus::prelude::*;
 use lucide_dioxus::{
-    Blocks, Bookmark, Braces, ChevronRight, CircleX, Code, Component, File, FileCode, FileDiff,
-    FileMinus, FilePen, FilePlus, FileText, FileX, Folder, FolderOpen, Hash, Info, Layers,
-    Lightbulb, Link2, Package, Palette, Smile, SquareFunction, Terminal, TextSearch, TriangleAlert,
-    Variable,
+    Blocks, Bookmark, Braces, ChevronRight, CircleX, Code, Component, FileCode, FileDiff,
+    FileMinus, FilePen, FilePlus, FileX, Hash, Info, Layers, Lightbulb, Link2, Package, Palette,
+    Smile, SquareFunction, Terminal, TextSearch, TriangleAlert, Variable,
 };
 
+use crate::components::file_icons::{FileTypeIcon, FolderTypeIcon};
 use crate::state::{PickerIcon, PickerItem};
 
 use super::highlight::HighlightedText;
@@ -103,47 +103,72 @@ pub fn PickerItemRow(
             }
 
             // Icon based on type
-            span {
-                class: "icon-wrapper",
-                style: "width: 16px; height: 16px; margin-right: 8px; flex-shrink: 0; color: {icon_color};",
-                {match item.icon {
-                    PickerIcon::Folder => rsx! { Folder { size: 16, color: "currentColor" } },
-                    PickerIcon::FolderOpen => rsx! { FolderOpen { size: 16, color: "currentColor" } },
-                    PickerIcon::File => rsx! { File { size: 16, color: "currentColor" } },
-                    PickerIcon::Buffer | PickerIcon::BufferModified => rsx! { FileText { size: 16, color: "currentColor" } },
-                    // Symbol icons
-                    PickerIcon::SymbolFunction => rsx! { SquareFunction { size: 16, color: "currentColor" } },
-                    PickerIcon::SymbolMethod => rsx! { Code { size: 16, color: "currentColor" } },
-                    PickerIcon::SymbolClass => rsx! { Blocks { size: 16, color: "currentColor" } },
-                    PickerIcon::SymbolStruct => rsx! { Braces { size: 16, color: "currentColor" } },
-                    PickerIcon::SymbolEnum => rsx! { Layers { size: 16, color: "currentColor" } },
-                    PickerIcon::SymbolInterface => rsx! { Component { size: 16, color: "currentColor" } },
-                    PickerIcon::SymbolVariable => rsx! { Variable { size: 16, color: "currentColor" } },
-                    PickerIcon::SymbolConstant => rsx! { Hash { size: 16, color: "currentColor" } },
-                    PickerIcon::SymbolField => rsx! { Code { size: 16, color: "currentColor" } },
-                    PickerIcon::SymbolModule => rsx! { Package { size: 16, color: "currentColor" } },
-                    PickerIcon::SymbolOther => rsx! { Code { size: 16, color: "currentColor" } },
-                    // Diagnostic icons
-                    PickerIcon::DiagnosticError => rsx! { CircleX { size: 16, color: "currentColor" } },
-                    PickerIcon::DiagnosticWarning => rsx! { TriangleAlert { size: 16, color: "currentColor" } },
-                    PickerIcon::DiagnosticInfo => rsx! { Info { size: 16, color: "currentColor" } },
-                    PickerIcon::DiagnosticHint => rsx! { Lightbulb { size: 16, color: "currentColor" } },
-                    PickerIcon::SearchResult => rsx! { TextSearch { size: 16, color: "currentColor" } },
-                    PickerIcon::Reference => rsx! { Link2 { size: 16, color: "currentColor" } },
-                    PickerIcon::Definition => rsx! { FileCode { size: 16, color: "currentColor" } },
-                    PickerIcon::Register => rsx! { FileText { size: 16, color: "currentColor" } },
-                    PickerIcon::Command => rsx! { Terminal { size: 16, color: "currentColor" } },
-                    PickerIcon::JumpEntry => rsx! { Bookmark { size: 16, color: "currentColor" } },
-                    PickerIcon::Theme => rsx! { Palette { size: 16, color: "currentColor" } },
-                    // VCS icons
-                    PickerIcon::VcsAdded => rsx! { FilePlus { size: 16, color: "currentColor" } },
-                    PickerIcon::VcsModified => rsx! { FilePen { size: 16, color: "currentColor" } },
-                    PickerIcon::VcsConflict => rsx! { FileX { size: 16, color: "currentColor" } },
-                    PickerIcon::VcsDeleted => rsx! { FileMinus { size: 16, color: "currentColor" } },
-                    PickerIcon::VcsRenamed => rsx! { FileDiff { size: 16, color: "currentColor" } },
-                    PickerIcon::Emoji => rsx! { Smile { size: 16, color: "currentColor" } },
-                }}
-            }
+            // File/Folder/Buffer variants use Material Icon Theme SVGs (colorful)
+            // All other variants keep Lucide icons (monochrome with color via CSS)
+            {match item.icon {
+                PickerIcon::Folder => rsx! {
+                    span { style: "margin-right: 8px; flex-shrink: 0;",
+                        FolderTypeIcon { size: 16 }
+                    }
+                },
+                PickerIcon::FolderOpen => rsx! {
+                    span { style: "margin-right: 8px; flex-shrink: 0;",
+                        FolderTypeIcon { is_open: true, size: 16 }
+                    }
+                },
+                PickerIcon::File => rsx! {
+                    span { style: "margin-right: 8px; flex-shrink: 0;",
+                        FileTypeIcon { name: item.display.clone(), size: 16 }
+                    }
+                },
+                PickerIcon::Buffer | PickerIcon::BufferModified => rsx! {
+                    span { style: "margin-right: 8px; flex-shrink: 0;",
+                        FileTypeIcon { name: item.display.clone(), size: 16 }
+                    }
+                },
+                _ => rsx! {
+                    span {
+                        class: "icon-wrapper",
+                        style: "width: 16px; height: 16px; margin-right: 8px; flex-shrink: 0; color: {icon_color};",
+                        {match item.icon {
+                            // Symbol icons
+                            PickerIcon::SymbolFunction => rsx! { SquareFunction { size: 16, color: "currentColor" } },
+                            PickerIcon::SymbolMethod => rsx! { Code { size: 16, color: "currentColor" } },
+                            PickerIcon::SymbolClass => rsx! { Blocks { size: 16, color: "currentColor" } },
+                            PickerIcon::SymbolStruct => rsx! { Braces { size: 16, color: "currentColor" } },
+                            PickerIcon::SymbolEnum => rsx! { Layers { size: 16, color: "currentColor" } },
+                            PickerIcon::SymbolInterface => rsx! { Component { size: 16, color: "currentColor" } },
+                            PickerIcon::SymbolVariable => rsx! { Variable { size: 16, color: "currentColor" } },
+                            PickerIcon::SymbolConstant => rsx! { Hash { size: 16, color: "currentColor" } },
+                            PickerIcon::SymbolField => rsx! { Code { size: 16, color: "currentColor" } },
+                            PickerIcon::SymbolModule => rsx! { Package { size: 16, color: "currentColor" } },
+                            PickerIcon::SymbolOther => rsx! { Code { size: 16, color: "currentColor" } },
+                            // Diagnostic icons
+                            PickerIcon::DiagnosticError => rsx! { CircleX { size: 16, color: "currentColor" } },
+                            PickerIcon::DiagnosticWarning => rsx! { TriangleAlert { size: 16, color: "currentColor" } },
+                            PickerIcon::DiagnosticInfo => rsx! { Info { size: 16, color: "currentColor" } },
+                            PickerIcon::DiagnosticHint => rsx! { Lightbulb { size: 16, color: "currentColor" } },
+                            PickerIcon::SearchResult => rsx! { TextSearch { size: 16, color: "currentColor" } },
+                            PickerIcon::Reference => rsx! { Link2 { size: 16, color: "currentColor" } },
+                            PickerIcon::Definition => rsx! { FileCode { size: 16, color: "currentColor" } },
+                            PickerIcon::Register => rsx! { Code { size: 16, color: "currentColor" } },
+                            PickerIcon::Command => rsx! { Terminal { size: 16, color: "currentColor" } },
+                            PickerIcon::JumpEntry => rsx! { Bookmark { size: 16, color: "currentColor" } },
+                            PickerIcon::Theme => rsx! { Palette { size: 16, color: "currentColor" } },
+                            // VCS icons
+                            PickerIcon::VcsAdded => rsx! { FilePlus { size: 16, color: "currentColor" } },
+                            PickerIcon::VcsModified => rsx! { FilePen { size: 16, color: "currentColor" } },
+                            PickerIcon::VcsConflict => rsx! { FileX { size: 16, color: "currentColor" } },
+                            PickerIcon::VcsDeleted => rsx! { FileMinus { size: 16, color: "currentColor" } },
+                            PickerIcon::VcsRenamed => rsx! { FileDiff { size: 16, color: "currentColor" } },
+                            PickerIcon::Emoji => rsx! { Smile { size: 16, color: "currentColor" } },
+                            // Already handled above
+                            PickerIcon::Folder | PickerIcon::FolderOpen | PickerIcon::File
+                            | PickerIcon::Buffer | PickerIcon::BufferModified => unreachable!(),
+                        }}
+                    }
+                },
+            }}
 
             // Main content area
             div {

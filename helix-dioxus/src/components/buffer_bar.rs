@@ -3,49 +3,13 @@
 //! Shows a horizontal tab bar with overflow scroll buttons when needed.
 
 use dioxus::prelude::*;
-use lucide_dioxus::{
-    Braces, ChevronLeft, ChevronRight, Code, FileCode, FileText, GitBranch, Image, Lock, Palette,
-    Terminal, X,
-};
+use lucide_dioxus::{ChevronLeft, ChevronRight, X};
 
 use crate::hooks::use_editor_snapshot;
 use crate::state::{BufferInfo, EditorCommand};
 use crate::AppState;
 
-/// Returns the appropriate Lucide icon element for a filename based on extension.
-fn file_icon(name: &str, color: &str) -> Element {
-    let ext = name.rsplit('.').next().unwrap_or("");
-    match ext.to_lowercase().as_str() {
-        // Rust
-        "rs" => rsx! { FileCode { size: 14, color } },
-        // Config files
-        "toml" | "yaml" | "yml" | "json" | "json5" => rsx! { Braces { size: 14, color } },
-        // Markdown/docs
-        "md" | "mdx" | "txt" | "rst" => rsx! { FileText { size: 14, color } },
-        // Web
-        "html" | "htm" | "xml" | "svg" => rsx! { Code { size: 14, color } },
-        "css" | "scss" | "sass" | "less" => rsx! { Palette { size: 14, color } },
-        "js" | "jsx" | "ts" | "tsx" | "mjs" | "cjs" => rsx! { FileCode { size: 14, color } },
-        // Python
-        "py" | "pyi" | "pyw" => rsx! { FileCode { size: 14, color } },
-        // Shell
-        "sh" | "bash" | "zsh" | "fish" => rsx! { Terminal { size: 14, color } },
-        // C/C++
-        "c" | "h" | "cpp" | "hpp" | "cc" | "cxx" => rsx! { FileCode { size: 14, color } },
-        // Go
-        "go" => rsx! { FileCode { size: 14, color } },
-        // Java/Kotlin
-        "java" | "kt" | "kts" => rsx! { FileCode { size: 14, color } },
-        // Images (if opened)
-        "png" | "jpg" | "jpeg" | "gif" | "webp" | "ico" => rsx! { Image { size: 14, color } },
-        // Git
-        "gitignore" | "gitattributes" => rsx! { GitBranch { size: 14, color } },
-        // Lock files
-        "lock" => rsx! { Lock { size: 14, color } },
-        // Default
-        _ => rsx! { FileText { size: 14, color } },
-    }
-}
+use super::file_icons::FileTypeIcon;
 
 /// Maximum number of visible tabs before scrolling is needed.
 const MAX_VISIBLE_TABS: usize = 8;
@@ -183,9 +147,8 @@ fn BufferTab(buffer: BufferInfo, on_action: EventHandler<()>) -> Element {
 
             // File icon
             span {
-                class: "icon-wrapper",
-                style: "width: 14px; height: 14px; margin-right: 6px;",
-                {file_icon(&buffer.name, text_color)}
+                style: "margin-right: 6px;",
+                FileTypeIcon { name: buffer.name.clone(), size: 14 }
             }
 
             // File name (truncated)

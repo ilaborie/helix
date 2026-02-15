@@ -13,6 +13,7 @@
 mod buffer_bar;
 mod diagnostics;
 mod editor_view;
+pub(crate) mod file_icons;
 mod kbd;
 mod keybinding_help;
 mod scrollbar;
@@ -30,6 +31,7 @@ pub use diagnostics::{
     DiagnosticUnderline, ErrorLens,
 };
 pub use editor_view::EditorView;
+pub use file_icons::{FileTypeIcon, FolderTypeIcon};
 pub use kbd::KbdKey;
 pub use keybinding_help::KeybindingHelpBar;
 pub use scrollbar::Scrollbar;

@@ -47,6 +47,9 @@ helix-dioxus/src/
 │   ├── keybinding_help.rs      # Context-aware keybinding help bar
 │   ├── scrollbar.rs            # Custom scrollbar with diagnostic markers
 │   ├── diagnostics.rs          # Diagnostic rendering helpers
+│   ├── file_icons/             # Material Icon Theme file/folder icons
+│   │   ├── mod.rs              # FileTypeIcon, FolderTypeIcon components + filename mapping
+│   │   └── svgs.rs             # ~40 embedded SVG constants from Material Icon Theme
 │   ├── lsp/                    # LSP-related popups
 │   │   ├── mod.rs              # Re-exports
 │   │   ├── code_actions.rs     # Code actions menu (two-column with preview)
@@ -190,6 +193,7 @@ Functions defined in `script.js`:
 - `.code-actions-layout`, `.code-actions-list-column`, `.code-actions-preview-column` (two-column preview)
 - `.code-action-preview`, `.code-action-diff-*` (diff preview panel)
 - `.kbd-key-compact` (compact kbd variant for 20px help bar)
+- `.file-type-icon` (Material Icon Theme SVG icons for files/folders)
 
 **Dynamic Styles**: Styles requiring Rust variables remain inline:
 - Mode colors: `style: "background-color: {mode_bg};"`

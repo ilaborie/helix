@@ -1489,6 +1489,37 @@ Split views are **not planned** for helix-dioxus. For multiple views, users shou
 
 ---
 
+## 2026-02-15: Material Icon Theme File Icons
+
+### Progress
+- Replaced monochrome Lucide icons with colorful SVGs from Material Icon Theme (MIT licensed)
+- Created `src/components/file_icons/` module with ~40 embedded SVG constants
+- `icon_svg_for_filename()` matches special filenames first (Dockerfile, Makefile, .gitignore), then extension, then default
+- `FileTypeIcon` and `FolderTypeIcon` Dioxus components render inline SVGs via `dangerous_inner_html`
+- Integrated into buffer bar (14px) and file picker (16px)
+- Symbol, diagnostic, VCS, and other picker icon types still use Lucide icons
+
+### Icon Coverage (~40 icons)
+- **Languages**: Rust, Python, JavaScript, TypeScript, Go, Java, C, C++, C#, Ruby, PHP, Swift, Kotlin, Scala, Lua, Elixir, Haskell, OCaml, Zig, Nim
+- **Web**: HTML, CSS, SCSS, SVG
+- **Data/Config**: JSON, YAML, TOML, XML, Markdown
+- **Build/DevOps**: Docker, Shell, Makefile, Nix
+- **Other**: Git, Lock, Image, Default file, Folder, Folder-open
+
+### Issues Encountered
+- Raw string literals `r#"..."#` failed because SVG content contains `"#` sequences (e.g., `fill="#ff7043"`); fixed by using `r##"..."##`
+- `std::ptr::eq` for `const` string identity doesn't work reliably (const items are inlined); switched tests to `assert_eq!`
+
+### Files Changed
+- `src/components/file_icons/svgs.rs` — created: ~40 const SVG strings
+- `src/components/file_icons/mod.rs` — created: components, mapping, 18 tests
+- `src/components/mod.rs` — added module + re-exports
+- `src/components/buffer_bar.rs` — removed `file_icon()`, use `FileTypeIcon`
+- `src/components/picker/item.rs` — File/Folder/Buffer use Material icons, rest keep Lucide
+- `assets/styles.css` — added `.file-type-icon` rules
+
+---
+
 ## Template for Future Entries
 
 ```markdown
