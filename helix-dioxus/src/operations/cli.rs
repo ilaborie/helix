@@ -244,6 +244,11 @@ pub fn command_completions() -> &'static [CommandCompletion] {
             aliases: &[],
             description: "Show TS scopes at cursor",
         },
+        CommandCompletion {
+            name: "emoji",
+            aliases: &[],
+            description: "Open emoji picker",
+        },
     ];
     COMMANDS
 }
@@ -676,6 +681,11 @@ impl CliOps for EditorContext {
                         self.restart_lsp_server(name);
                     }
                 }
+            }
+
+            // Emoji picker
+            "emoji" => {
+                self.show_emoji_picker();
             }
 
             // Tree-sitter scopes

@@ -1,6 +1,10 @@
-# helix-dioxus CLAUDE.md
+# CLAUDE.md
 
-This file provides guidance to Claude Code when working with the helix-dioxus crate.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Workspace Context
+
+helix-dioxus is a crate inside the [helix](https://github.com/helix-editor/helix) monorepo workspace. It depends on sibling crates (`helix-core`, `helix-view`, `helix-lsp`, `helix-event`, `helix-loader`, `helix-vcs`, `helix-stdx`) via relative path dependencies. The parent workspace root is at `../`.
 
 ## Architecture
 
@@ -319,6 +323,9 @@ cargo clippy -p helix-dioxus --bins --lib
 # Tests (use --lib to skip examples)
 cargo test -p helix-dioxus --lib
 
+# Run a single test
+cargo test -p helix-dioxus --lib test_name
+
 # Documentation
 cargo doc -p helix-dioxus --no-deps
 ```
@@ -415,81 +422,27 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - Solution: In `translate_key_code`, when Alt is pressed, use `evt.code()` (physical key) via `key_code_from_physical()` to get the intended character instead of the composed one
 - Affected bindings: Alt+o/i (expand/shrink), Alt+. (repeat), Alt+; (flip selections), Alt+d (delete no yank), Alt+c/C (copy selection), Alt+s (split), Alt+x (shrink to line bounds), Alt+` (case)
 
-## Feature Roadmap
+## Emoji Picker
 
-### Planned Enhancements
-- [x] ~~Keybinding help bar above statusline showing common shortcuts (context-aware per mode)~~ Context-aware help bar with register indicators
-- [x] ~~Command panel as picker-style UI with fuzzy search~~ `Space p` or `:cmd`/`:commands` opens GenericPicker with ~40 commands, fuzzy filter, keybinding hints
-- [x] ~~File-type specific icons in buffer bar~~ Added file-type icons
-- [x] ~~Mouse click support in picker~~ Added picker mouse clicks
-- [x] ~~LSP integration for diagnostics and completions~~ Diagnostics display with gutter icons, error lens, wavy underlines, and status bar counts
-- ~~Multiple splits/views support~~ **Not supported** — single-view design decision
-- [x] ~~System clipboard integration~~ Uses `Editor.registers` with `'+'` register for system clipboard
-- [x] ~~Extract theme colors to `theme.rs` or `colors.rs`~~ Extracted to CSS custom properties in `:root`
-- [x] ~~Add custom hooks (`use_editor_state`, `use_keybinding`)~~ `use_editor_snapshot()` hook in `hooks.rs` for DRY component state access
-- [x] ~~Consider splitting picker into `FilePicker`, `BufferPicker` components~~ Split into picker/ folder
-- [x] ~~Add integration tests for key operations~~ `integration_tests.rs` with dispatch harness, tests for normal/insert/search/select/command/picker modes
-- [x] ~~Named registers (`"a`–`"z`) — register selection before yank/paste (e.g., `"ay`, `"ap`)~~ Full register support with `"` prefix key, named/special registers, black hole `_`, statusline indicator
-- [x] ~~Register picker (`:reg` command) — picker-style overlay showing all populated registers~~ GenericPicker with register browsing, confirm sets selected register
+- **Trigger**: `Ctrl+Cmd+Space` in insert mode, or `:emoji` command
+- **Crate**: `emojis` v0.8 (Unicode 17.0, all standard emojis with names and shortcodes)
+- **UI**: Reuses `GenericPicker` with `PickerMode::Emojis`, `PickerIcon::Emoji` (Smile icon)
+- **Insertion**: `EditorCommand::InsertText(String)` — supports multi-codepoint emojis (flags, ZWJ sequences)
+- **Meta modifier**: `translate_modifiers()` maps `mods.meta()` → `KeyModifiers::SUPER`
 
-### UI Improvements (RustRover-inspired)
-- [x] Severity-colored lightbulb indicator - change color based on diagnostic severity (red/yellow/blue/cyan)
-- [x] Code actions search box - filter input with count display, typing filters actions
-- [x] Diagnostic scrollbar markers - show diagnostic and search positions on right scrollbar edge
-- [x] Jump list gutter markers - Bookmark icon on lines with jump list entries, matching picker icon
-- [x] Picker file preview panel - side-by-side syntax-highlighted file preview in picker (40%/60% split), with search match highlighting for global search
-- [x] Code actions preview panel - show fix preview before applying (LSP resolve + diff preview)
-- [x] ~~Dialog search mode setting~~ `[dialog] search_mode = "vim-style"` in `dhx.toml`, j/k navigate pickers, `/` toggles search focus, visual feedback with focused border and cursor
-- [x] ~~Cursor block visibility~~ `cursor-pulse-in-selection` CSS animation with stronger glow when cursor is inside selection
-- [x] ~~Clipboard register (`+`) visibility in register dialog~~ Line count and byte count info in register dialog header
-- [x] ~~`*` register~~ macOS fallback to clipboard content (no primary selection on macOS)
-- [x] ~~Jump list clear~~ `:jumplist-clear` command with `JumpList::clear()`, notification, command panel entry
+## Design Decisions
 
-### LSP Improvements
-- [ ] Investigate rust-analyzer diagnostic line reporting - diagnostics may be reported on the line where parsing fails rather than where the actual error is (e.g., unterminated string reports on the next line). Consider requesting upstream fix or mapping diagnostic positions back to the originating code
-
-### Design Decisions
 - **Window/Splits**: Not supported — helix-dioxus uses a single-view design. `C-w` prefix and `Space w` sub-menu will not be implemented.
 - **DAP/Debug**: Not supported — `Space G` sub-menu will not be implemented. Debug adapter protocol is not integrated.
 
-### Recently Completed
-- [x] Textobject word/paragraph support for `mi`/`ma` — `miw`/`maw` select inside/around word, `miW`/`maW` for WORD, `mip`/`map` for paragraph using `helix_core::textobject`; non-alphanumeric chars still use pair surround; unknown alpha chars are no-ops; help bar hints updated; 4 tests
-- [x] KbdKey component + keyboard shortcut contrast fix — reusable `KbdKey` Dioxus component with physical key CSS styling (border, box-shadow), `--kbd-bg`/`--kbd-border`/`--kbd-text` CSS custom properties with dark/light theme defaults, `.kbd-key-compact` variant for 20px help bar, WCAG contrast fix (description text uses `--text` with `opacity: 0.85` instead of `--text-dim`), removed duplicate `kbd` overrides in LSP/input dialog help sections
-- [x] Code actions preview panel — two-column layout with diff preview when navigating code actions, async `codeAction/resolve` for workspace edits, `imara-diff` Histogram algorithm for line-level diffs, `apply_text_edits()` with LSP offset encoding, `compute_file_diff()` with context lines, `CodeActionPreviewPanel` component (Loading/Available/Unavailable states), preview caching by action index, `.code-actions-layout` flex row CSS, diff line colors (added/removed/context), 16 diff computation tests
-- [x] Command mode autocompletion — fuzzy-matching popup above `:` prompt showing all ~45 commands with aliases and descriptions, Tab to accept, Up/Down to navigate, `CommandCompletion` struct as single source of truth, `CommandCompletionPopup` component, `compute_command_completions()` reuses `fuzzy_match_with_indices`, CSS `.command-completion-*` classes
-- [x] File explorer picker (`Space e` / `Space E`) — tree-style file explorer with expandable/collapsible directories (Enter/Left/Right/h/l), `FolderOpen` icon, `depth`-based indentation, hidden files shown, flat fuzzy filtering when typing (restores tree on clear), file preview panel, `rebuild_explorer_items()` with dirs-first sorting, `explorer_expanded` state, `collect_all_files()` via `ignore::WalkBuilder`, command panel entries, help bar hint
-- [x] Planned enhancements batch (7 items) — cursor-in-selection glow animation, `:jumplist-clear` command with `JumpList::clear()`, `*` register macOS clipboard fallback, register dialog line/byte count info, integration tests for key operations (normal/insert/search/select/command/picker modes), `use_editor_snapshot()` hook for DRY component state, dialog search mode setting (`vim-style` in `dhx.toml` with j/k navigation and `/` search focus toggle)
-- [x] Missing `:` commands batch (7 commands) — `:sort` (sort multi-cursor selections), `:reflow [width]` (rewrap text), `:config-open` / `:log-open` (open config/log files), `:encoding [label]` (show/set encoding), `:set-line-ending [lf|crlf]` (show/set line endings with Transaction), `:tree-sitter-scopes` (show TS scopes at cursor), `TextManipulationOps` extension trait, `CliCommand(String)` variant for command panel passthrough, 6 command panel entries
-- [x] Macro recording/replay (`Q`/`q`) — `Q` toggles recording to register (`"aQ` records to `a`, default `@`), `q` replays from register, `MacroOps` extension trait, statusline `REC [@]` indicator with blink animation, help bar hints, prevents recursion during replay, works in normal and select modes
-- [x] Theme switching — `:theme <name>` applies theme directly, `:theme` (no args) opens theme picker with all available themes, current theme highlighted, live preview on navigation (arrows/filter update UI immediately, Escape restores original theme), dynamic CSS variable injection from theme scopes (ui.background, ui.text, diagnostics, etc.), command panel entry, `ThemeOps` extension trait
-- [x] Shell integration (`|`, `!`, `A-|`, `A-!`) — pipe selections through shell commands with interactive prompt, per-selection processing, CLI commands (`:pipe`, `:sh`, `:insert-output`, `:append-output`, `:pipe-to`, `:run`), help bar hints, command panel entries
-- [x] Word jump (`gw`) — EasyMotion-style two-char label navigation, `gw` in normal mode jumps to word, `gw` in select mode extends selection, labels rendered as overlay spans, dimming on first char filter, Esc to cancel
-- [x] Picker file preview panel — side-by-side two-column layout (40% list / 60% preview) with syntax-highlighted file content, focus line indicator, search match highlighting for GlobalSearch; supports all file-based picker modes (DirectoryBrowser, FilesRecursive, Buffers, Symbols, Diagnostics, GlobalSearch, References, Definitions, JumpList); single-column preserved for Registers/Commands; `compute_tokens_for_rope` extracted as reusable helper for both editor view and preview
-- [x] Jump list gutter markers — orange Bookmark icon in indicator gutter for lines with jump list entries, `jump_lines` in `EditorSnapshot`, cache key updated for re-renders
-- [x] Fix Alt+key bindings on macOS — Option key composed special characters (ø, ˆ, ç) instead of intended keys; now uses physical key code (`evt.code()`) for Alt normalization in `translate.rs`
-- [x] Tree-sitter expand/shrink selection — `A-o` expands to parent syntax node (pushes history), `A-i` shrinks back (pops history or uses tree-sitter), both in normal and select modes, command panel entries
-- [x] Multi-selection, regex select/split, copy/rotate — multi-selection rendering (all ranges, not just primary), `s`/`S` regex select/split with prompt, `A-s` split on newline, `C`/`A-C` copy selection on next/prev line, `(`/`)` rotate selections
-- [x] Format document + align selections — `:format` / command panel now uses LSP `textDocument/formatting`, `&` aligns multi-cursor selections, `=` formats via LSP range formatting
-- [x] Quick wins batch (6 bindings) — `A-d`/`A-c` delete/change without yanking, `C-a`/`C-x` increment/decrement numbers and dates, `_` trim selections, `=` format selections via LSP range formatting
-- [x] Goto + bracket navigation batch (20 bindings) — `gt`/`gc`/`gb` window position, `ga`/`gm`/`g.` file/edit goto, `]f`/`[f` function, `]t`/`[t` class, `]a`/`[a` parameter, `]c`/`[c` comment, `]p`/`[p` paragraph, `]D`/`[D` first/last diagnostic, `X` extend to line bounds, `A-x` shrink to line bounds
-- [x] Keybinding gap reduction (3 batches, ~30 new bindings) — Batch 1: wire existing commands (`C-b`/`C-f` page, `ge`/`gh`/`gl`/`gn`/`gp` goto, `Space b` buffer picker, insert `C-h`/`C-d`/`C-j`). Batch 2: new operations (`C-u`/`C-d` half-page, `%` select all, `A-;` flip selections, `gs` first non-whitespace, `] Space`/`[ Space` add newline, `C-k` kill to line end, `A-d` delete word forward). Batch 3: select mode extend variants (`f`/`F`/`t`/`T`/`r` in select mode, `n`/`N` extend search next/prev, mode-aware dispatch in `app.rs`)
-- [x] Command panel — `Space p` or `:cmd`/`:commands` opens GenericPicker with ~40 editor commands, fuzzy filter, keybinding hints as secondary text, `Terminal` icon (cyan), deferred dispatch via `command_tx`
-- [x] Register picker — `:reg`/`:registers` command opens GenericPicker showing all registers, populated first, confirm sets `editor.selected_register` for next yank/paste
-- [x] Named registers — `"` prefix key for register selection (`"ay`, `"ap`, `"_d`), `take_register()` helper, black hole register `_`, statusline `reg=` indicator, help bar hints, select mode `p` fix (`ReplaceWithYanked`)
-- [x] Core tutor commands batch — 21 commands: `;` (collapse selection), `,` (keep primary), `Alt-.` (repeat motion), `c` (change), `e`/`W`/`E`/`B` (word motions), `I` (insert line start), `r` (replace char), `R` (replace with yank), `J` (join), `~`/`` ` ``/`Alt+`` ` (case ops), `mm` (match bracket), `mi`/`ma` (select inside/around), `ms`/`md`/`mr` (surround)
-- [x] Register indicators in help bar — `+` (clipboard), `*` (selection), `/` (search) with active/inactive highlighting, click-to-open dialog with content view and Clear button
-- [x] Keybinding help bar — context-aware shortcut hints above statusline per mode and pending key sequence
-- [x] Find/till character motions (f/F/t/T) with repeat (Alt-.)
-- [x] Indent/unindent (>/<), search word under cursor (*)
-- [x] Insert mode: Ctrl+w (delete word backward), Ctrl+u (delete to line start)
-- [x] Picker: Home/End/PageUp/PageDown navigation
-- [x] CSS custom properties - extracted all hardcoded colors/z-indices to `:root` variables
-- [x] Keybinding refactoring - shared helpers for move/extend/text-input/list-navigation patterns
-- [x] Buffer save refactoring - `save_doc_inner` helper, `build_confirmation_dialog` helper
-- [x] Selection visibility fix - show multi-char selections in all modes (not just Select)
-- [x] Removed unused `inlay_hints.rs` module and dead code comments
-- [x] Confirmation dialog for quit/close with unsaved changes
-- [x] LSP document synchronization - register helix_event hooks
-- [x] Scrollbar with diagnostic and search result markers, tooltips
-- [x] Generic inline dialog components
-- [x] LSP progress tracking, server restart, code actions search
+## Open Items
+
+- [ ] Investigate rust-analyzer diagnostic line reporting — diagnostics may be reported on the line where parsing fails rather than where the actual error is (e.g., unterminated string reports on the next line)
+
+## Development History
+
+See [DEV_LOGBOOK.md](DEV_LOGBOOK.md) for detailed development history and completed features.
+
+## Long-term Roadmap
+
+Design notes and long-term vision (IDE layout, perspectives, views, plugins, automation) are maintained in `~/Documents/Workspaces/_ideas/DNA - Dioxus + Helix/`.

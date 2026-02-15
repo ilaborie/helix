@@ -1464,6 +1464,31 @@ Split views are **not planned** for helix-dioxus. For multiple views, users shou
 
 ---
 
+## 2026-02-15: Emoji Picker
+
+### Progress
+- Added emoji picker using `emojis` crate v0.8 (Unicode 17.0)
+- `Ctrl+Cmd+Space` in insert mode or `:emoji` command opens the picker
+- Reuses existing `GenericPicker` with new `PickerMode::Emojis` and `PickerIcon::Emoji`
+- Added `EditorCommand::InsertText(String)` for multi-codepoint text insertion (flags, ZWJ sequences)
+- Added `KeyModifiers::SUPER` translation from `mods.meta()` for macOS Cmd key support
+- Lucide `Smile` icon with `var(--warning)` color for picker items
+- 5 new tests: 3 for `insert_text` (emoji, multi-codepoint, empty no-op), 2 for keybinding dispatch
+
+### Files Changed (10)
+- `Cargo.toml` — `emojis = "0.8"` dependency
+- `keybindings/translate.rs` — meta → SUPER modifier
+- `keybindings/insert.rs` — Ctrl+Cmd+Space binding + tests
+- `state/types.rs` — `PickerIcon::Emoji`, `PickerMode::Emojis`, `InsertText`, `ShowEmojiPicker`
+- `operations/editing.rs` — `insert_text()` method + tests
+- `operations/picker_ops.rs` — `show_emoji_picker()`, confirm handler, command panel entry
+- `operations/cli.rs` — `:emoji` command
+- `components/picker/item.rs` — Emoji icon rendering
+- `components/keybinding_help.rs` — insert mode hint
+- `state/mod.rs` — command dispatch wiring
+
+---
+
 ## Template for Future Entries
 
 ```markdown

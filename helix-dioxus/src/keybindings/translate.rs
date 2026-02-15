@@ -152,6 +152,9 @@ fn translate_modifiers(evt: &KeyboardEvent) -> KeyModifiers {
     if mods.alt() {
         result |= KeyModifiers::ALT;
     }
+    if mods.meta() {
+        result |= KeyModifiers::SUPER;
+    }
 
     result
 }

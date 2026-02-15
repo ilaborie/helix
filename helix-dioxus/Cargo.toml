@@ -78,6 +78,9 @@ grep-matcher = "0.1"
 # Native file dialogs
 rfd = "0.15"
 
+# Emoji data (Unicode 17.0)
+emojis = "0.8"
+
 [dev-dependencies]
 tempfile = "3"
 

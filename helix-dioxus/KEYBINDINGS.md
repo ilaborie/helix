@@ -309,6 +309,7 @@ Reference: `helix-term/src/keymap/default.rs`
 | `C-c` | `ToggleLineComment` | Comment toggle in insert mode |
 | `C-Space` | `TriggerCompletion` | Explicit completion trigger |
 | `C-.` | `ShowCodeActions` | Quick fix in insert mode |
+| `C-Cmd-Space` | `ShowEmojiPicker` | Open emoji picker (`emojis` crate) |
 
 ---
 
@@ -396,6 +397,7 @@ When typing `:` commands, a completion popup appears above the prompt showing fi
 | `:toggle` | | Toggle config option (`:toggle <key> [val1 val2 ...]`) |
 | `:format` | `:fmt` | Format document via LSP |
 | `:lsp-restart` | | Restart LSP server(s) for current document |
+| `:emoji` | | Open emoji picker |
 
 ---
 
@@ -439,7 +441,7 @@ When typing `:` commands, a completion popup appears above the prompt showing fi
 | Select Mode | 35+ bindings | 0 | 100% |
 | Insert Mode | 20 bindings | 0 | 100% |
 | Macros | 4 bindings | 0 | 100% |
-| Commands | 45 commands | 0 | 100% |
+| Commands | 46 commands | 0 | 100% |
 | **Overall** | **100%** | | |
 
 ### Design Decisions

@@ -69,6 +69,7 @@ pub trait EditingOps {
     fn increment(&mut self, doc_id: DocumentId, view_id: ViewId, amount: i64);
     fn commit_undo_checkpoint(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn insert_register(&mut self, doc_id: DocumentId, view_id: ViewId, register: char);
+    fn insert_text(&mut self, doc_id: DocumentId, view_id: ViewId, text: &str);
     fn format_document(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn format_selections(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn align_selections(&mut self, doc_id: DocumentId, view_id: ViewId);
@@ -82,6 +83,18 @@ impl EditingOps for EditorContext {
 
         let transaction =
             helix_core::Transaction::insert(doc.text(), &selection, c.to_string().into());
+        doc.apply(&transaction, view_id);
+    }
+
+    fn insert_text(&mut self, doc_id: DocumentId, view_id: ViewId, text: &str) {
+        if text.is_empty() {
+            return;
+        }
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text_slice = doc.text().slice(..);
+        let selection = doc.selection(view_id).clone().cursors(text_slice);
+
+        let transaction = helix_core::Transaction::insert(doc.text(), &selection, text.into());
         doc.apply(&transaction, view_id);
     }
 
@@ -1264,6 +1277,33 @@ mod tests {
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.surround_replace(doc_id, view_id, '"', '(');
         assert_text(&ctx, "(hello)\n");
+    }
+
+    // --- insert_text ---
+
+    #[test]
+    fn insert_text_emoji() {
+        let mut ctx = test_context("#[|h]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.insert_text(doc_id, view_id, "🚀");
+        assert_text(&ctx, "🚀hello\n");
+    }
+
+    #[test]
+    fn insert_text_multi_codepoint() {
+        let mut ctx = test_context("#[|h]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        // Flag emoji (multi-codepoint ZWJ sequence)
+        ctx.insert_text(doc_id, view_id, "🇫🇷");
+        assert_text(&ctx, "🇫🇷hello\n");
+    }
+
+    #[test]
+    fn insert_text_empty_noop() {
+        let mut ctx = test_context("#[|h]#ello\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.insert_text(doc_id, view_id, "");
+        assert_text(&ctx, "hello\n");
     }
 
     // --- insert_char ---

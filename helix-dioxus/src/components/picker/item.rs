@@ -4,7 +4,7 @@ use dioxus::prelude::*;
 use lucide_dioxus::{
     Blocks, Bookmark, Braces, ChevronRight, CircleX, Code, Component, File, FileCode, FileDiff,
     FileMinus, FilePen, FilePlus, FileText, FileX, Folder, FolderOpen, Hash, Info, Layers,
-    Lightbulb, Link2, Package, Palette, SquareFunction, Terminal, TextSearch, TriangleAlert,
+    Lightbulb, Link2, Package, Palette, Smile, SquareFunction, Terminal, TextSearch, TriangleAlert,
     Variable,
 };
 
@@ -61,6 +61,8 @@ pub fn PickerItemRow(
         PickerIcon::VcsConflict => "var(--error)",
         PickerIcon::VcsDeleted => "var(--error)",
         PickerIcon::VcsRenamed => "var(--accent)",
+        // Emoji
+        PickerIcon::Emoji => "var(--warning)",
         // Default colors
         PickerIcon::File | PickerIcon::Buffer => "var(--text)",
     };
@@ -139,6 +141,7 @@ pub fn PickerItemRow(
                     PickerIcon::VcsConflict => rsx! { FileX { size: 16, color: "currentColor" } },
                     PickerIcon::VcsDeleted => rsx! { FileMinus { size: 16, color: "currentColor" } },
                     PickerIcon::VcsRenamed => rsx! { FileDiff { size: 16, color: "currentColor" } },
+                    PickerIcon::Emoji => rsx! { Smile { size: 16, color: "currentColor" } },
                 }}
             }
 

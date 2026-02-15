@@ -1352,6 +1352,14 @@ impl EditorContext {
                 self.replay_macro();
             }
 
+            // Emoji picker
+            EditorCommand::ShowEmojiPicker => {
+                self.show_emoji_picker();
+            }
+            EditorCommand::InsertText(text) => {
+                self.insert_text(doc_id, view_id, &text);
+            }
+
             EditorCommand::CliCommand(cmd) => {
                 self.command_input = cmd;
                 self.execute_command();
@@ -2341,7 +2349,10 @@ impl EditorContext {
                 let line = doc.text().char_to_line(cursor) + 1;
                 Some((path, Some(line)))
             }
-            PickerMode::Registers | PickerMode::Commands | PickerMode::Themes => None,
+            PickerMode::Registers
+            | PickerMode::Commands
+            | PickerMode::Themes
+            | PickerMode::Emojis => None,
         }
     }
 
@@ -3999,6 +4010,7 @@ impl EditorContext {
             Some(PickerMode::JumpList) => self.show_jumplist_picker(),
             Some(PickerMode::Themes) => self.show_theme_picker(),
             Some(PickerMode::ChangedFiles) => self.show_changed_files_picker(),
+            Some(PickerMode::Emojis) => self.show_emoji_picker(),
             None => {}
         }
     }

@@ -112,6 +112,8 @@ pub enum PickerIcon {
     JumpEntry,
     // Theme icon
     Theme,
+    // Emoji icon
+    Emoji,
     // VCS icons
     VcsAdded,
     VcsModified,
@@ -152,6 +154,7 @@ pub enum PickerMode {
     JumpList,
     Themes,
     ChangedFiles,
+    Emojis,
 }
 
 impl PickerMode {
@@ -174,6 +177,7 @@ impl PickerMode {
             Self::JumpList => "Jump List",
             Self::Themes => "Themes",
             Self::ChangedFiles => "Changed Files",
+            Self::Emojis => "Emojis",
         }
     }
 
@@ -189,7 +193,10 @@ impl PickerMode {
 
     /// Whether this picker mode supports file preview.
     pub fn supports_preview(&self) -> bool {
-        !matches!(self, Self::Registers | Self::Commands | Self::Themes)
+        !matches!(
+            self,
+            Self::Registers | Self::Commands | Self::Themes | Self::Emojis
+        )
     }
 }
 
@@ -1018,6 +1025,12 @@ pub enum EditorCommand {
     /// Unfocus picker search input (Esc in vim-style mode when search is focused).
     PickerUnfocusSearch,
 
+    // Emoji picker
+    /// Show the emoji picker.
+    ShowEmojiPicker,
+    /// Insert a multi-character text string at cursor (used by emoji picker).
+    InsertText(String),
+
     // CLI passthrough
     /// Execute a CLI command by string (e.g., ":sort", ":reflow").
     CliCommand(String),
@@ -1298,6 +1311,7 @@ mod tests {
             PickerMode::JumpList,
             PickerMode::Themes,
             PickerMode::ChangedFiles,
+            PickerMode::Emojis,
         ];
         for mode in modes {
             let title = mode.title();
@@ -1364,6 +1378,10 @@ mod tests {
         assert!(
             !PickerMode::Themes.supports_preview(),
             "Themes should not support preview"
+        );
+        assert!(
+            !PickerMode::Emojis.supports_preview(),
+            "Emojis should not support preview"
         );
     }
 

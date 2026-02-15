@@ -144,6 +144,7 @@ fn hints_for_context(mode: &str, pending: PendingKeySequence) -> Vec<(&'static s
                 ("A-d", "del word fwd"),
                 ("C-Space", "complete"),
                 ("C-.", "actions"),
+                ("C-Cmd-Spc", "emoji"),
             ],
             "SELECT" => vec![
                 ("Esc", "exit"),

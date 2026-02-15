@@ -916,8 +916,16 @@ mod tests {
         ctx.select_inside_pair(doc_id, view_id, 'z');
         let (_view, doc) = helix_view::current_ref!(ctx.editor);
         let sel = doc.selection(view_id).primary();
-        assert_eq!(sel.from(), 4, "unknown alpha char should not change selection");
-        assert_eq!(sel.to(), 5, "unknown alpha char should not change selection");
+        assert_eq!(
+            sel.from(),
+            4,
+            "unknown alpha char should not change selection"
+        );
+        assert_eq!(
+            sel.to(),
+            5,
+            "unknown alpha char should not change selection"
+        );
     }
 
     // --- extend_selection ---

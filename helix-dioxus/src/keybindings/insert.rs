@@ -22,6 +22,14 @@ pub fn handle_insert_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         };
     }
 
+    // Handle Ctrl+Cmd+Space (emoji picker) before plain Ctrl
+    if key.modifiers.contains(KeyModifiers::CONTROL)
+        && key.modifiers.contains(KeyModifiers::SUPER)
+        && key.code == KeyCode::Char(' ')
+    {
+        return vec![EditorCommand::ShowEmojiPicker];
+    }
+
     // Handle control key combinations
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         return match key.code {
@@ -69,5 +77,32 @@ pub fn handle_insert_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         KeyCode::PageUp => vec![EditorCommand::PageUp],
         KeyCode::PageDown => vec![EditorCommand::PageDown],
         _ => vec![],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ctrl_cmd_space_shows_emoji_picker() {
+        let key = KeyEvent {
+            code: KeyCode::Char(' '),
+            modifiers: KeyModifiers::CONTROL | KeyModifiers::SUPER,
+        };
+        let cmds = handle_insert_mode(&key);
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(cmds[0], EditorCommand::ShowEmojiPicker));
+    }
+
+    #[test]
+    fn ctrl_space_triggers_completion_not_emoji() {
+        let key = KeyEvent {
+            code: KeyCode::Char(' '),
+            modifiers: KeyModifiers::CONTROL,
+        };
+        let cmds = handle_insert_mode(&key);
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(cmds[0], EditorCommand::TriggerCompletion));
     }
 }

@@ -468,6 +468,12 @@ impl PickerOps for EditorContext {
                     let path = PathBuf::from(&selected.id);
                     self.open_file(&path);
                 }
+                PickerMode::Emojis => {
+                    // Insert the emoji text via deferred dispatch (same pattern as Commands)
+                    let _ = self
+                        .command_tx
+                        .send(EditorCommand::InsertText(selected.id.clone()));
+                }
                 PickerMode::References | PickerMode::Definitions => {
                     // Extract location data before mutable borrow
                     if let Ok(idx) = selected.id.parse::<usize>() {
@@ -770,6 +776,35 @@ impl EditorContext {
         self.picker_visible = true;
         self.picker_mode = PickerMode::Themes;
         self.last_picker_mode = Some(PickerMode::Themes);
+        self.picker_current_path = None;
+    }
+
+    /// Show the emoji picker populated from the `emojis` crate.
+    pub(crate) fn show_emoji_picker(&mut self) {
+        self.command_mode = false;
+        self.command_input.clear();
+
+        let items: Vec<PickerItem> = emojis::iter()
+            .map(|emoji| {
+                let shortcode = emoji.shortcode().map(|sc| format!(":{sc}:"));
+
+                PickerItem {
+                    id: emoji.as_str().to_string(),
+                    display: format!("{} {}", emoji.as_str(), emoji.name()),
+                    icon: PickerIcon::Emoji,
+                    match_indices: vec![],
+                    secondary: shortcode,
+                    depth: 0,
+                }
+            })
+            .collect();
+
+        self.picker_items = items;
+        self.picker_filter.clear();
+        self.picker_selected = 0;
+        self.picker_visible = true;
+        self.picker_mode = PickerMode::Emojis;
+        self.last_picker_mode = Some(PickerMode::Emojis);
         self.picker_current_path = None;
     }
 
@@ -1332,6 +1367,12 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
         (EditorCommand::PrevChange, "Previous Change", Some("[g")),
         (EditorCommand::GotoFirstChange, "First Change", Some("[G")),
         (EditorCommand::GotoLastChange, "Last Change", Some("]G")),
+        // Emoji picker
+        (
+            EditorCommand::ShowEmojiPicker,
+            "Insert Emoji",
+            Some("C-Cmd-Spc"),
+        ),
         // Text manipulation
         (
             EditorCommand::CliCommand("sort".to_string()),
