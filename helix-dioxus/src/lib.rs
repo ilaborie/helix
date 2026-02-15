@@ -41,6 +41,7 @@ pub mod config;
 pub mod events;
 pub mod hooks;
 pub mod keybindings;
+pub mod keymap;
 pub mod lsp;
 pub mod operations;
 pub mod state;
@@ -227,6 +228,60 @@ impl AppState {
             if let Some(ref editor_ctx) = *ctx.borrow() {
                 if let Ok(mut editor) = editor_ctx.try_borrow_mut() {
                     editor.maybe_record_key(key);
+                }
+            }
+        });
+    }
+
+    /// Dispatch a key event through the configurable keymap system.
+    ///
+    /// Returns the keymap result (matched commands, pending, await-char, etc.).
+    /// Accesses `EditorContext` via thread-local for the keymap state.
+    pub fn dispatch_key(
+        &self,
+        mode: helix_view::document::Mode,
+        key: helix_view::input::KeyEvent,
+    ) -> crate::keymap::DhxKeymapResult {
+        EDITOR_CTX.with(|ctx| {
+            if let Some(ref editor_ctx) = *ctx.borrow() {
+                if let Ok(mut editor) = editor_ctx.try_borrow_mut() {
+                    return editor.keymaps.get(mode, key);
+                }
+            }
+            crate::keymap::DhxKeymapResult::NotFound
+        })
+    }
+
+    /// Check if the keymap is in a pending state (multi-key sequence in progress).
+    pub fn is_keymap_pending(&self) -> bool {
+        EDITOR_CTX.with(|ctx| {
+            if let Some(ref editor_ctx) = *ctx.borrow() {
+                if let Ok(editor) = editor_ctx.try_borrow() {
+                    return editor.keymaps.is_pending();
+                }
+            }
+            false
+        })
+    }
+
+    /// Check if the keymap is in sticky mode (e.g., Z view mode).
+    pub fn is_keymap_sticky(&self) -> bool {
+        EDITOR_CTX.with(|ctx| {
+            if let Some(ref editor_ctx) = *ctx.borrow() {
+                if let Ok(editor) = editor_ctx.try_borrow() {
+                    return editor.keymaps.is_sticky();
+                }
+            }
+            false
+        })
+    }
+
+    /// Reset the keymap pending state.
+    pub fn reset_keymap(&self) {
+        EDITOR_CTX.with(|ctx| {
+            if let Some(ref editor_ctx) = *ctx.borrow() {
+                if let Ok(mut editor) = editor_ctx.try_borrow_mut() {
+                    editor.keymaps.reset();
                 }
             }
         });

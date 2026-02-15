@@ -104,11 +104,10 @@ impl EditorContext {
     /// Replay a single key event by dispatching it through the appropriate mode handler.
     fn replay_key(&mut self, key: &KeyEvent) {
         use crate::keybindings::{
-            handle_command_mode, handle_insert_mode, handle_normal_mode, handle_regex_mode,
-            handle_search_mode, handle_select_mode, handle_shell_mode,
+            handle_command_mode, handle_regex_mode, handle_search_mode, handle_shell_mode,
         };
+        use crate::keymap::DhxKeymapResult;
         use crate::state::EditorCommand;
-        use helix_view::document::Mode;
         use helix_view::input::KeyCode;
 
         // Determine commands based on current mode and UI state
@@ -121,23 +120,26 @@ impl EditorContext {
         } else if self.shell_mode {
             handle_shell_mode(key)
         } else {
-            match self.editor.mode() {
-                Mode::Insert => {
-                    // Handle C-r in insert mode
-                    if key
-                        .modifiers
-                        .contains(helix_view::input::KeyModifiers::CONTROL)
-                        && key.code == KeyCode::Char('r')
-                    {
-                        // Skip C-r prefix — in replay we can't do multi-key sequences
-                        // for register insertion
-                        vec![]
+            let mode = self.editor.mode();
+            match self.keymaps.get(mode, *key) {
+                DhxKeymapResult::Matched(cmds) => cmds,
+                DhxKeymapResult::Pending(_) | DhxKeymapResult::AwaitChar(_) => {
+                    // Multi-key sequence in progress — no commands yet
+                    vec![]
+                }
+                DhxKeymapResult::NotFound => {
+                    // In insert mode, unrecognized char keys → InsertChar
+                    if mode == helix_view::document::Mode::Insert {
+                        if let KeyCode::Char(c) = key.code {
+                            vec![EditorCommand::InsertChar(c)]
+                        } else {
+                            vec![]
+                        }
                     } else {
-                        handle_insert_mode(key)
+                        vec![]
                     }
                 }
-                Mode::Select => handle_select_mode(key),
-                Mode::Normal => handle_normal_mode(key),
+                DhxKeymapResult::Cancelled => vec![],
             }
         };
 

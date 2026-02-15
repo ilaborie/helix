@@ -3,7 +3,7 @@
 //! This is the root Dioxus component that composes the editor UI.
 
 use dioxus::prelude::*;
-use helix_view::input::{KeyCode, KeyModifiers};
+use helix_view::input::KeyCode;
 
 use crate::components::{
     BufferBar, CodeActionsMenu, CommandCompletionPopup, CommandPrompt, CompletionPopup,
@@ -12,15 +12,57 @@ use crate::components::{
     SignatureHelpPopup, StatusLine,
 };
 use crate::keybindings::{
-    handle_bracket_next, handle_bracket_prev, handle_code_actions_mode, handle_command_mode,
-    handle_completion_mode, handle_confirmation_mode, handle_g_prefix, handle_input_dialog_mode,
-    handle_insert_mode, handle_location_picker_mode, handle_lsp_dialog_mode, handle_normal_mode,
-    handle_picker_mode, handle_regex_mode, handle_search_mode, handle_select_g_prefix,
-    handle_select_mode, handle_shell_mode, handle_space_leader, handle_view_prefix,
-    translate_key_event,
+    handle_code_actions_mode, handle_command_mode, handle_completion_mode,
+    handle_confirmation_mode, handle_input_dialog_mode, handle_location_picker_mode,
+    handle_lsp_dialog_mode, handle_picker_mode, handle_regex_mode, handle_search_mode,
+    handle_shell_mode, translate_key_event,
 };
+use crate::keymap::command::AwaitCharKind;
+use crate::keymap::DhxKeymapResult;
 use crate::state::{EditorCommand, PendingKeySequence};
 use crate::AppState;
+
+/// Convert a snapshot mode string to `helix_view::document::Mode`.
+fn parse_mode(mode: &str) -> Option<helix_view::document::Mode> {
+    match mode {
+        "NORMAL" => Some(helix_view::document::Mode::Normal),
+        "SELECT" => Some(helix_view::document::Mode::Select),
+        "INSERT" => Some(helix_view::document::Mode::Insert),
+        _ => None,
+    }
+}
+
+/// Map a `DhxKeymapResult` to the corresponding `PendingKeySequence` for the help bar.
+fn keymap_result_to_pending(result: &DhxKeymapResult, is_sticky: bool) -> PendingKeySequence {
+    match result {
+        DhxKeymapResult::Pending(name) => match name.as_str() {
+            "goto" => PendingKeySequence::GPrefix,
+            "space" => PendingKeySequence::SpaceLeader,
+            "next" => PendingKeySequence::BracketNext,
+            "prev" => PendingKeySequence::BracketPrev,
+            "match" => PendingKeySequence::MatchPrefix,
+            "view" if is_sticky => PendingKeySequence::ViewPrefixSticky,
+            "view" => PendingKeySequence::ViewPrefix,
+            _ => PendingKeySequence::None,
+        },
+        DhxKeymapResult::AwaitChar(kind) => match kind {
+            AwaitCharKind::FindForward => PendingKeySequence::FindForward,
+            AwaitCharKind::FindBackward => PendingKeySequence::FindBackward,
+            AwaitCharKind::TillForward => PendingKeySequence::TillForward,
+            AwaitCharKind::TillBackward => PendingKeySequence::TillBackward,
+            AwaitCharKind::ReplaceChar => PendingKeySequence::ReplacePrefix,
+            AwaitCharKind::SelectRegister => PendingKeySequence::RegisterPrefix,
+            AwaitCharKind::SelectInsidePair => PendingKeySequence::MatchInside,
+            AwaitCharKind::SelectAroundPair => PendingKeySequence::MatchAround,
+            AwaitCharKind::SurroundAdd => PendingKeySequence::MatchSurround,
+            AwaitCharKind::SurroundDelete => PendingKeySequence::MatchDeleteSurround,
+            AwaitCharKind::SurroundReplaceFrom => PendingKeySequence::MatchReplaceSurroundFrom,
+            AwaitCharKind::SurroundReplaceTo(ch) => PendingKeySequence::MatchReplaceSurroundTo(*ch),
+            AwaitCharKind::InsertRegister => PendingKeySequence::InsertRegisterPrefix,
+        },
+        _ => PendingKeySequence::None,
+    }
+}
 
 /// Main application component.
 #[component]
@@ -31,7 +73,7 @@ pub fn App() -> Element {
     // Track version for re-renders when editor state changes
     let mut version = use_signal(|| 0_usize);
 
-    // Track pending key sequence for multi-key commands (g, ], [, Space)
+    // Track pending key sequence for multi-key commands (display only — dispatch is via keymap)
     let mut pending_key = use_signal(PendingKeySequence::default);
 
     // Read the signal to subscribe to changes and trigger re-render of this component
@@ -131,173 +173,11 @@ pub fn App() -> Element {
                 handle_regex_mode(&key_event)
             } else if snapshot.shell_mode {
                 handle_shell_mode(&key_event)
-            } else if snapshot.mode == "NORMAL" || snapshot.mode == "SELECT" {
-                // Handle multi-key sequences in normal/select mode
-                let current_pending = pending_key();
-                match current_pending {
-                    PendingKeySequence::GPrefix => {
-                        pending_key.set(PendingKeySequence::None);
-                        
-                        if snapshot.mode == "SELECT" {
-                            handle_select_g_prefix(&key_event)
-                        } else {
-                            handle_g_prefix(&key_event)
-                        }
-                    }
-                    PendingKeySequence::BracketNext => {
-                        pending_key.set(PendingKeySequence::None);
-                        handle_bracket_next(&key_event)
-                    }
-                    PendingKeySequence::BracketPrev => {
-                        pending_key.set(PendingKeySequence::None);
-                        handle_bracket_prev(&key_event)
-                    }
-                    PendingKeySequence::SpaceLeader => {
-                        pending_key.set(PendingKeySequence::None);
-                        handle_space_leader(&key_event)
-                    }
-                    PendingKeySequence::FindForward => {
-                        pending_key.set(PendingKeySequence::None);
-                        if let KeyCode::Char(ch) = key_event.code {
-                            if snapshot.mode == "SELECT" {
-                                vec![EditorCommand::ExtendFindCharForward(ch)]
-                            } else {
-                                vec![EditorCommand::FindCharForward(ch)]
-                            }
-                        } else {
-                            vec![]
-                        }
-                    }
-                    PendingKeySequence::FindBackward => {
-                        pending_key.set(PendingKeySequence::None);
-                        if let KeyCode::Char(ch) = key_event.code {
-                            if snapshot.mode == "SELECT" {
-                                vec![EditorCommand::ExtendFindCharBackward(ch)]
-                            } else {
-                                vec![EditorCommand::FindCharBackward(ch)]
-                            }
-                        } else {
-                            vec![]
-                        }
-                    }
-                    PendingKeySequence::TillForward => {
-                        pending_key.set(PendingKeySequence::None);
-                        if let KeyCode::Char(ch) = key_event.code {
-                            if snapshot.mode == "SELECT" {
-                                vec![EditorCommand::ExtendTillCharForward(ch)]
-                            } else {
-                                vec![EditorCommand::TillCharForward(ch)]
-                            }
-                        } else {
-                            vec![]
-                        }
-                    }
-                    PendingKeySequence::TillBackward => {
-                        pending_key.set(PendingKeySequence::None);
-                        if let KeyCode::Char(ch) = key_event.code {
-                            if snapshot.mode == "SELECT" {
-                                vec![EditorCommand::ExtendTillCharBackward(ch)]
-                            } else {
-                                vec![EditorCommand::TillCharBackward(ch)]
-                            }
-                        } else {
-                            vec![]
-                        }
-                    }
-                    PendingKeySequence::RegisterPrefix => {
-                        pending_key.set(PendingKeySequence::None);
-                        if let KeyCode::Char(ch) = key_event.code {
-                            vec![EditorCommand::SetSelectedRegister(ch)]
-                        } else {
-                            vec![]
-                        }
-                    }
-                    PendingKeySequence::ReplacePrefix => {
-                        pending_key.set(PendingKeySequence::None);
-                        if let KeyCode::Char(ch) = key_event.code {
-                            vec![EditorCommand::ReplaceChar(ch)]
-                        } else {
-                            vec![]
-                        }
-                    }
-                    PendingKeySequence::MatchPrefix => match key_event.code {
-                        KeyCode::Char('m') => {
-                            pending_key.set(PendingKeySequence::None);
-                            vec![EditorCommand::MatchBracket]
-                        }
-                        KeyCode::Char('i') => {
-                            pending_key.set(PendingKeySequence::MatchInside);
-                            vec![]
-                        }
-                        KeyCode::Char('a') => {
-                            pending_key.set(PendingKeySequence::MatchAround);
-                            vec![]
-                        }
-                        KeyCode::Char('s') => {
-                            pending_key.set(PendingKeySequence::MatchSurround);
-                            vec![]
-                        }
-                        KeyCode::Char('d') => {
-                            pending_key.set(PendingKeySequence::MatchDeleteSurround);
-                            vec![]
-                        }
-                        KeyCode::Char('r') => {
-                            pending_key.set(PendingKeySequence::MatchReplaceSurroundFrom);
-                            vec![]
-                        }
-                        _ => {
-                            pending_key.set(PendingKeySequence::None);
-                            vec![]
-                        }
-                    },
-                    PendingKeySequence::MatchInside => {
-                        pending_key.set(PendingKeySequence::None);
-                        if let KeyCode::Char(ch) = key_event.code {
-                            vec![EditorCommand::SelectInsidePair(ch)]
-                        } else {
-                            vec![]
-                        }
-                    }
-                    PendingKeySequence::MatchAround => {
-                        pending_key.set(PendingKeySequence::None);
-                        if let KeyCode::Char(ch) = key_event.code {
-                            vec![EditorCommand::SelectAroundPair(ch)]
-                        } else {
-                            vec![]
-                        }
-                    }
-                    PendingKeySequence::MatchSurround => {
-                        pending_key.set(PendingKeySequence::None);
-                        if let KeyCode::Char(ch) = key_event.code {
-                            vec![EditorCommand::SurroundAdd(ch)]
-                        } else {
-                            vec![]
-                        }
-                    }
-                    PendingKeySequence::MatchDeleteSurround => {
-                        pending_key.set(PendingKeySequence::None);
-                        if let KeyCode::Char(ch) = key_event.code {
-                            vec![EditorCommand::SurroundDelete(ch)]
-                        } else {
-                            vec![]
-                        }
-                    }
-                    PendingKeySequence::MatchReplaceSurroundFrom => {
-                        if let KeyCode::Char(old) = key_event.code {
-                            pending_key.set(PendingKeySequence::MatchReplaceSurroundTo(old));
-                        } else {
-                            pending_key.set(PendingKeySequence::None);
-                        }
-                        vec![]
-                    }
-                    PendingKeySequence::MatchReplaceSurroundTo(old) => {
-                        pending_key.set(PendingKeySequence::None);
-                        if let KeyCode::Char(new) = key_event.code {
-                            vec![EditorCommand::SurroundReplace(old, new)]
-                        } else {
-                            vec![]
-                        }
-                    }
+            } else if let Some(mode) = parse_mode(&snapshot.mode) {
+                // --- Keymap-based dispatch for Normal/Select/Insert modes ---
+
+                // Word jump has its own UI flow (visual labels) — keep separate
+                match pending_key() {
                     PendingKeySequence::WordJumpFirstChar => {
                         match key_event.code {
                             KeyCode::Esc => {
@@ -305,8 +185,6 @@ pub fn App() -> Element {
                                 vec![EditorCommand::CancelWordJump]
                             }
                             KeyCode::Char(ch) => {
-                                // Will be updated to WordJumpSecondChar or None
-                                // after processing based on word_jump_active
                                 pending_key.set(PendingKeySequence::None);
                                 vec![EditorCommand::WordJumpFirstChar(ch)]
                             }
@@ -321,121 +199,42 @@ pub fn App() -> Element {
                             _ => vec![],
                         }
                     }
-                    PendingKeySequence::ViewPrefix => {
-                        pending_key.set(PendingKeySequence::None);
-                        handle_view_prefix(&key_event)
-                    }
-                    PendingKeySequence::ViewPrefixSticky => {
-                        if key_event.code == KeyCode::Esc {
-                            pending_key.set(PendingKeySequence::None);
-                            vec![]
-                        } else {
-                            let cmds = handle_view_prefix(&key_event);
-                            // Exit sticky mode on unrecognized key
-                            if cmds.is_empty() {
-                                pending_key.set(PendingKeySequence::None);
-                            }
-                            cmds
-                        }
-                    }
-                    PendingKeySequence::InsertRegisterPrefix => {
-                        // Should not happen in normal/select mode; reset
-                        pending_key.set(PendingKeySequence::None);
-                        vec![]
-                    }
-                    PendingKeySequence::None => {
-                        // Check for Ctrl modifier first - Ctrl+key combos go to normal mode handler
-                        if key_event.modifiers.contains(KeyModifiers::CONTROL) {
-                            if snapshot.mode == "SELECT" {
-                                handle_select_mode(&key_event)
-                            } else {
-                                handle_normal_mode(&key_event)
-                            }
-                        } else {
-                            // Check if this starts a sequence (only without modifiers)
-                            match key_event.code {
-                                KeyCode::Char('g') => {
-                                    pending_key.set(PendingKeySequence::GPrefix);
-                                    vec![]
-                                }
-                                KeyCode::Char(']') => {
-                                    pending_key.set(PendingKeySequence::BracketNext);
-                                    vec![]
-                                }
-                                KeyCode::Char('[') => {
-                                    pending_key.set(PendingKeySequence::BracketPrev);
-                                    vec![]
-                                }
-                                KeyCode::Char(' ') => {
-                                    pending_key.set(PendingKeySequence::SpaceLeader);
-                                    vec![]
-                                }
-                                KeyCode::Char('f') => {
-                                    pending_key.set(PendingKeySequence::FindForward);
-                                    vec![]
-                                }
-                                KeyCode::Char('F') => {
-                                    pending_key.set(PendingKeySequence::FindBackward);
-                                    vec![]
-                                }
-                                KeyCode::Char('t') => {
-                                    pending_key.set(PendingKeySequence::TillForward);
-                                    vec![]
-                                }
-                                KeyCode::Char('T') => {
-                                    pending_key.set(PendingKeySequence::TillBackward);
-                                    vec![]
-                                }
-                                KeyCode::Char('r') => {
-                                    pending_key.set(PendingKeySequence::ReplacePrefix);
-                                    vec![]
-                                }
-                                KeyCode::Char('m') => {
-                                    pending_key.set(PendingKeySequence::MatchPrefix);
-                                    vec![]
-                                }
-                                KeyCode::Char('"') => {
-                                    pending_key.set(PendingKeySequence::RegisterPrefix);
-                                    vec![]
-                                }
-                                KeyCode::Char('z') => {
-                                    pending_key.set(PendingKeySequence::ViewPrefix);
-                                    vec![]
-                                }
-                                KeyCode::Char('Z') => {
-                                    pending_key.set(PendingKeySequence::ViewPrefixSticky);
-                                    vec![]
-                                }
-                                _ => {
-                                    if snapshot.mode == "SELECT" {
-                                        handle_select_mode(&key_event)
-                                    } else {
-                                        handle_normal_mode(&key_event)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            } else if snapshot.mode == "INSERT" {
-                // Handle C-r pending key sequence in insert mode
-                match pending_key() {
-                    PendingKeySequence::InsertRegisterPrefix => {
-                        pending_key.set(PendingKeySequence::None);
-                        match key_event.code {
-                            KeyCode::Char(ch) => vec![EditorCommand::InsertRegister(ch)],
-                            _ => vec![], // Esc or non-char cancels
-                        }
-                    }
                     _ => {
-                        // C-r starts the register prompt
-                        if key_event.modifiers.contains(KeyModifiers::CONTROL)
-                            && key_event.code == KeyCode::Char('r')
-                        {
-                            pending_key.set(PendingKeySequence::InsertRegisterPrefix);
-                            vec![]
-                        } else {
-                            handle_insert_mode(&key_event)
+                        // Dispatch through the configurable keymap
+                        let result = app_state_for_handler.dispatch_key(mode, key_event);
+
+                        match result {
+                            DhxKeymapResult::Matched(cmds) => {
+                                // Update help bar: if keymap is still in sticky mode, show it
+                                if app_state_for_handler.is_keymap_pending() {
+                                    pending_key.set(PendingKeySequence::ViewPrefixSticky);
+                                } else {
+                                    pending_key.set(PendingKeySequence::None);
+                                }
+                                cmds
+                            }
+                            DhxKeymapResult::Pending(_) | DhxKeymapResult::AwaitChar(_) => {
+                                let is_sticky = app_state_for_handler.is_keymap_sticky();
+                                pending_key.set(keymap_result_to_pending(&result, is_sticky));
+                                vec![]
+                            }
+                            DhxKeymapResult::NotFound => {
+                                pending_key.set(PendingKeySequence::None);
+                                // In insert mode, unrecognized char keys → InsertChar
+                                if mode == helix_view::document::Mode::Insert {
+                                    if let KeyCode::Char(c) = key_event.code {
+                                        vec![EditorCommand::InsertChar(c)]
+                                    } else {
+                                        vec![]
+                                    }
+                                } else {
+                                    vec![]
+                                }
+                            }
+                            DhxKeymapResult::Cancelled => {
+                                pending_key.set(PendingKeySequence::None);
+                                vec![]
+                            }
                         }
                     }
                 }

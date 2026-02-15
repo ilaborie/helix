@@ -233,6 +233,9 @@ pub struct EditorContext {
 
     /// Snapshot version counter, incremented on each snapshot creation.
     snapshot_version: u64,
+
+    /// Configurable keymaps (trie-based dispatch replacing hardcoded handlers).
+    pub(crate) keymaps: crate::keymap::DhxKeymaps,
 }
 
 impl EditorContext {
@@ -399,6 +402,7 @@ impl EditorContext {
             picker_search_focused: false,
             should_quit: false,
             snapshot_version: 0,
+            keymaps: load_keymaps(),
         })
     }
 
@@ -4609,6 +4613,48 @@ pub(crate) fn load_editor_config() -> helix_view::editor::Config {
         }),
         None => helix_view::editor::Config::default(),
     }
+}
+
+/// Load configurable keymaps: start with defaults, merge user `[keys]` from config.toml.
+fn load_keymaps() -> crate::keymap::DhxKeymaps {
+    use crate::keymap::{default::default_keymaps, merge_keys, trie::DhxKeyTrie, DhxKeymaps};
+
+    let mut map = default_keymaps();
+
+    if let Some(merged_config) = load_merged_config_toml() {
+        if let Some(keys_val) = merged_config.get("keys") {
+            // Expect [keys.normal], [keys.select], [keys.insert]
+            if let Some(keys_table) = keys_val.as_table() {
+                for (mode_name, mode_val) in keys_table {
+                    let mode = match mode_name.as_str() {
+                        "normal" => helix_view::document::Mode::Normal,
+                        "select" => helix_view::document::Mode::Select,
+                        "insert" => helix_view::document::Mode::Insert,
+                        other => {
+                            log::warn!("Unknown mode in [keys]: {other}");
+                            continue;
+                        }
+                    };
+
+                    // Deserialize user overrides into a DhxKeyTrie
+                    let user_trie: DhxKeyTrie = match mode_val.clone().try_into() {
+                        Ok(trie) => trie,
+                        Err(err) => {
+                            log::warn!("Failed to deserialize [keys.{mode_name}]: {err}");
+                            continue;
+                        }
+                    };
+
+                    // Merge into defaults
+                    if let Some(base) = map.get_mut(&mode) {
+                        merge_keys(base, user_trie);
+                    }
+                }
+            }
+        }
+    }
+
+    DhxKeymaps::new(map)
 }
 
 /// Check if a character matches any of the LSP signature help trigger characters.

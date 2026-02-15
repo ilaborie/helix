@@ -1,17 +1,30 @@
 //! Integration tests for key operations.
 //!
-//! These tests dispatch key sequences through keybinding handlers
+//! These tests dispatch key sequences through the keymap-based dispatch
 //! and verify the resulting editor state, simulating real user input.
 
+use helix_view::document::Mode;
 use helix_view::input::KeyCode;
 
 use crate::config::DialogSearchMode;
-use crate::keybindings::{
-    handle_normal_mode, handle_picker_mode, handle_search_mode, handle_select_mode,
-};
+use crate::keybindings::{handle_picker_mode, handle_search_mode};
+use crate::keymap::DhxKeymapResult;
 use crate::operations::{CliOps, EditingOps, MovementOps, SearchOps};
-use crate::state::{EditorCommand, PickerMode};
+use crate::state::{EditorCommand, EditorContext, PickerMode};
 use crate::test_helpers::{assert_state, assert_text, doc_view, key, special_key, test_context};
+
+/// Dispatch a key through the keymap and return matched commands.
+/// Returns empty vec for Pending/AwaitChar/NotFound/Cancelled results.
+fn keymap_dispatch(
+    ctx: &mut EditorContext,
+    mode: Mode,
+    key: &helix_view::input::KeyEvent,
+) -> Vec<EditorCommand> {
+    match ctx.keymaps.get(mode, *key) {
+        DhxKeymapResult::Matched(cmds) => cmds,
+        _ => vec![],
+    }
+}
 
 /// Dispatch a sequence of editor commands on the context.
 fn dispatch_commands(ctx: &mut crate::state::EditorContext, commands: &[EditorCommand]) {
@@ -79,22 +92,22 @@ fn normal_mode_hjkl_movement() {
     let mut ctx = test_context("#[h|]#ello\nworld\n");
 
     // l → move right
-    let cmds = handle_normal_mode(&key('l'));
+    let cmds = keymap_dispatch(&mut ctx, Mode::Normal, &key('l'));
     dispatch_commands(&mut ctx, &cmds);
     assert_state(&ctx, "h#[e|]#llo\nworld\n");
 
     // j → move down
-    let cmds = handle_normal_mode(&key('j'));
+    let cmds = keymap_dispatch(&mut ctx, Mode::Normal, &key('j'));
     dispatch_commands(&mut ctx, &cmds);
     assert_state(&ctx, "hello\nw#[o|]#rld\n");
 
     // h → move left
-    let cmds = handle_normal_mode(&key('h'));
+    let cmds = keymap_dispatch(&mut ctx, Mode::Normal, &key('h'));
     dispatch_commands(&mut ctx, &cmds);
     assert_state(&ctx, "hello\n#[w|]#orld\n");
 
     // k → move up
-    let cmds = handle_normal_mode(&key('k'));
+    let cmds = keymap_dispatch(&mut ctx, Mode::Normal, &key('k'));
     dispatch_commands(&mut ctx, &cmds);
     assert_state(&ctx, "#[h|]#ello\nworld\n");
 }
@@ -103,11 +116,11 @@ fn normal_mode_hjkl_movement() {
 fn normal_mode_arrow_movement() {
     let mut ctx = test_context("#[h|]#ello\nworld\n");
 
-    let cmds = handle_normal_mode(&special_key(KeyCode::Right));
+    let cmds = keymap_dispatch(&mut ctx, Mode::Normal, &special_key(KeyCode::Right));
     dispatch_commands(&mut ctx, &cmds);
     assert_state(&ctx, "h#[e|]#llo\nworld\n");
 
-    let cmds = handle_normal_mode(&special_key(KeyCode::Down));
+    let cmds = keymap_dispatch(&mut ctx, Mode::Normal, &special_key(KeyCode::Down));
     dispatch_commands(&mut ctx, &cmds);
     assert_state(&ctx, "hello\nw#[o|]#rld\n");
 }
@@ -119,7 +132,7 @@ fn goto_last_line() {
     let mut ctx = test_context("#[h|]#ello\nworld\nfoo\n");
 
     // G → goto last line
-    let cmds = handle_normal_mode(&key('G'));
+    let cmds = keymap_dispatch(&mut ctx, Mode::Normal, &key('G'));
     dispatch_commands(&mut ctx, &cmds);
     let (_view, doc) = helix_view::current_ref!(ctx.editor);
     let text = doc.text().slice(..);
@@ -131,10 +144,14 @@ fn goto_last_line() {
 // --- Find character ---
 
 #[test]
-fn find_char_returns_pending() {
-    // f alone should produce no commands (two-key sequence handled by app.rs)
-    let cmds = handle_normal_mode(&key('f'));
-    assert!(cmds.is_empty(), "f should produce no commands (pending)");
+fn find_char_returns_await_char() {
+    let mut ctx = test_context("#[h|]#ello\n");
+    // f alone should return AwaitChar (two-key sequence handled by keymap)
+    let result = ctx.keymaps.get(Mode::Normal, *&key('f'));
+    assert!(
+        matches!(result, DhxKeymapResult::AwaitChar(_)),
+        "f should return AwaitChar, got: {result:?}"
+    );
 }
 
 // --- Insert mode and escape ---
@@ -144,9 +161,9 @@ fn insert_mode_and_escape() {
     let mut ctx = test_context("#[h|]#ello\n");
 
     // i → enter insert mode
-    let cmds = handle_normal_mode(&key('i'));
+    let cmds = keymap_dispatch(&mut ctx, Mode::Normal, &key('i'));
     dispatch_commands(&mut ctx, &cmds);
-    assert_eq!(ctx.editor.mode, helix_view::document::Mode::Insert);
+    assert_eq!(ctx.editor.mode, Mode::Insert);
 
     // Type 'x'
     let cmds = vec![EditorCommand::InsertChar('x')];
@@ -154,9 +171,9 @@ fn insert_mode_and_escape() {
     assert_text(&ctx, "xhello\n");
 
     // Esc → exit insert mode
-    let cmds = crate::keybindings::handle_insert_mode(&special_key(KeyCode::Esc));
+    let cmds = keymap_dispatch(&mut ctx, Mode::Insert, &special_key(KeyCode::Esc));
     dispatch_commands(&mut ctx, &cmds);
-    assert_eq!(ctx.editor.mode, helix_view::document::Mode::Normal);
+    assert_eq!(ctx.editor.mode, Mode::Normal);
 }
 
 // --- Search mode ---
@@ -166,7 +183,7 @@ fn search_forward_dispatch() {
     let mut ctx = test_context("#[h|]#ello world hello\n");
 
     // / → enter search mode
-    let cmds = handle_normal_mode(&key('/'));
+    let cmds = keymap_dispatch(&mut ctx, Mode::Normal, &key('/'));
     dispatch_commands(&mut ctx, &cmds);
     assert!(ctx.search_mode);
     assert!(!ctx.search_backwards);
@@ -197,7 +214,7 @@ fn command_mode_entry() {
     let mut ctx = test_context("#[h|]#ello\n");
 
     // : → enter command mode
-    let cmds = handle_normal_mode(&key(':'));
+    let cmds = keymap_dispatch(&mut ctx, Mode::Normal, &key(':'));
     dispatch_commands(&mut ctx, &cmds);
     assert!(ctx.command_mode);
     assert!(ctx.command_input.is_empty());
@@ -210,14 +227,14 @@ fn select_mode_entry_and_exit() {
     let mut ctx = test_context("#[h|]#ello\n");
 
     // v → enter select mode
-    let cmds = handle_normal_mode(&key('v'));
+    let cmds = keymap_dispatch(&mut ctx, Mode::Normal, &key('v'));
     dispatch_commands(&mut ctx, &cmds);
-    assert_eq!(ctx.editor.mode, helix_view::document::Mode::Select);
+    assert_eq!(ctx.editor.mode, Mode::Select);
 
     // Esc → exit select mode
-    let cmds = handle_select_mode(&special_key(KeyCode::Esc));
+    let cmds = keymap_dispatch(&mut ctx, Mode::Select, &special_key(KeyCode::Esc));
     dispatch_commands(&mut ctx, &cmds);
-    assert_eq!(ctx.editor.mode, helix_view::document::Mode::Normal);
+    assert_eq!(ctx.editor.mode, Mode::Normal);
 }
 
 // --- Picker mode (direct vs vim-style) ---

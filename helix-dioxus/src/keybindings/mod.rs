@@ -1,24 +1,23 @@
-//! Keybinding handlers for different editor modes.
+//! Keybinding handlers for dialog and prompt modes.
 //!
-//! This module contains handlers that translate keyboard events into editor commands
-//! for each editor mode (normal, insert, select, command, picker, search).
+//! Normal, insert, and select mode dispatch is handled by the keymap system
+//! (`crate::keymap`). This module contains handlers for overlay UIs:
+//! command prompt, search prompt, regex prompt, shell prompt, picker,
+//! completion, confirmation, input dialog, and LSP dialogs.
 
 mod command;
 mod completion;
 mod confirmation;
 mod input_dialog;
-mod insert;
-mod normal;
 mod picker;
 mod regex;
 mod search;
-mod select;
 mod shell;
 mod translate;
 
 use helix_view::input::KeyCode;
 
-use crate::state::{Direction, EditorCommand};
+use crate::state::EditorCommand;
 
 pub use command::handle_command_mode;
 pub use completion::{
@@ -27,58 +26,11 @@ pub use completion::{
 };
 pub use confirmation::handle_confirmation_mode;
 pub use input_dialog::handle_input_dialog_mode;
-pub use insert::handle_insert_mode;
-pub use normal::{
-    handle_bracket_next, handle_bracket_prev, handle_g_prefix, handle_normal_mode,
-    handle_space_leader, handle_view_prefix,
-};
 pub use picker::handle_picker_mode;
 pub use regex::handle_regex_mode;
 pub use search::handle_search_mode;
-pub use select::{handle_select_g_prefix, handle_select_mode};
 pub use shell::handle_shell_mode;
 pub use translate::translate_key_event;
-
-/// Map direction keys (hjkl + arrows) to a `Direction`.
-fn direction_from_key(code: KeyCode) -> Option<Direction> {
-    match code {
-        KeyCode::Char('h') | KeyCode::Left => Some(Direction::Left),
-        KeyCode::Char('l') | KeyCode::Right => Some(Direction::Right),
-        KeyCode::Char('j') | KeyCode::Down => Some(Direction::Down),
-        KeyCode::Char('k') | KeyCode::Up => Some(Direction::Up),
-        _ => None,
-    }
-}
-
-/// Map a direction to a movement command (for normal/insert mode).
-fn move_command(direction: Direction) -> EditorCommand {
-    match direction {
-        Direction::Left => EditorCommand::MoveLeft,
-        Direction::Right => EditorCommand::MoveRight,
-        Direction::Down => EditorCommand::MoveDown,
-        Direction::Up => EditorCommand::MoveUp,
-    }
-}
-
-/// Map a direction to a selection-extend command (for select mode).
-fn extend_command(direction: Direction) -> EditorCommand {
-    match direction {
-        Direction::Left => EditorCommand::ExtendLeft,
-        Direction::Right => EditorCommand::ExtendRight,
-        Direction::Down => EditorCommand::ExtendDown,
-        Direction::Up => EditorCommand::ExtendUp,
-    }
-}
-
-/// Handle direction keys and return the appropriate move command, if matched.
-fn handle_move_keys(code: KeyCode) -> Option<Vec<EditorCommand>> {
-    direction_from_key(code).map(|dir| vec![move_command(dir)])
-}
-
-/// Handle direction keys and return the appropriate extend command, if matched.
-fn handle_extend_keys(code: KeyCode) -> Option<Vec<EditorCommand>> {
-    direction_from_key(code).map(|dir| vec![extend_command(dir)])
-}
 
 /// Handle text input keys shared by search and command modes.
 ///
@@ -139,123 +91,6 @@ mod tests {
     use crate::assert_single_command;
 
     use super::*;
-
-    // --- direction_from_key ---
-
-    #[test]
-    fn direction_from_key_hjkl() {
-        assert!(matches!(
-            direction_from_key(KeyCode::Char('h')),
-            Some(Direction::Left)
-        ));
-        assert!(matches!(
-            direction_from_key(KeyCode::Char('j')),
-            Some(Direction::Down)
-        ));
-        assert!(matches!(
-            direction_from_key(KeyCode::Char('k')),
-            Some(Direction::Up)
-        ));
-        assert!(matches!(
-            direction_from_key(KeyCode::Char('l')),
-            Some(Direction::Right)
-        ));
-    }
-
-    #[test]
-    fn direction_from_key_arrows() {
-        assert!(matches!(
-            direction_from_key(KeyCode::Left),
-            Some(Direction::Left)
-        ));
-        assert!(matches!(
-            direction_from_key(KeyCode::Right),
-            Some(Direction::Right)
-        ));
-        assert!(matches!(
-            direction_from_key(KeyCode::Up),
-            Some(Direction::Up)
-        ));
-        assert!(matches!(
-            direction_from_key(KeyCode::Down),
-            Some(Direction::Down)
-        ));
-    }
-
-    #[test]
-    fn direction_from_key_unrecognized() {
-        assert!(direction_from_key(KeyCode::Char('a')).is_none());
-        assert!(direction_from_key(KeyCode::Enter).is_none());
-        assert!(direction_from_key(KeyCode::Esc).is_none());
-    }
-
-    // --- move_command ---
-
-    #[test]
-    fn move_command_maps_directions() {
-        assert!(matches!(
-            move_command(Direction::Left),
-            EditorCommand::MoveLeft
-        ));
-        assert!(matches!(
-            move_command(Direction::Right),
-            EditorCommand::MoveRight
-        ));
-        assert!(matches!(move_command(Direction::Up), EditorCommand::MoveUp));
-        assert!(matches!(
-            move_command(Direction::Down),
-            EditorCommand::MoveDown
-        ));
-    }
-
-    // --- extend_command ---
-
-    #[test]
-    fn extend_command_maps_directions() {
-        assert!(matches!(
-            extend_command(Direction::Left),
-            EditorCommand::ExtendLeft
-        ));
-        assert!(matches!(
-            extend_command(Direction::Right),
-            EditorCommand::ExtendRight
-        ));
-        assert!(matches!(
-            extend_command(Direction::Up),
-            EditorCommand::ExtendUp
-        ));
-        assert!(matches!(
-            extend_command(Direction::Down),
-            EditorCommand::ExtendDown
-        ));
-    }
-
-    // --- handle_move_keys ---
-
-    #[test]
-    fn handle_move_keys_returns_command_for_hjkl() {
-        let cmds = handle_move_keys(KeyCode::Char('h')).expect("should match 'h'");
-        assert_single_command!(cmds, EditorCommand::MoveLeft);
-    }
-
-    #[test]
-    fn handle_move_keys_returns_none_for_unrecognized() {
-        assert!(handle_move_keys(KeyCode::Char('a')).is_none());
-        assert!(handle_move_keys(KeyCode::Esc).is_none());
-    }
-
-    // --- handle_extend_keys ---
-
-    #[test]
-    fn handle_extend_keys_returns_command_for_arrows() {
-        let cmds = handle_extend_keys(KeyCode::Right).expect("should match Right");
-        assert_single_command!(cmds, EditorCommand::ExtendRight);
-    }
-
-    #[test]
-    fn handle_extend_keys_returns_none_for_unrecognized() {
-        assert!(handle_extend_keys(KeyCode::Enter).is_none());
-    }
 
     // --- handle_text_input_keys ---
 
