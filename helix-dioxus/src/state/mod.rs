@@ -117,6 +117,9 @@ pub struct EditorContext {
     /// Whether code actions are available at the current cursor position.
     /// This is checked proactively to show a lightbulb indicator.
     pub(crate) has_code_actions: bool,
+    /// Cache of resolved code action previews, keyed by action index.
+    pub(crate) code_action_previews:
+        std::collections::HashMap<usize, crate::lsp::CodeActionPreviewState>,
     /// Last position where we checked for code actions (to avoid repeated checks).
     code_actions_check_position: Option<(helix_view::DocumentId, usize, usize)>,
     /// Whether location picker is visible.
@@ -324,6 +327,7 @@ impl EditorContext {
             code_action_selected: 0,
             code_action_filter: String::new(),
             has_code_actions: false,
+            code_action_previews: std::collections::HashMap::new(),
             code_actions_check_position: None,
             location_picker_visible: false,
             locations: Vec::new(),
@@ -1000,10 +1004,12 @@ impl EditorContext {
             EditorCommand::ShowCodeActions => {
                 // Clear the filter when opening
                 self.code_action_filter.clear();
+                self.code_action_previews.clear();
                 // If we already have cached code actions from the proactive check, show them
                 if self.has_code_actions && !self.code_actions.is_empty() {
                     self.code_actions_visible = true;
                     self.code_action_selected = 0;
+                    self.resolve_code_action_preview();
                 } else {
                     // Otherwise trigger a fresh request
                     self.trigger_code_actions();
@@ -1013,12 +1019,14 @@ impl EditorContext {
                 let filtered_count = self.filtered_code_actions_count();
                 if self.code_action_selected > 0 && filtered_count > 0 {
                     self.code_action_selected -= 1;
+                    self.resolve_code_action_preview();
                 }
             }
             EditorCommand::CodeActionDown => {
                 let filtered_count = self.filtered_code_actions_count();
                 if filtered_count > 0 && self.code_action_selected + 1 < filtered_count {
                     self.code_action_selected += 1;
+                    self.resolve_code_action_preview();
                 }
             }
             EditorCommand::CodeActionConfirm => {
@@ -1029,14 +1037,17 @@ impl EditorContext {
                 self.code_actions.clear();
                 self.code_action_selected = 0;
                 self.code_action_filter.clear();
+                self.code_action_previews.clear();
             }
             EditorCommand::CodeActionFilterChar(ch) => {
                 self.code_action_filter.push(ch);
-                self.code_action_selected = 0; // Reset selection when filter changes
+                self.code_action_selected = 0;
+                self.resolve_code_action_preview();
             }
             EditorCommand::CodeActionFilterBackspace => {
                 self.code_action_filter.pop();
-                self.code_action_selected = 0; // Reset selection when filter changes
+                self.code_action_selected = 0;
+                self.resolve_code_action_preview();
             }
 
             // VCS - Hunk navigation
@@ -1399,8 +1410,12 @@ impl EditorContext {
             LspResponse::CodeActions(actions) => {
                 self.code_actions = actions;
                 self.code_action_selected = 0;
+                self.code_action_previews.clear();
                 self.code_actions_visible = !self.code_actions.is_empty();
                 self.has_code_actions = !self.code_actions.is_empty();
+                if self.code_actions_visible {
+                    self.resolve_code_action_preview();
+                }
             }
             LspResponse::CodeActionsAvailable(has_actions, cached_actions) => {
                 self.has_code_actions = has_actions;
@@ -1447,6 +1462,13 @@ impl EditorContext {
                 self.symbols = symbols;
                 self.populate_symbol_picker_items();
             }
+            LspResponse::CodeActionResolved {
+                action_index,
+                workspace_edit,
+                offset_encoding,
+            } => {
+                self.handle_code_action_resolved(action_index, workspace_edit, offset_encoding);
+            }
             LspResponse::Error(msg) => {
                 log::error!("LSP error: {msg}");
             }
@@ -1475,6 +1497,139 @@ impl EditorContext {
             .iter()
             .filter(|a| a.snapshot.title.to_lowercase().contains(&filter_lower))
             .collect()
+    }
+
+    /// Handle a resolved code action response for preview.
+    fn handle_code_action_resolved(
+        &mut self,
+        action_index: usize,
+        workspace_edit: Option<lsp::WorkspaceEdit>,
+        offset_encoding: helix_lsp::OffsetEncoding,
+    ) {
+        use crate::lsp::CodeActionPreviewState;
+
+        let preview = if let Some(edit) = workspace_edit {
+            let preview = self.compute_preview_from_edit(&edit, offset_encoding);
+            if preview.file_diffs.is_empty() {
+                CodeActionPreviewState::Unavailable
+            } else {
+                CodeActionPreviewState::Available(preview)
+            }
+        } else {
+            CodeActionPreviewState::Unavailable
+        };
+        self.code_action_previews.insert(action_index, preview);
+    }
+
+    /// Compute a preview from a workspace edit.
+    fn compute_preview_from_edit(
+        &self,
+        edit: &lsp::WorkspaceEdit,
+        offset_encoding: helix_lsp::OffsetEncoding,
+    ) -> crate::lsp::CodeActionPreview {
+        crate::lsp::diff::compute_preview(edit, offset_encoding, |uri| {
+            // Try to read from open documents first.
+            if let Ok(path) = uri.to_file_path() {
+                for doc in self.editor.documents() {
+                    if doc.path().is_some_and(|doc_path| doc_path == &path) {
+                        return Some(doc.text().to_string());
+                    }
+                }
+                // Fallback: read from disk.
+                std::fs::read_to_string(&path).ok()
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Trigger preview resolution for the currently selected code action.
+    fn resolve_code_action_preview(&mut self) {
+        use crate::lsp::CodeActionPreviewState;
+
+        // Extract all needed data from the action to avoid holding a borrow on self.
+        let action_data = {
+            let filtered = self.filtered_code_actions();
+            let Some(action) = filtered.get(self.code_action_selected) else {
+                return;
+            };
+            let action_index = action.snapshot.index;
+            if self.code_action_previews.contains_key(&action_index) {
+                return;
+            }
+            (
+                action_index,
+                action.lsp_item.clone(),
+                action.language_server_id,
+                action.offset_encoding,
+            )
+        };
+
+        let (action_index, lsp_item, language_server_id, offset_encoding) = action_data;
+
+        match &lsp_item {
+            lsp::CodeActionOrCommand::Command(_) => {
+                self.code_action_previews
+                    .insert(action_index, CodeActionPreviewState::Unavailable);
+            }
+            lsp::CodeActionOrCommand::CodeAction(code_action) => {
+                if code_action.disabled.is_some() {
+                    self.code_action_previews
+                        .insert(action_index, CodeActionPreviewState::Unavailable);
+                    return;
+                }
+
+                if let Some(ref edit) = code_action.edit {
+                    let preview = self.compute_preview_from_edit(edit, offset_encoding);
+                    let state = if preview.file_diffs.is_empty() {
+                        CodeActionPreviewState::Unavailable
+                    } else {
+                        CodeActionPreviewState::Available(preview)
+                    };
+                    self.code_action_previews.insert(action_index, state);
+                } else {
+                    self.code_action_previews
+                        .insert(action_index, CodeActionPreviewState::Loading);
+
+                    if let Some(ls) = self.editor.language_server_by_id(language_server_id) {
+                        if let Some(future) = ls.resolve_code_action(code_action) {
+                            let tx = self.command_tx.clone();
+                            tokio::spawn(async move {
+                                match future.await {
+                                    Ok(resolved) => {
+                                        let _ = tx.send(EditorCommand::LspResponse(
+                                            LspResponse::CodeActionResolved {
+                                                action_index,
+                                                workspace_edit: resolved.edit,
+                                                offset_encoding,
+                                            },
+                                        ));
+                                    }
+                                    Err(err) => {
+                                        log::error!(
+                                            "Failed to resolve code action for preview: {err}"
+                                        );
+                                        let _ = tx.send(EditorCommand::LspResponse(
+                                            LspResponse::CodeActionResolved {
+                                                action_index,
+                                                workspace_edit: None,
+                                                offset_encoding,
+                                            },
+                                        ));
+                                    }
+                                }
+                            });
+                        } else {
+                            self.code_action_previews
+                                .insert(action_index, CodeActionPreviewState::Unavailable);
+                        }
+                    } else {
+                        self.code_action_previews
+                            .insert(action_index, CodeActionPreviewState::Unavailable);
+                    }
+                }
+            }
+        }
     }
 
     /// Compute filtered command completions for the current command input.
@@ -1959,6 +2114,13 @@ impl EditorContext {
                 .collect(),
             code_action_selected: self.code_action_selected,
             code_action_filter: self.code_action_filter.clone(),
+            code_action_preview: {
+                let filtered = self.filtered_code_actions();
+                filtered
+                    .get(self.code_action_selected)
+                    .and_then(|a| self.code_action_previews.get(&a.snapshot.index))
+                    .cloned()
+            },
             has_code_actions: self.has_code_actions,
             location_picker_visible: self.location_picker_visible,
             locations: self.locations.clone(),
@@ -2662,8 +2824,7 @@ impl EditorContext {
         if resolved.exists() {
             self.open_file(&resolved);
         } else {
-            self.editor
-                .set_error(format!("File not found: {path_str}"));
+            self.editor.set_error(format!("File not found: {path_str}"));
         }
     }
 
@@ -2981,6 +3142,7 @@ impl EditorContext {
             self.code_actions.clear();
             self.code_action_selected = 0;
             self.code_action_filter.clear();
+            self.code_action_previews.clear();
             return;
         };
 
@@ -2989,6 +3151,7 @@ impl EditorContext {
         self.code_actions.clear();
         self.code_action_selected = 0;
         self.code_action_filter.clear();
+        self.code_action_previews.clear();
 
         match &action.lsp_item {
             lsp::CodeActionOrCommand::Command(command) => {

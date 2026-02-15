@@ -608,6 +608,7 @@ pub fn App() -> Element {
                     cursor_line: snapshot.cursor_line,
                     cursor_col: snapshot.cursor_col,
                     filter: snapshot.code_action_filter.clone(),
+                    preview: snapshot.code_action_preview.clone(),
                 }
             }
 

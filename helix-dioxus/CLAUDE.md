@@ -28,6 +28,12 @@ helix-dioxus/src/
 │   ├── args.rs                 # Command-line argument parsing → StartupAction
 │   └── tracing_setup.rs        # Tracing subscriber init from LoggingConfig
 │
+├── lsp/                        # LSP Data & Logic
+│   ├── mod.rs                  # Re-exports types and conversions
+│   ├── types.rs                # LSP snapshot types (CodeActionSnapshot, CompletionItem, etc.)
+│   ├── conversions.rs          # helix-lsp → snapshot type conversions
+│   └── diff.rs                 # Diff computation for code action preview
+│
 ├── components/                 # UI Components
 │   ├── mod.rs                  # Re-exports all components
 │   ├── editor_view.rs          # Document rendering with syntax highlighting
@@ -38,7 +44,8 @@ helix-dioxus/src/
 │   ├── diagnostics.rs          # Diagnostic rendering helpers
 │   ├── lsp/                    # LSP-related popups
 │   │   ├── mod.rs              # Re-exports
-│   │   ├── code_actions.rs     # Code actions menu (uses InlineListDialog)
+│   │   ├── code_actions.rs     # Code actions menu (two-column with preview)
+│   │   ├── code_action_preview.rs # Diff preview panel for code actions
 │   │   ├── completion.rs       # Completion popup (uses InlineListDialog)
 │   │   ├── hover.rs            # Hover popup (uses InlineDialogContainer)
 │   │   ├── signature_help.rs   # Signature help (uses InlineDialogContainer)
@@ -174,6 +181,8 @@ Functions defined in `script.js`:
 - `.confirmation-*` (modal confirmation dialogs)
 - `.command-completion-*` (command mode autocompletion popup)
 - `.editor-scrollbar`, `.scrollbar-*` (custom scrollbar with markers)
+- `.code-actions-layout`, `.code-actions-list-column`, `.code-actions-preview-column` (two-column preview)
+- `.code-action-preview`, `.code-action-diff-*` (diff preview panel)
 
 **Dynamic Styles**: Styles requiring Rust variables remain inline:
 - Mode colors: `style: "background-color: {mode_bg};"`
@@ -426,7 +435,7 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - [x] Diagnostic scrollbar markers - show diagnostic and search positions on right scrollbar edge
 - [x] Jump list gutter markers - Bookmark icon on lines with jump list entries, matching picker icon
 - [x] Picker file preview panel - side-by-side syntax-highlighted file preview in picker (40%/60% split), with search match highlighting for global search
-- [ ] Code actions preview panel - show fix preview before applying (needs LSP resolve)
+- [x] Code actions preview panel - show fix preview before applying (LSP resolve + diff preview)
 - [x] ~~Dialog search mode setting~~ `[dialog] search_mode = "vim-style"` in `dhx.toml`, j/k navigate pickers, `/` toggles search focus, visual feedback with focused border and cursor
 - [x] ~~Cursor block visibility~~ `cursor-pulse-in-selection` CSS animation with stronger glow when cursor is inside selection
 - [x] ~~Clipboard register (`+`) visibility in register dialog~~ Line count and byte count info in register dialog header
@@ -441,6 +450,7 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - **DAP/Debug**: Not supported — `Space G` sub-menu will not be implemented. Debug adapter protocol is not integrated.
 
 ### Recently Completed
+- [x] Code actions preview panel — two-column layout with diff preview when navigating code actions, async `codeAction/resolve` for workspace edits, `imara-diff` Histogram algorithm for line-level diffs, `apply_text_edits()` with LSP offset encoding, `compute_file_diff()` with context lines, `CodeActionPreviewPanel` component (Loading/Available/Unavailable states), preview caching by action index, `.code-actions-layout` flex row CSS, diff line colors (added/removed/context), 16 diff computation tests
 - [x] Command mode autocompletion — fuzzy-matching popup above `:` prompt showing all ~45 commands with aliases and descriptions, Tab to accept, Up/Down to navigate, `CommandCompletion` struct as single source of truth, `CommandCompletionPopup` component, `compute_command_completions()` reuses `fuzzy_match_with_indices`, CSS `.command-completion-*` classes
 - [x] File explorer picker (`Space e` / `Space E`) — tree-style file explorer with expandable/collapsible directories (Enter/Left/Right/h/l), `FolderOpen` icon, `depth`-based indentation, hidden files shown, flat fuzzy filtering when typing (restores tree on clear), file preview panel, `rebuild_explorer_items()` with dirs-first sorting, `explorer_expanded` state, `collect_all_files()` via `ignore::WalkBuilder`, command panel entries, help bar hint
 - [x] Planned enhancements batch (7 items) — cursor-in-selection glow animation, `:jumplist-clear` command with `JumpList::clear()`, `*` register macOS clipboard fallback, register dialog line/byte count info, integration tests for key operations (normal/insert/search/select/command/picker modes), `use_editor_snapshot()` hook for DRY component state, dialog search mode setting (`vim-style` in `dhx.toml` with j/k navigation and `/` search focus toggle)

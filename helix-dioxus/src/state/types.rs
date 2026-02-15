@@ -9,8 +9,9 @@ use helix_view::DocumentId;
 
 use crate::config::DialogSearchMode;
 use crate::lsp::{
-    CodeActionSnapshot, CompletionItemSnapshot, DiagnosticSeverity, DiagnosticSnapshot,
-    HoverSnapshot, InlayHintSnapshot, LocationSnapshot, LspServerSnapshot, SignatureHelpSnapshot,
+    CodeActionPreviewState, CodeActionSnapshot, CompletionItemSnapshot, DiagnosticSeverity,
+    DiagnosticSnapshot, HoverSnapshot, InlayHintSnapshot, LocationSnapshot, LspServerSnapshot,
+    SignatureHelpSnapshot,
 };
 
 /// Compute a visible window of `window_size` items centered on `selected`,
@@ -315,6 +316,8 @@ pub struct EditorSnapshot {
     pub code_action_selected: usize,
     /// Code action filter string for searching.
     pub code_action_filter: String,
+    /// Preview of the currently selected code action.
+    pub code_action_preview: Option<CodeActionPreviewState>,
     /// Whether code actions are available at cursor position (for lightbulb indicator).
     pub has_code_actions: bool,
     /// Whether location picker is visible.

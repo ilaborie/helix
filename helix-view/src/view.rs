@@ -60,7 +60,7 @@ impl JumpList {
         self.push_impl(jump);
     }
 
-    pub(crate) fn forward(&mut self, count: usize) -> Option<&Jump> {
+    pub fn forward(&mut self, count: usize) -> Option<&Jump> {
         if self.current + count < self.jumps.len() {
             self.current += count;
             self.jumps.get(self.current)
@@ -70,12 +70,7 @@ impl JumpList {
     }
 
     // Taking view and doc to prevent unnecessary cloning when jump is not required.
-    pub(crate) fn backward(
-        &mut self,
-        view_id: ViewId,
-        doc: &mut Document,
-        count: usize,
-    ) -> Option<&Jump> {
+    pub fn backward(&mut self, view_id: ViewId, doc: &mut Document, count: usize) -> Option<&Jump> {
         if let Some(mut current) = self.current.checked_sub(count) {
             if self.current == self.jumps.len() {
                 let jump = (doc.id(), doc.selection(view_id).clone());

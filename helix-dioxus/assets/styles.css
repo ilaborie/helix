@@ -981,6 +981,134 @@ kbd {
     font-size: 11px;
 }
 
+/* Code actions two-column layout with preview */
+.code-actions-layout {
+    display: flex;
+    flex-direction: row;
+    height: 100%;
+    max-height: 380px;
+}
+
+.code-actions-list-column {
+    min-width: 220px;
+    max-width: 350px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--bg-selection);
+    overflow-y: auto;
+}
+
+.code-actions-preview-column {
+    flex: 1;
+    overflow-y: auto;
+    min-width: 0;
+}
+
+/* Code action preview panel */
+.code-action-preview {
+    padding: 4px 0;
+    font-size: 12px;
+    font-family: var(--font-mono);
+}
+
+.code-action-preview-header {
+    display: flex;
+    gap: 8px;
+    padding: 4px 8px;
+    font-size: 11px;
+    border-bottom: 1px solid var(--bg-selection);
+}
+
+.code-action-diff-stat-added {
+    color: var(--success);
+}
+
+.code-action-diff-stat-removed {
+    color: var(--error);
+}
+
+.code-action-preview-file {
+    margin-bottom: 4px;
+}
+
+.code-action-preview-file-header {
+    padding: 3px 8px;
+    color: var(--text-dim);
+    font-size: 11px;
+    background-color: var(--bg-deep);
+    border-bottom: 1px solid var(--bg-selection);
+}
+
+.code-action-diff-separator {
+    text-align: center;
+    color: var(--text-dimmer);
+    font-size: 10px;
+    padding: 2px 0;
+}
+
+.code-action-diff-line {
+    display: flex;
+    flex-direction: row;
+    line-height: 18px;
+    white-space: pre;
+}
+
+.code-action-diff-added {
+    background-color: rgba(152, 195, 121, 0.15);
+}
+
+.code-action-diff-removed {
+    background-color: rgba(224, 108, 117, 0.15);
+}
+
+.code-action-diff-context {
+    color: var(--text-dim);
+}
+
+.code-action-diff-gutter {
+    width: 28px;
+    text-align: right;
+    padding-right: 4px;
+    color: var(--text-dimmer);
+    font-size: 11px;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.code-action-diff-sign {
+    width: 12px;
+    text-align: center;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.code-action-diff-added .code-action-diff-sign {
+    color: var(--success);
+}
+
+.code-action-diff-removed .code-action-diff-sign {
+    color: var(--error);
+}
+
+.code-action-diff-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.code-action-preview-loading,
+.code-action-preview-unavailable {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 60px;
+    color: var(--text-dim);
+    font-size: 12px;
+}
+
 /* ───── Location picker ───── */
 .location-picker-overlay {
     position: absolute;

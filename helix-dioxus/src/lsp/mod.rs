@@ -4,6 +4,7 @@
 //! handles the async bridge between LSP operations and the sync UI.
 
 mod conversions;
+pub mod diff;
 mod types;
 
 pub use conversions::{
@@ -12,8 +13,9 @@ pub use conversions::{
     convert_signature_help, convert_workspace_symbols,
 };
 pub use types::{
-    CodeActionSnapshot, CompletionItemKind, CompletionItemSnapshot, DiagnosticPickerEntry,
-    DiagnosticSeverity, DiagnosticSnapshot, HoverSnapshot, InlayHintKind, InlayHintSnapshot,
+    CodeActionPreview, CodeActionPreviewState, CodeActionSnapshot, CompletionItemKind,
+    CompletionItemSnapshot, DiagnosticPickerEntry, DiagnosticSeverity, DiagnosticSnapshot,
+    DiffChangeKind, DiffHunk, DiffLine, FileDiff, HoverSnapshot, InlayHintKind, InlayHintSnapshot,
     LocationSnapshot, LspResponse, LspServerSnapshot, LspServerStatus, ParameterSnapshot,
     SignatureHelpSnapshot, SignatureSnapshot, StoredCodeAction, SymbolKind, SymbolSnapshot,
 };

@@ -3,6 +3,7 @@
 //! Components for displaying LSP features: code actions, completion,
 //! hover, signature help, and location picker.
 
+mod code_action_preview;
 mod code_actions;
 mod completion;
 mod hover;

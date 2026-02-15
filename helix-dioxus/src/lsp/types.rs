@@ -454,6 +454,68 @@ pub struct SymbolSnapshot {
     pub column: usize,
 }
 
+/// Kind of change in a diff line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiffChangeKind {
+    /// Unchanged context line.
+    Context,
+    /// Line was removed.
+    Removed,
+    /// Line was added.
+    Added,
+}
+
+/// A single line in a diff.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiffLine {
+    /// The kind of change.
+    pub kind: DiffChangeKind,
+    /// The line content.
+    pub content: String,
+    /// Line number in the old file (None for added lines).
+    pub old_line_number: Option<usize>,
+    /// Line number in the new file (None for removed lines).
+    pub new_line_number: Option<usize>,
+}
+
+/// A contiguous group of changed lines with context.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiffHunk {
+    /// The lines in this hunk.
+    pub lines: Vec<DiffLine>,
+}
+
+/// Diff for a single file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileDiff {
+    /// The file path.
+    pub file_path: String,
+    /// The hunks of changes.
+    pub hunks: Vec<DiffHunk>,
+}
+
+/// Preview of what a code action will change.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodeActionPreview {
+    /// Per-file diffs.
+    pub file_diffs: Vec<FileDiff>,
+    /// Total lines added.
+    pub lines_added: usize,
+    /// Total lines removed.
+    pub lines_removed: usize,
+}
+
+/// State of code action preview resolution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CodeActionPreviewState {
+    /// Currently resolving the action.
+    Loading,
+    /// Preview is available.
+    Available(CodeActionPreview),
+    /// No preview available (command or disabled action).
+    Unavailable,
+}
+
 /// Response types from async LSP operations.
 #[derive(Debug, Clone)]
 pub enum LspResponse {
@@ -496,6 +558,12 @@ pub enum LspResponse {
     DocumentSymbols(Vec<SymbolSnapshot>),
     /// Workspace symbols received.
     WorkspaceSymbols(Vec<SymbolSnapshot>),
+    /// Resolved code action for preview.
+    CodeActionResolved {
+        action_index: usize,
+        workspace_edit: Option<helix_lsp::lsp::WorkspaceEdit>,
+        offset_encoding: helix_lsp::OffsetEncoding,
+    },
     /// Error from LSP operation.
     Error(String),
 }

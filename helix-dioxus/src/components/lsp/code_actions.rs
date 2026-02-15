@@ -1,12 +1,14 @@
 //! Code actions menu component.
 //!
-//! Displays available code actions (quick fixes, refactors) at cursor position.
+//! Displays available code actions (quick fixes, refactors) at cursor position,
+//! with an optional preview panel showing the diff for the selected action.
 
 use dioxus::prelude::*;
 use lucide_dioxus::{FileCode, Lightbulb, PackagePlus, Search, Star, Wrench};
 
-use crate::components::inline_dialog::{DialogConstraints, InlineListDialog, InlineListItem};
-use crate::lsp::CodeActionSnapshot;
+use super::code_action_preview::CodeActionPreviewPanel;
+use crate::components::inline_dialog::{DialogConstraints, InlineDialogContainer, InlineListItem};
+use crate::lsp::{CodeActionPreviewState, CodeActionSnapshot};
 
 /// Get the icon and color for a code action kind.
 fn action_kind_style(kind: Option<&str>, is_preferred: bool) -> (&'static str, Element) {
@@ -110,6 +112,41 @@ fn CodeActionItem(action: CodeActionSnapshot, is_selected: bool) -> Element {
     }
 }
 
+/// Search bar with filter input and count.
+#[component]
+fn SearchBar(filter: String, filtered_count: usize, total_count: usize) -> Element {
+    rsx! {
+        div {
+            class: "code-actions-search",
+            span {
+                class: "icon-wrapper",
+                style: "color: var(--text-dim);",
+                Search { size: 14, color: "currentColor" }
+            }
+            span {
+                class: "code-actions-search-input",
+                if filter.is_empty() {
+                    span { class: "code-actions-search-placeholder", "Type to filter..." }
+                } else {
+                    "{filter}"
+                }
+            }
+            span {
+                class: "code-actions-count",
+                "{filtered_count}/{total_count}"
+            }
+        }
+    }
+}
+
+/// Whether the preview is displayable (not all unavailable).
+fn has_displayable_preview(preview: Option<&CodeActionPreviewState>) -> bool {
+    matches!(
+        preview,
+        Some(CodeActionPreviewState::Loading | CodeActionPreviewState::Available(_))
+    )
+}
+
 /// Code actions menu that displays available fixes and refactors.
 #[component]
 pub fn CodeActionsMenu(
@@ -118,68 +155,118 @@ pub fn CodeActionsMenu(
     cursor_line: usize,
     cursor_col: usize,
     filter: String,
+    #[props(default)] preview: Option<CodeActionPreviewState>,
 ) -> Element {
     // Filter actions by title (case-insensitive substring match)
     let filter_lower = filter.to_lowercase();
     let filtered_actions: Vec<_> = actions
         .iter()
-        .filter(|a| filter.is_empty() || a.title.to_lowercase().contains(&filter_lower))
+        .filter(|action| filter.is_empty() || action.title.to_lowercase().contains(&filter_lower))
         .cloned()
         .collect();
 
     let total_count = actions.len();
     let filtered_count = filtered_actions.len();
+    let show_preview = has_displayable_preview(preview.as_ref());
 
-    // Determine empty message based on filter state
-    let empty_message = if filter.is_empty() {
-        "No code actions available"
+    let constraints = if show_preview {
+        DialogConstraints {
+            min_width: Some(600),
+            max_width: Some(800),
+            max_height: Some(400),
+        }
     } else {
-        "No matching code actions"
-    };
-
-    let constraints = DialogConstraints {
-        min_width: Some(220),
-        max_width: Some(450),
-        max_height: Some(300),
+        DialogConstraints {
+            min_width: Some(220),
+            max_width: Some(450),
+            max_height: Some(300),
+        }
     };
 
     rsx! {
-        InlineListDialog {
+        InlineDialogContainer {
             cursor_line,
             cursor_col,
-            selected,
-            empty_message,
             class: "code-actions-menu",
             constraints,
-            has_items: !filtered_actions.is_empty(),
 
-            // Search input at the top
-            div {
-                class: "code-actions-search",
-                span {
-                    class: "icon-wrapper",
-                    style: "color: var(--text-dim);",
-                    Search { size: 14, color: "currentColor" }
-                }
-                span {
-                    class: "code-actions-search-input",
-                    if filter.is_empty() {
-                        span { class: "code-actions-search-placeholder", "Type to filter..." }
-                    } else {
-                        "{filter}"
+            if show_preview {
+                // Two-column layout
+                div {
+                    class: "code-actions-layout",
+
+                    // Left column: action list
+                    div {
+                        class: "code-actions-list-column",
+
+                        SearchBar {
+                            filter: filter.clone(),
+                            filtered_count,
+                            total_count,
+                        }
+
+                        div {
+                            class: "inline-dialog-items",
+                            if filtered_actions.is_empty() {
+                                div {
+                                    class: "inline-dialog-empty",
+                                    if filter.is_empty() {
+                                        "No code actions available"
+                                    } else {
+                                        "No matching code actions"
+                                    }
+                                }
+                            }
+                            for (idx, action) in filtered_actions.iter().enumerate() {
+                                CodeActionItem {
+                                    key: "{idx}",
+                                    action: action.clone(),
+                                    is_selected: idx == selected,
+                                }
+                            }
+                        }
+                    }
+
+                    // Right column: preview
+                    div {
+                        class: "code-actions-preview-column",
+                        if let Some(ref preview_state) = preview {
+                            CodeActionPreviewPanel { preview: preview_state.clone() }
+                        }
                     }
                 }
-                span {
-                    class: "code-actions-count",
-                    "{filtered_count}/{total_count}"
-                }
-            }
+            } else {
+                // Single-column layout (original)
+                div {
+                    class: "inline-dialog-list",
 
-            for (idx, action) in filtered_actions.iter().enumerate() {
-                CodeActionItem {
-                    key: "{idx}",
-                    action: action.clone(),
-                    is_selected: idx == selected,
+                    SearchBar {
+                        filter: filter.clone(),
+                        filtered_count,
+                        total_count,
+                    }
+
+                    if filtered_actions.is_empty() {
+                        div {
+                            class: "inline-dialog-empty",
+                            if filter.is_empty() {
+                                "No code actions available"
+                            } else {
+                                "No matching code actions"
+                            }
+                        }
+                    } else {
+                        div {
+                            class: "inline-dialog-items",
+                            for (idx, action) in filtered_actions.iter().enumerate() {
+                                CodeActionItem {
+                                    key: "{idx}",
+                                    action: action.clone(),
+                                    is_selected: idx == selected,
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

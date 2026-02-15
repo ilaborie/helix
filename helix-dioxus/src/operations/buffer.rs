@@ -329,7 +329,10 @@ impl BufferOps for EditorContext {
     fn quit_all(&mut self, force: bool) {
         // Check for unsaved changes in any buffer
         if !force {
-            let has_unsaved = self.editor.documents().any(helix_view::Document::is_modified);
+            let has_unsaved = self
+                .editor
+                .documents()
+                .any(helix_view::Document::is_modified);
             if has_unsaved {
                 // Count modified buffers
                 let modified_count = self.editor.documents().filter(|d| d.is_modified()).count();
@@ -355,7 +358,10 @@ impl BufferOps for EditorContext {
     fn buffer_close_all(&mut self, force: bool) {
         // Check for unsaved changes if not forcing
         if !force {
-            let has_unsaved = self.editor.documents().any(helix_view::Document::is_modified);
+            let has_unsaved = self
+                .editor
+                .documents()
+                .any(helix_view::Document::is_modified);
             if has_unsaved {
                 self.show_notification(
                     "Some buffers have unsaved changes. Use :bca! to force close.".to_string(),
@@ -365,7 +371,11 @@ impl BufferOps for EditorContext {
             }
         }
 
-        let doc_ids: Vec<_> = self.editor.documents().map(helix_view::Document::id).collect();
+        let doc_ids: Vec<_> = self
+            .editor
+            .documents()
+            .map(helix_view::Document::id)
+            .collect();
         for doc_id in doc_ids {
             let _ = self.editor.close_document(doc_id, force);
         }
