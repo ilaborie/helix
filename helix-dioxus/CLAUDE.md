@@ -439,10 +439,6 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - **Window/Splits**: Not supported — helix-dioxus uses a single-view design. `C-w` prefix and `Space w` sub-menu will not be implemented.
 - **DAP/Debug**: Not supported — `Space G` sub-menu will not be implemented. Debug adapter protocol is not integrated.
 
-## Open Items
-
-- [ ] Investigate rust-analyzer diagnostic line reporting — diagnostics may be reported on the line where parsing fails rather than where the actual error is (e.g., unterminated string reports on the next line)
-
 ## Development History
 
 See [DEV_LOGBOOK.md](DEV_LOGBOOK.md) for detailed development history and completed features.
