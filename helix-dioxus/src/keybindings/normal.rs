@@ -230,6 +230,9 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         // Repeat last insert (dot command)
         KeyCode::Char('.') => vec![EditorCommand::RepeatLastInsert],
 
+        // Escape - collapse selection (also closes hover/popups via auto-close)
+        KeyCode::Esc => vec![EditorCommand::CollapseSelection],
+
         _ => vec![],
     }
 }

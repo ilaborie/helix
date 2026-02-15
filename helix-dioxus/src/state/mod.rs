@@ -499,8 +499,13 @@ impl EditorContext {
             None
         };
 
-        // Auto-close hover popup on any command except opening hover
-        if self.hover_visible && !matches!(cmd, EditorCommand::TriggerHover) {
+        // Auto-close hover popup on user-initiated commands (not internal LSP responses)
+        if self.hover_visible
+            && !matches!(
+                cmd,
+                EditorCommand::TriggerHover | EditorCommand::LspResponse(_)
+            )
+        {
             self.hover_visible = false;
             self.hover_content = None;
         }
