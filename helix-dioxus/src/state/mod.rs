@@ -626,20 +626,53 @@ impl EditorContext {
                 doc.set_selection(view_id, helix_core::Selection::point(pos));
                 self.editor.mode = Mode::Insert;
             }
-            EditorCommand::ExitInsertMode => self.editor.mode = Mode::Normal,
+            EditorCommand::ExitInsertMode => {
+                self.editor.mode = Mode::Normal;
+                self.signature_help_visible = false;
+                self.signature_help = None;
+            }
             EditorCommand::EnterSelectMode => self.editor.mode = Mode::Select,
             EditorCommand::ExitSelectMode => self.editor.mode = Mode::Normal,
 
             // Editing operations
-            EditorCommand::InsertChar(c) => self.insert_char(doc_id, view_id, c),
-            EditorCommand::InsertTab => self.insert_tab(doc_id, view_id),
-            EditorCommand::InsertNewline => self.insert_newline(doc_id, view_id),
-            EditorCommand::DeleteCharBackward => self.delete_char_backward(doc_id, view_id),
-            EditorCommand::DeleteCharForward => self.delete_char_forward(doc_id, view_id),
-            EditorCommand::DeleteWordBackward => self.delete_word_backward(doc_id, view_id),
-            EditorCommand::DeleteWordForward => self.delete_word_forward(doc_id, view_id),
-            EditorCommand::DeleteToLineStart => self.delete_to_line_start(doc_id, view_id),
-            EditorCommand::KillToLineEnd => self.kill_to_line_end(doc_id, view_id),
+            EditorCommand::InsertChar(c) => {
+                self.insert_char(doc_id, view_id, c);
+                if !self.maybe_auto_trigger_signature_help(c) {
+                    self.maybe_retrigger_signature_help();
+                }
+            }
+            EditorCommand::InsertTab => {
+                self.insert_tab(doc_id, view_id);
+                self.maybe_retrigger_signature_help();
+            }
+            EditorCommand::InsertNewline => {
+                self.insert_newline(doc_id, view_id);
+                self.maybe_retrigger_signature_help();
+            }
+            EditorCommand::DeleteCharBackward => {
+                self.delete_char_backward(doc_id, view_id);
+                self.maybe_retrigger_signature_help();
+            }
+            EditorCommand::DeleteCharForward => {
+                self.delete_char_forward(doc_id, view_id);
+                self.maybe_retrigger_signature_help();
+            }
+            EditorCommand::DeleteWordBackward => {
+                self.delete_word_backward(doc_id, view_id);
+                self.maybe_retrigger_signature_help();
+            }
+            EditorCommand::DeleteWordForward => {
+                self.delete_word_forward(doc_id, view_id);
+                self.maybe_retrigger_signature_help();
+            }
+            EditorCommand::DeleteToLineStart => {
+                self.delete_to_line_start(doc_id, view_id);
+                self.maybe_retrigger_signature_help();
+            }
+            EditorCommand::KillToLineEnd => {
+                self.kill_to_line_end(doc_id, view_id);
+                self.maybe_retrigger_signature_help();
+            }
             EditorCommand::IndentLine => self.indent_line(doc_id, view_id),
             EditorCommand::UnindentLine => self.unindent_line(doc_id, view_id),
             EditorCommand::OpenLineBelow => {
@@ -3207,6 +3240,53 @@ impl EditorContext {
         });
     }
 
+    /// Auto-trigger signature help if `c` is a trigger character for the current LSP.
+    ///
+    /// Returns `true` if signature help was triggered.
+    fn maybe_auto_trigger_signature_help(&mut self, c: char) -> bool {
+        if !self.editor.config().lsp.auto_signature_help {
+            return false;
+        }
+
+        let view_id = self.editor.tree.focus;
+        let doc_id = self.editor.tree.get(view_id).doc;
+        let Some(doc) = self.editor.document(doc_id) else {
+            return false;
+        };
+
+        let Some(ls) = doc
+            .language_servers_with_feature(LanguageServerFeature::SignatureHelp)
+            .next()
+        else {
+            return false;
+        };
+
+        let capabilities = ls.capabilities();
+        let trigger_chars = match &capabilities.signature_help_provider {
+            Some(lsp::SignatureHelpOptions {
+                trigger_characters: Some(triggers),
+                ..
+            }) => triggers,
+            _ => return false,
+        };
+
+        if is_signature_help_trigger_char(c, trigger_chars) {
+            self.trigger_signature_help();
+            return true;
+        }
+
+        false
+    }
+
+    /// Re-trigger signature help if the popup is already visible.
+    ///
+    /// Keeps the popup in sync as the user types parameter names, deletes chars, etc.
+    fn maybe_retrigger_signature_help(&mut self) {
+        if self.signature_help_visible {
+            self.trigger_signature_help();
+        }
+    }
+
     /// Trigger code actions at the current cursor position.
     pub(crate) fn trigger_code_actions(&mut self) {
         let view_id = self.editor.tree.focus;
@@ -4483,26 +4563,46 @@ fn create_handlers() -> helix_view::handlers::Handlers {
     handlers
 }
 
-/// Load editor configuration from the user's `config.toml` `[editor]` section.
-///
-/// Falls back to defaults if the file doesn't exist or can't be parsed.
-pub(crate) fn load_editor_config() -> helix_view::editor::Config {
-    let config_path = helix_loader::config_file();
-    let content = match std::fs::read_to_string(&config_path) {
-        Ok(c) => c,
-        Err(_) => return helix_view::editor::Config::default(),
-    };
-
-    // Parse the TOML and extract the [editor] section
-    let toml_val: toml::Value = match toml::from_str(&content) {
-        Ok(v) => v,
+/// Read and parse a TOML file, returning `None` on missing file or parse error.
+fn read_toml_file(path: &std::path::Path) -> Option<toml::Value> {
+    let content = std::fs::read_to_string(path).ok()?;
+    match toml::from_str::<toml::Value>(&content) {
+        Ok(v) => Some(v),
         Err(err) => {
-            log::warn!("Failed to parse config.toml: {err}");
-            return helix_view::editor::Config::default();
+            log::warn!("Failed to parse {}: {err}", path.display());
+            None
         }
+    }
+}
+
+/// Merge two optional TOML values, with `right` overriding `left`.
+fn merge_optional_toml(
+    left: Option<toml::Value>,
+    right: Option<toml::Value>,
+) -> Option<toml::Value> {
+    match (left, right) {
+        (Some(g), Some(l)) => Some(helix_loader::merge_toml_values(g, l, 3)),
+        (g, l) => g.or(l),
+    }
+}
+
+/// Load and merge global + workspace `config.toml` files.
+fn load_merged_config_toml() -> Option<toml::Value> {
+    let global = read_toml_file(&helix_loader::config_file());
+    let local = read_toml_file(&helix_loader::workspace_config_file());
+    merge_optional_toml(global, local)
+}
+
+/// Load editor configuration from global + workspace `config.toml` `[editor]` sections.
+///
+/// Workspace values override global. Falls back to defaults if neither file exists.
+pub(crate) fn load_editor_config() -> helix_view::editor::Config {
+    let merged = match load_merged_config_toml() {
+        Some(v) => v,
+        None => return helix_view::editor::Config::default(),
     };
 
-    match toml_val.get("editor") {
+    match merged.get("editor") {
         Some(editor_val) => editor_val.clone().try_into().unwrap_or_else(|err| {
             log::warn!("Failed to deserialize [editor] config: {err}");
             helix_view::editor::Config::default()
@@ -4511,15 +4611,54 @@ pub(crate) fn load_editor_config() -> helix_view::editor::Config {
     }
 }
 
-/// Load the theme name from the user's `config.toml`.
+/// Check if a character matches any of the LSP signature help trigger characters.
+fn is_signature_help_trigger_char(c: char, trigger_characters: &[String]) -> bool {
+    let c_str = c.to_string();
+    trigger_characters.iter().any(|t| t == &c_str)
+}
+
+/// Load the theme name from global + workspace `config.toml`.
 ///
-/// Returns `None` if no theme is specified or the file can't be read.
+/// Workspace theme overrides global. Returns `None` if no theme is specified.
 pub(crate) fn load_theme_name() -> Option<String> {
-    let config_path = helix_loader::config_file();
-    let content = std::fs::read_to_string(config_path).ok()?;
-    let toml_val: toml::Value = toml::from_str(&content).ok()?;
-    toml_val
+    let merged = load_merged_config_toml()?;
+    merged
         .get("theme")
         .and_then(toml::Value::as_str)
         .map(String::from)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn trigger_char_matches_open_paren() {
+        let triggers = vec!["(".to_string(), ",".to_string()];
+        assert!(is_signature_help_trigger_char('(', &triggers));
+    }
+
+    #[test]
+    fn trigger_char_matches_comma() {
+        let triggers = vec!["(".to_string(), ",".to_string()];
+        assert!(is_signature_help_trigger_char(',', &triggers));
+    }
+
+    #[test]
+    fn trigger_char_matches_angle_bracket() {
+        let triggers = vec!["(".to_string(), ",".to_string(), "<".to_string()];
+        assert!(is_signature_help_trigger_char('<', &triggers));
+    }
+
+    #[test]
+    fn trigger_char_rejects_non_trigger() {
+        let triggers = vec!["(".to_string(), ",".to_string()];
+        assert!(!is_signature_help_trigger_char('a', &triggers));
+    }
+
+    #[test]
+    fn trigger_char_empty_triggers_returns_false() {
+        let triggers: Vec<String> = vec![];
+        assert!(!is_signature_help_trigger_char('(', &triggers));
+    }
 }

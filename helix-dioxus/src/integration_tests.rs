@@ -483,6 +483,22 @@ fn dot_repeat_with_backspace() {
 }
 
 #[test]
+fn exit_insert_mode_dismisses_signature_help() {
+    let _guard = crate::test_helpers::init();
+    let mut ctx = test_context("#[|h]#ello\n");
+
+    // Simulate signature help being visible (as if LSP responded)
+    ctx.signature_help_visible = true;
+    ctx.signature_help = Some(crate::lsp::SignatureHelpSnapshot::default());
+
+    // Exit insert mode should dismiss signature help
+    ctx.handle_command(EditorCommand::ExitInsertMode);
+
+    assert!(!ctx.signature_help_visible);
+    assert!(ctx.signature_help.is_none());
+}
+
+#[test]
 fn dot_repeat_does_not_record_during_replay() {
     let _guard = crate::test_helpers::init();
     let mut ctx = test_context("#[|h]#ello\n");

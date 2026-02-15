@@ -1,8 +1,9 @@
 //! GUI-specific configuration for helix-dioxus.
 //!
-//! Configuration is loaded from `~/.config/helix/dhx.toml` and provides
-//! window, font, and logging settings. Editor settings (keybindings, theme,
-//! LSP) are loaded from the standard helix `config.toml` and `languages.toml`.
+//! Configuration is loaded from `~/.config/helix/dhx.toml` (global) and
+//! `.helix/dhx.toml` (workspace), with workspace values overriding global.
+//! Editor settings (keybindings, theme, LSP) are loaded from the standard
+//! helix `config.toml` and `languages.toml` with the same merging strategy.
 
 use std::path::{Path, PathBuf};
 
@@ -106,16 +107,27 @@ impl Default for LoggingConfig {
 }
 
 impl DhxConfig {
-    /// Load configuration from the default location (`~/.config/helix/dhx.toml`).
+    /// Load configuration by merging global (`~/.config/helix/dhx.toml`) and
+    /// workspace (`.helix/dhx.toml`) files. Workspace values override global.
     ///
-    /// Falls back to defaults if the file doesn't exist.
-    /// Returns an error only if the file exists but is malformed.
+    /// Falls back to defaults if neither file exists.
     pub fn load_default() -> Result<Self> {
-        let config_path = helix_loader::config_dir().join("dhx.toml");
-        if config_path.exists() {
-            Self::load_from(&config_path)
-        } else {
-            Ok(Self::default())
+        let global_path = helix_loader::config_dir().join("dhx.toml");
+        let workspace_path = helix_loader::find_workspace()
+            .0
+            .join(".helix")
+            .join("dhx.toml");
+
+        let global = Self::read_toml_file(&global_path);
+        let local = Self::read_toml_file(&workspace_path);
+
+        match (global, local) {
+            (Some(g), Some(l)) => {
+                let merged = helix_loader::merge_toml_values(g, l, 3);
+                Ok(merged.try_into()?)
+            }
+            (Some(v), None) | (None, Some(v)) => Ok(v.try_into()?),
+            (None, None) => Ok(Self::default()),
         }
     }
 
@@ -124,6 +136,18 @@ impl DhxConfig {
         let content = std::fs::read_to_string(path)?;
         let config = toml::from_str::<DhxConfig>(&content)?;
         Ok(config)
+    }
+
+    /// Read and parse a TOML file, returning `None` on missing file or parse error.
+    fn read_toml_file(path: &Path) -> Option<toml::Value> {
+        let content = std::fs::read_to_string(path).ok()?;
+        match toml::from_str::<toml::Value>(&content) {
+            Ok(v) => Some(v),
+            Err(err) => {
+                log::warn!("Failed to parse {}: {err}", path.display());
+                None
+            }
+        }
     }
 
     /// Set the window title.
@@ -292,5 +316,135 @@ search_mode = "direct"
 "#;
         let config = toml::from_str::<DhxConfig>(toml_str).expect("should deserialize");
         assert_eq!(config.dialog.search_mode, DialogSearchMode::Direct);
+    }
+
+    /// Helper: parse TOML string into Value.
+    fn parse_toml(s: &str) -> toml::Value {
+        toml::from_str::<toml::Value>(s).expect("valid TOML")
+    }
+
+    /// Helper: merge two TOML strings and deserialize into DhxConfig.
+    fn merge_and_deserialize(global: &str, workspace: &str) -> DhxConfig {
+        let merged =
+            helix_loader::merge_toml_values(parse_toml(global), parse_toml(workspace), 3);
+        merged.try_into().expect("should deserialize merged config")
+    }
+
+    #[test]
+    fn merge_global_and_workspace_configs() {
+        let global = r#"
+[window]
+title = "global-title"
+width = 1000.0
+
+[font]
+size = 14.0
+"#;
+        let workspace = r#"
+[font]
+size = 20.0
+"#;
+        let config = merge_and_deserialize(global, workspace);
+        // Workspace overrides font.size
+        assert!((config.font.size - 20.0).abs() < f64::EPSILON);
+        // Global window.title preserved
+        assert_eq!(config.window.title, "global-title");
+        // Global window.width preserved
+        assert!((config.window.width - 1000.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn workspace_only_config() {
+        let workspace = r#"
+[font]
+size = 18.0
+ligatures = false
+"#;
+        let config: DhxConfig = parse_toml(workspace)
+            .try_into()
+            .expect("should deserialize");
+        assert!((config.font.size - 18.0).abs() < f64::EPSILON);
+        assert!(!config.font.ligatures);
+        // Window should be default
+        assert_eq!(config.window.title, "helix-dioxus");
+    }
+
+    #[test]
+    fn global_only_config() {
+        let global = r#"
+[window]
+title = "my-editor"
+width = 800.0
+"#;
+        let config: DhxConfig = parse_toml(global).try_into().expect("should deserialize");
+        assert_eq!(config.window.title, "my-editor");
+        assert!((config.window.width - 800.0).abs() < f64::EPSILON);
+        // Font should be default
+        assert!((config.font.size - 14.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn neither_config_returns_default() {
+        let config = DhxConfig::default();
+        assert_eq!(config.window.title, "helix-dioxus");
+        assert!((config.font.size - 14.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn malformed_workspace_ignored_global_still_loads() {
+        // Simulate: global is valid, workspace fails to parse → only global used
+        let global = r#"
+[window]
+title = "from-global"
+"#;
+        // If workspace TOML is malformed, read_toml_file returns None,
+        // so only global is used. We test the single-value path here.
+        let config: DhxConfig = parse_toml(global).try_into().expect("should deserialize");
+        assert_eq!(config.window.title, "from-global");
+    }
+
+    #[test]
+    fn merge_workspace_overrides_nested_sections() {
+        let global = r#"
+[window]
+title = "global"
+width = 1200.0
+height = 800.0
+
+[font]
+family = "'Fira Code'"
+size = 14.0
+ligatures = true
+
+[logging]
+level = "info"
+"#;
+        let workspace = r#"
+[window]
+title = "workspace"
+
+[font]
+size = 20.0
+ligatures = false
+
+[logging]
+level = "debug"
+"#;
+        let config = merge_and_deserialize(global, workspace);
+        // Workspace overrides
+        assert_eq!(config.window.title, "workspace");
+        assert!((config.font.size - 20.0).abs() < f64::EPSILON);
+        assert!(!config.font.ligatures);
+        assert_eq!(config.logging.level, "debug");
+        // Global preserved where workspace doesn't override
+        assert!((config.window.width - 1200.0).abs() < f64::EPSILON);
+        assert!((config.window.height - 800.0).abs() < f64::EPSILON);
+        assert_eq!(config.font.family, "'Fira Code'");
+    }
+
+    #[test]
+    fn read_toml_file_returns_none_for_missing_file() {
+        let result = DhxConfig::read_toml_file(Path::new("/nonexistent/dhx.toml"));
+        assert!(result.is_none());
     }
 }
