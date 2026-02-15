@@ -251,6 +251,8 @@ pub struct EditorSnapshot {
     pub cursor_col: usize,
     pub total_lines: usize,
     pub visible_start: usize,
+    /// Number of selections (cursors) in the current document.
+    pub selection_count: usize,
     pub lines: Vec<LineSnapshot>,
 
     // UI state
@@ -406,7 +408,10 @@ pub struct LineSnapshot {
     pub line_number: usize,
     pub content: String,
     pub is_cursor_line: bool,
-    pub cursor_col: Option<usize>,
+    /// All cursor column positions on this line (multiple cursors from multi-selection).
+    pub cursor_cols: Vec<usize>,
+    /// The primary cursor column on this line (used for `id="editor-cursor"` and scrollIntoView).
+    pub primary_cursor_col: Option<usize>,
     pub tokens: Vec<TokenSpan>,
     /// Selection ranges within this line (start_col, end_col) - for visual mode highlighting.
     /// Each range [start, end) should be highlighted as selected.

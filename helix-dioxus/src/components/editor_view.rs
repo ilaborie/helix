@@ -232,11 +232,13 @@ fn Line(
 
     let selection_ranges = &line.selection_ranges;
 
-    // Build sorted list of styling events (token starts/ends and cursor position)
-    let cursor_pos = if line.is_cursor_line {
-        line.cursor_col
-    } else {
-        None
+    let cursor_cols = &line.cursor_cols;
+    let primary_cursor_col = line.primary_cursor_col;
+
+    let secondary_cursor_class = match mode.as_str() {
+        "INSERT" => "cursor-secondary-insert",
+        "SELECT" => "cursor-secondary-select",
+        _ => "cursor-secondary-normal",
     };
 
     // Only show ErrorLens if this line has content (not empty/whitespace)
@@ -247,7 +249,7 @@ fn Line(
     rsx! {
         div {
             class: "{line_class}",
-            {render_styled_content(&chars, &line.tokens, cursor_pos, cursor_class, selection_ranges)}
+            {render_styled_content(&chars, &line.tokens, cursor_cols, primary_cursor_col, cursor_class, secondary_cursor_class, selection_ranges)}
             // Diagnostic underlines (wavy lines under errors/warnings)
             for (idx, diag) in diagnostics.iter().enumerate() {
                 DiagnosticUnderline {
@@ -284,12 +286,14 @@ fn Line(
     }
 }
 
-/// Render content with syntax highlighting tokens, cursor, and selection.
+/// Render content with syntax highlighting tokens, cursors, and selection.
 fn render_styled_content(
     chars: &[char],
     tokens: &[TokenSpan],
-    cursor_pos: Option<usize>,
-    cursor_class: &str,
+    cursor_cols: &[usize],
+    primary_cursor_col: Option<usize>,
+    primary_cursor_class: &str,
+    secondary_cursor_class: &str,
     selection_ranges: &[(usize, usize)],
 ) -> Element {
     // Build a list of spans to render
@@ -318,8 +322,8 @@ fn render_styled_content(
             }
         }
 
-        // Check for cursor position
-        if let Some(cursor) = cursor_pos {
+        // Check for cursor positions (all cursors create boundaries)
+        for &cursor in cursor_cols {
             if cursor > pos && cursor < next_pos {
                 next_pos = cursor;
             } else if cursor == pos {
@@ -347,8 +351,9 @@ fn render_styled_content(
         // Find active token at this position
         let active_token = sorted_tokens.iter().find(|t| t.start <= pos && pos < t.end);
 
-        // Determine if this is the cursor position
-        let is_cursor = cursor_pos == Some(pos);
+        // Determine if this is any cursor position
+        let is_cursor = cursor_cols.contains(&pos);
+        let is_primary = primary_cursor_col == Some(pos);
 
         // Determine if this position is within any selection range
         let is_selected = selection_ranges
@@ -381,9 +386,15 @@ fn render_styled_content(
 
         // Add the span (with id and class for cursor to enable scrollIntoView + CSS animation)
         if is_cursor {
-            spans.push(
-                rsx! { span { key: "{pos}", id: "editor-cursor", class: "{cursor_class}", style: "{style}", "{text}" } },
-            );
+            if is_primary {
+                spans.push(
+                    rsx! { span { key: "{pos}", id: "editor-cursor", class: "{primary_cursor_class}", style: "{style}", "{text}" } },
+                );
+            } else {
+                spans.push(
+                    rsx! { span { key: "{pos}", class: "{secondary_cursor_class}", style: "{style}", "{text}" } },
+                );
+            }
         } else if style.is_empty() {
             spans.push(rsx! { span { key: "{pos}", "{text}" } });
         } else {
@@ -398,13 +409,20 @@ fn render_styled_content(
         }
     }
 
-    // Handle cursor at end of line
-    if let Some(cursor) = cursor_pos {
+    // Handle cursors at end of line
+    for &cursor in cursor_cols {
         if cursor >= len {
-            let cursor_key = "cursor-end";
-            spans.push(
-                rsx! { span { key: "{cursor_key}", id: "editor-cursor", class: "{cursor_class}", " " } },
-            );
+            let is_primary = primary_cursor_col == Some(cursor);
+            let cursor_end_key = format!("cursor-end-{cursor}");
+            if is_primary {
+                spans.push(
+                    rsx! { span { key: "{cursor_end_key}", id: "editor-cursor", class: "{primary_cursor_class}", " " } },
+                );
+            } else {
+                spans.push(
+                    rsx! { span { key: "{cursor_end_key}", class: "{secondary_cursor_class}", " " } },
+                );
+            }
         }
     }
 

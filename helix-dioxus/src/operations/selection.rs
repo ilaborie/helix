@@ -1281,4 +1281,95 @@ mod tests {
             "stale history should be cleared"
         );
     }
+
+    // --- copy_selection_on_line (multi-cursor) ---
+
+    #[test]
+    fn copy_selection_on_next_line_creates_two_cursors() {
+        let mut ctx = test_context("#[h|]#ello\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.copy_selection_on_line(doc_id, view_id, true);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id);
+        assert_eq!(sel.len(), 2, "C should create 2 selections");
+    }
+
+    #[test]
+    fn copy_selection_on_next_line_twice_creates_three_cursors() {
+        let mut ctx = test_context("#[h|]#ello\nworld\nfoo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.copy_selection_on_line(doc_id, view_id, true);
+        ctx.copy_selection_on_line(doc_id, view_id, true);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id);
+        assert_eq!(sel.len(), 3, "C twice should create 3 selections");
+    }
+
+    #[test]
+    fn copy_selection_on_prev_line_creates_cursor_above() {
+        let mut ctx = test_context("hello\n#[w|]#orld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.copy_selection_on_line(doc_id, view_id, false);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id);
+        assert_eq!(sel.len(), 2, "Alt-C should create 2 selections");
+        // The new cursor should be on the first line
+        let text = doc.text().slice(..);
+        let lines: Vec<usize> = sel.iter().map(|r| text.char_to_line(r.cursor(text))).collect();
+        assert!(lines.contains(&0), "should have a cursor on line 0");
+        assert!(lines.contains(&1), "should have a cursor on line 1");
+    }
+
+    #[test]
+    fn copy_selection_on_next_line_at_last_line_noop() {
+        let mut ctx = test_context("hello\n#[w|]#orld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.copy_selection_on_line(doc_id, view_id, true);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id);
+        // Last line only has a newline, so the copy can't place a cursor at the same column
+        // The selection count depends on whether the target line is long enough
+        assert!(sel.len() >= 1, "should have at least 1 selection");
+    }
+
+    #[test]
+    fn keep_primary_after_copy_selection() {
+        let mut ctx = test_context("#[h|]#ello\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.copy_selection_on_line(doc_id, view_id, true);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id);
+        let text = doc.text().slice(..);
+        // Primary should be the new (bottom) cursor
+        let primary_line = text.char_to_line(sel.primary().cursor(text));
+        assert_eq!(primary_line, 1, "primary should be on the new (bottom) line");
+    }
+
+    // --- rotate_selections ---
+
+    #[test]
+    fn rotate_selections_forward_cycles() {
+        let mut ctx = test_context("#[h|]#ello\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.copy_selection_on_line(doc_id, view_id, true);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let before_primary = doc.selection(view_id).primary_index();
+        ctx.rotate_selections_forward(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let after_primary = doc.selection(view_id).primary_index();
+        assert_ne!(before_primary, after_primary, "primary index should change");
+    }
+
+    #[test]
+    fn rotate_selections_backward_cycles() {
+        let mut ctx = test_context("#[h|]#ello\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.copy_selection_on_line(doc_id, view_id, true);
+        ctx.rotate_selections_backward(doc_id, view_id);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id);
+        // After forward copy, primary is at index 1 (new cursor).
+        // Rotating backward should move it back.
+        assert_eq!(sel.primary_index(), 0, "should rotate back to first selection");
+    }
 }

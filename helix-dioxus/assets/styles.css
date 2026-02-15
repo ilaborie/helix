@@ -232,6 +232,33 @@ body {
     animation: none;
 }
 
+/* ───── Secondary Cursors (multi-cursor) ───── */
+.cursor-secondary-normal {
+    background-color: var(--cursor-normal);
+    color: var(--cursor-fg);
+    position: relative;
+    z-index: 1;
+    opacity: 0.7;
+    box-shadow: 0 0 0 1px var(--cursor-normal);
+}
+.cursor-secondary-select {
+    background-color: var(--cursor-select);
+    color: var(--cursor-fg);
+    position: relative;
+    z-index: 1;
+    opacity: 0.7;
+    box-shadow: 0 0 0 1px var(--cursor-select);
+}
+.cursor-secondary-insert {
+    box-shadow: -3px 0 0 0 var(--cursor-normal);
+    opacity: 0.7;
+}
+.line-selected .cursor-secondary-normal {
+    background-color: var(--cursor-in-selection);
+    color: var(--cursor-fg);
+    box-shadow: 0 0 0 1px var(--cursor-in-selection);
+}
+
 /* ───── Buffer bar ───── */
 .buffer-bar {
     display: flex;

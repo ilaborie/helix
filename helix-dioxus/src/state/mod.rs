@@ -1973,11 +1973,12 @@ impl EditorContext {
 
         let text = doc.text();
         let selection = doc.selection(view_id);
-        let cursor = selection.primary().cursor(text.slice(..));
+        let selection_count = selection.len();
+        let primary_cursor = selection.primary().cursor(text.slice(..));
 
-        let cursor_line = text.char_to_line(cursor);
+        let cursor_line = text.char_to_line(primary_cursor);
         let line_start = text.line_to_char(cursor_line);
-        let cursor_col = cursor - line_start;
+        let cursor_col = primary_cursor - line_start;
 
         let total_lines = text.len_lines();
 
@@ -1988,11 +1989,27 @@ impl EditorContext {
 
         log::trace!(
             "snapshot: cursor={}, cursor_line={}, view_offset.anchor={}, visible_start={}, visible_end={}",
-            cursor, cursor_line, view_offset.anchor, visible_start, visible_end
+            primary_cursor, cursor_line, view_offset.anchor, visible_start, visible_end
         );
 
         // Compute syntax highlighting tokens for visible lines
         let line_tokens = self.compute_syntax_tokens(doc, visible_start, visible_end);
+
+        // Collect ALL cursor positions (for multi-cursor display).
+        // Build a map of line_idx → Vec<col> for all cursors on visible lines.
+        let mut cursor_positions_by_line: std::collections::HashMap<usize, Vec<usize>> =
+            std::collections::HashMap::new();
+        for range in selection.iter() {
+            let cursor_char = range.cursor(text.slice(..));
+            let line_idx = text.char_to_line(cursor_char);
+            if line_idx >= visible_start && line_idx < visible_end {
+                let col = cursor_char - text.line_to_char(line_idx);
+                cursor_positions_by_line
+                    .entry(line_idx)
+                    .or_default()
+                    .push(col);
+            }
+        }
 
         // Collect all multi-char selection ranges for highlighting.
         // In Normal mode, Helix always has a 1-char selection internally,
@@ -2011,8 +2028,12 @@ impl EditorContext {
             .enumerate()
             .map(|(idx, line_idx)| {
                 let line_content = text.line(line_idx).to_string();
-                let is_cursor_line = line_idx == cursor_line;
-                let cursor_col_opt = if is_cursor_line {
+                let cursor_cols = cursor_positions_by_line
+                    .get(&line_idx)
+                    .cloned()
+                    .unwrap_or_default();
+                let is_cursor_line = !cursor_cols.is_empty();
+                let primary_cursor_col = if line_idx == cursor_line {
                     Some(cursor_col)
                 } else {
                     None
@@ -2043,7 +2064,8 @@ impl EditorContext {
                     line_number: line_idx + 1,
                     content: line_content,
                     is_cursor_line,
-                    cursor_col: cursor_col_opt,
+                    cursor_cols,
+                    primary_cursor_col,
                     tokens: line_tokens.get(idx).cloned().unwrap_or_default(),
                     selection_ranges,
                 }
@@ -2136,6 +2158,7 @@ impl EditorContext {
             cursor_col: cursor_col + 1,
             total_lines,
             visible_start,
+            selection_count,
             lines,
             command_mode: self.command_mode,
             command_input: self.command_input.clone(),

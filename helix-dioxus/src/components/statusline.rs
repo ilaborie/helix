@@ -98,6 +98,7 @@ pub fn StatusLine(version: ReadSignal<usize>, on_change: EventHandler<()>) -> El
     let error_count = snapshot.error_count;
     let warning_count = snapshot.warning_count;
     let lsp_servers = snapshot.lsp_servers.clone();
+    let selection_count = snapshot.selection_count;
     let selected_register = snapshot.selected_register;
     let macro_recording = snapshot.macro_recording;
 
@@ -196,6 +197,15 @@ pub fn StatusLine(version: ReadSignal<usize>, on_change: EventHandler<()>) -> El
                     class: "statusline-register",
                     style: "color: var(--orange); padding: 0 6px;",
                     "reg={reg}"
+                }
+            }
+
+            // Selection count (multi-cursor indicator)
+            if selection_count > 1 {
+                div {
+                    class: "statusline-position",
+                    style: "color: var(--accent);",
+                    "{selection_count} sel"
                 }
             }
 
