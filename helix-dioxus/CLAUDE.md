@@ -26,6 +26,8 @@ helix-dioxus/src/
 ├── app.rs                      # Root App component
 ├── events.rs                   # Event registration for helix_event (MUST run before hooks)
 ├── hooks.rs                    # Custom Dioxus hooks (use_editor_snapshot)
+├── test_helpers.rs             # Test utilities (init(), test setup)
+├── integration_tests.rs        # Integration tests (dot-repeat, etc.)
 │
 ├── bin/dhx/                    # Binary entry point
 │   ├── main.rs                 # CLI: loads config, inits tracing/loader, launches app
@@ -57,7 +59,8 @@ helix-dioxus/src/
 │   │   ├── completion.rs       # Completion popup (uses InlineListDialog)
 │   │   ├── hover.rs            # Hover popup (uses InlineDialogContainer)
 │   │   ├── signature_help.rs   # Signature help (uses InlineDialogContainer)
-│   │   └── location_picker.rs  # Location picker for LSP references/definitions
+│   │   ├── location_picker.rs  # Location picker for LSP references/definitions
+│   │   └── markdown.rs         # Markdown parsing and rendering for LSP popups
 │   ├── dialog/                 # Dialogs and prompts
 │   │   ├── mod.rs              # Re-exports
 │   │   ├── command_completion.rs # Command completion popup (fuzzy-filtered above : prompt)
@@ -96,6 +99,9 @@ helix-dioxus/src/
 │   ├── shell.rs                # ShellOps: execute_shell_command (pipe selections)
 │   ├── text_manipulation.rs    # TextManipulationOps: sort_selections, reflow_selections
 │   ├── theme.rs                # ThemeOps: list_themes, apply_theme, theme_to_css_vars
+│   ├── jump.rs                 # JumpOps: jump list navigation (Ctrl-o/i/s)
+│   ├── vcs.rs                  # VcsOps: git diff hunks, gutter markers, change navigation
+│   ├── lsp.rs                  # LspOps: diagnostic navigation, LSP lifecycle
 │   └── word_jump.rs            # WordJumpOps: compute labels, filter, jump
 │
 └── keybindings/                # Key Handling
@@ -181,19 +187,31 @@ Functions defined in `script.js`:
 
 **CSS Classes** (defined in `styles.css`):
 - `.app-container`, `.editor-view`, `.gutter`, `.content`
-- `.buffer-bar`, `.buffer-tab`, `.statusline`
-- `.picker-*` (overlay, container, header, list, item)
+- `.gutter-line`, `.gutter-line-active` (line number row styles)
+- `.buffer-bar`, `.buffer-tab`, `.buffer-tabs`, `.buffer-tab-name`, `.scroll-button` (tab bar)
+- `.statusline`, `.statusline-lsp`, `.statusline-recording` (status bar)
+- `.picker-*` (overlay, container, header, list, item, body, left, preview)
 - `.prompt`, `.prompt-cursor`
 - `.completion-*`, `.hover-*`, `.code-action-*` (LSP popups)
 - `.inline-dialog`, `.inline-dialog-list`, `.inline-dialog-item` (cursor-positioned popups)
 - `.notification-*` (toast notifications)
 - `.confirmation-*` (modal confirmation dialogs)
 - `.command-completion-*` (command mode autocompletion popup)
+- `.input-dialog`, `.input-dialog-*` (rename symbol, etc.)
 - `.editor-scrollbar`, `.scrollbar-*` (custom scrollbar with markers)
 - `.code-actions-layout`, `.code-actions-list-column`, `.code-actions-preview-column` (two-column preview)
 - `.code-action-preview`, `.code-action-diff-*` (diff preview panel)
 - `.kbd-key-compact` (compact kbd variant for 20px help bar)
 - `.file-type-icon` (Material Icon Theme SVG icons for files/folders)
+- `.cursor-secondary-normal`, `.cursor-secondary-select`, `.cursor-secondary-insert` (multi-cursor)
+- `.indicator-gutter`, `.indicator-diagnostic`, `.indicator-jumplist` (gutter indicators)
+- `.gutter-diff-bar`, `.gutter-diff-deleted` (VCS diff markers)
+- `.error-lens` (inline diagnostic messages)
+- `.inlay-hint`, `.inlay-hint-type`, `.inlay-hint-param` (LSP inlay hints)
+- `.lsp-icon-blinking`, `.lsp-icon-spinning` (LSP status animations)
+- `.lsp-dialog-*`, `.lsp-server-*`, `.lsp-restart-btn` (LSP status dialog)
+- `.keybinding-help-registers`, `.register-dialog-*` (register viewer)
+- `.location-picker-*` (location picker)
 
 **Dynamic Styles**: Styles requiring Rust variables remain inline:
 - Mode colors: `style: "background-color: {mode_bg};"`

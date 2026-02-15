@@ -1374,6 +1374,73 @@ This is the first 3-key sequence (`mr<old><new>`) in the codebase.
 
 ---
 
+## 2026-02-07 → 2026-02-14: Feature Parity Sprint
+
+### Overview
+Massive sprint bringing helix-dioxus to 100% keybinding coverage and full LSP integration. Tests grew from 29 to 319. Changes are grouped thematically below.
+
+### Multi-Selection, Regex, and Tree-Sitter Selection
+- Multi-selection rendering with regex select/split modes
+- Tree-sitter expand/shrink selection (`Alt-o`/`Alt-i`)
+- Select-mode g-prefix and 10 additional keybindings
+- Test coverage doubled from 87 to 175 tests
+
+### Jump List, Alt-Key Fix, and LSP Animations
+- Jump list with gutter markers, picker (`Space j`), and `C-o`/`C-i`/`C-s` navigation
+- Fixed Alt+key bindings on macOS (Option key composing special characters)
+- LSP icon animations for transitioning states (blinking/spinning)
+
+### Picker Preview and Shell Integration
+- Picker file preview panel with syntax highlighting
+- Shell integration (pipe selections to shell commands)
+- Word jump (`gw`) with two-char EasyMotion-style labels
+- Insert mode keybindings: `C-r`, `C-s`, `S-Tab`
+
+### Theme System and Cursor Visibility
+- Live theme preview in picker with dynamic CSS variable system
+- Cursor glow pulse and improved selection opacity
+- Macro recording/replay (`Q`/`q`)
+
+### CLI Commands and Configuration
+- 7 missing CLI commands (`:sort`, `:reflow`, `:config-open`, `:encoding`, etc.)
+- 7 planned enhancements batch (various improvements)
+- File explorer picker (`Space e` / `Space E`)
+- VCS integration (`]g`/`[g` navigation, `Space g` changed files, gutter diff markers)
+- `:config-reload`, `:set`, `:toggle` commands for runtime configuration
+- `:format` and `:lsp-restart` wired as `:` commands
+
+### UI Components
+- Command mode autocompletion popup with fuzzy filtering
+- Code action preview panel with two-column diff display
+- Reusable KbdKey component for consistent keyboard key styling
+- Word/paragraph textobjects support in `mi`/`ma` selections
+- Component reorganization into `lsp/` and `dialog/` subfolders
+
+### Files Changed
+- 50+ files modified across components, operations, keybindings, and state
+- Tests: 29 → 319 passing
+
+---
+
+## 2026-02-15: Multi-Cursor Display
+
+### Progress
+- Display all cursors for multi-selection operations (`C`/`Alt-C`)
+- Secondary cursors rendered with mode-specific CSS classes (`.cursor-secondary-normal`, `.cursor-secondary-select`, `.cursor-secondary-insert`)
+- All selections now visible simultaneously in the editor view
+
+---
+
+## 2026-02-15: Markdown Rendering in LSP Popups
+
+### Progress
+- Created `src/components/lsp/markdown.rs` module for parsing and rendering markdown
+- Hover and signature help popups now render markdown content with proper formatting
+- Added syntax highlighting for fenced code blocks in hover popups
+- Popups auto-dismiss on keypress for smoother editing flow
+
+---
+
 ## Planned Enhancements
 
 ### Helix Commands & Modes
@@ -1383,84 +1450,86 @@ This is the first 3-key sequence (`mr<old><new>`) in the codebase.
 - [x] Match mode (`m` prefix - matching brackets, surround)
 - [x] Core motions (`e`, `W`/`E`/`B`, `I`, `c`, `r`, `R`, `J`, case ops)
 - [x] Selection operations (`;` collapse, `,` keep primary, `mi`/`ma`)
-- [ ] Support remaining helix commands (comprehensive coverage)
-- [ ] Right/Left bracket modes (`]`/`[` prefix - next/prev item navigation)
+- [x] Keybinding coverage (100% — all standard Helix bindings implemented)
+- [x] Right/Left bracket modes (`]`/`[` prefix - next/prev item navigation)
+- [x] Macro recording/replay (`Q`/`q`)
+- [x] Shell integration (pipe selections to shell)
+- [x] Word jump (`gw` — EasyMotion-style two-char labels)
+- [x] Dot-repeat (`.` — replay last insert session)
 
 ### Configuration
-- [ ] Use helix configuration (`~/.config/helix/config.toml`)
-- [ ] Use language configuration (`languages.toml`)
-- [ ] User preferences support
+- [x] Use helix configuration (`~/.config/helix/config.toml`)
+- [x] Use language configuration (`languages.toml`)
+- [x] User preferences (`:set`, `:toggle`, `:config-reload`)
 
 ### Standard UI Components
 - [x] Toast notifications
 - [x] Confirm dialogs
 - [x] Rename prompt (for LSP rename)
-- [x] Documentation popup (hover info)
-- [ ] Help panel
-- [ ] Autocomplete lite picker
+- [x] Documentation popup (hover info with markdown rendering)
+- [x] Keybinding help bar (context-aware hints)
+- [x] Completion popup (LSP autocompletion)
+- [x] Command mode autocompletion popup
+- [x] KbdKey reusable component (physical key styling)
 - [x] Error lens (inline diagnostics)
+- [x] Emoji picker (`Ctrl+Cmd+Space`)
 
 ### LSP Integration
 - [x] LSP snapshot types (thread-safe for UI rendering)
+- [x] LSP client integration (actual server communication)
 - [x] Diagnostics display with Error Lens
 - [x] Completion popup component
-- [x] Hover popup component
+- [x] Hover popup with markdown rendering and syntax-highlighted code blocks
 - [x] Signature help popup component
-- [x] Code actions menu component
+- [x] Code actions menu with two-column preview and diff display
 - [x] Location picker component
 - [x] Inlay hints utilities
 - [x] Diagnostic navigation (`]d`, `[d`)
 - [x] LSP keybindings (K, gd, gr, gy, gi, Space+a/f/i)
-- [ ] LSP client integration (actual server communication)
+- [x] LSP icon animations (blinking/spinning for transitioning states)
+- [x] `:format` and `:lsp-restart` commands
 
 ### Gutter Improvements
-- [ ] Git diff indicators (added/modified/removed lines)
+- [x] Git diff indicators (added/modified/removed lines)
 - [x] Diagnostic indicators (error/warning icons)
+- [x] Jumplist markers
 
-### Application Icon (macOS)
-- [ ] Fix macOS dock icon not displaying
-  - Investigate `dx bundle` for creating proper `.app` bundle
-  - Alternative: Create `.app` bundle structure manually
-  - May need to convert PNG to ICNS format for macOS
-
-### Command Panel
-- [ ] Rework command panel to be a picker-style UI
-  - Fuzzy search through available commands
-  - Show command descriptions and keybindings
-  - Similar to VSCode's command palette or helix's `:` menu
-
-### Buffer Bar
-- [x] File-type specific icons (use lucide icons based on extension)
-- [ ] Option to hide buffer bar (add setting)
-- [ ] Context menu on right-click (close, close others, close all)
-
-### Scrollbar Interactions (Blocked)
-- [ ] Fix track click to scroll to position
-- [ ] Fix thumb drag to scroll document
-- **Blocker**: Cannot get scrollbar element height at runtime
-  - `onmounted` returns height=0 (element not laid out yet)
-  - `document::eval` with `getBoundingClientRect()` also returns 0
-  - Need to investigate Dioxus desktop element sizing or use different approach
-  - Possible solutions: delay height capture, use ResizeObserver, calculate from viewport
+### Multi-Cursor / Multi-Selection
+- [x] Multi-selection rendering (all cursors visible for C/Alt-C)
+- [x] Regex select/split
+- [x] Tree-sitter expand/shrink selection (Alt-o/Alt-i)
 
 ### Picker Infrastructure
-- [ ] Scrollbar for long lists
-- [ ] Preview pane (file content preview)
-
-### Additional Pickers
+- [x] Preview pane (syntax-highlighted file content preview)
 - [x] Symbol picker (document symbols via LSP)
 - [x] Workspace symbol picker (project-wide symbols)
 - [x] Global search picker (grep-based, `Space+/`)
 - [x] Diagnostics picker (jump to errors/warnings)
 - [x] References picker (LSP references, `gr`)
 - [x] Definitions picker (LSP definitions, `gd`)
-- [ ] Command picker (all available commands)
-- [ ] Theme picker (preview and switch themes)
-- [ ] Jumplist picker (navigation history)
-- [ ] Changed files picker (modified buffers)
+- [x] Command picker (all available commands)
+- [x] Theme picker (with live preview via CSS variables)
+- [x] Jumplist picker (navigation history)
+- [x] Changed files picker (modified buffers)
+- [x] File explorer picker (`Space e` / `Space E`)
+- [x] Emoji picker (`Ctrl+Cmd+Space` / `:emoji`)
+- [ ] Scrollbar for long lists
+
+### Theming
+- [x] Dynamic CSS variable system
+- [x] Live theme preview in picker
+- [x] Material Icon Theme file icons (~40 file types)
+- [x] Cursor glow pulse and selection opacity
+
+### Remaining TODOs
+- [ ] Scrollbar interactions (track click, thumb drag) — **BLOCKED** by Dioxus element height issue
+- [ ] Signature help parameter position highlighting
+- [ ] Buffer bar: hide option, right-click context menu
+- [ ] macOS dock icon (needs .app bundle)
 
 ### Architecture Note
 Split views are **not planned** for helix-dioxus. For multiple views, users should launch multiple editor instances. This keeps the architecture simpler and aligns with a single-document-focus paradigm.
+DAP/Debug is **not supported** — `Space G` sub-menu will not be implemented.
 
 ---
 
