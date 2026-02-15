@@ -277,9 +277,15 @@ pub fn App() -> Element {
         .saturating_sub(snapshot.visible_start);
     let viewport_cursor_col = snapshot.cursor_col;
 
+    // Font CSS must be injected AFTER the stylesheet so custom properties override defaults
+    let font_css = &app_state.font_css;
+
     rsx! {
         // Load external stylesheet
         document::Stylesheet { href: asset!("/assets/styles.css") }
+
+        // Font config overrides (must come after stylesheet to win in cascade)
+        document::Style { {font_css.clone()} }
 
         // Dynamic window title based on current buffer
         document::Title { "helix-dioxus - {snapshot.file_name}" }

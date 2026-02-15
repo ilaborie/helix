@@ -54,7 +54,11 @@ pub struct WindowConfig {
 pub struct FontConfig {
     pub family: String,
     pub size: f64,
+    pub weight: Option<u16>,
     pub ligatures: bool,
+    /// OpenType feature tags (e.g. `["calt", "liga", "ss01"]`).
+    /// When non-empty, overrides the `ligatures` boolean for `font-feature-settings`.
+    pub features: Vec<String>,
 }
 
 /// Logging configuration.
@@ -82,7 +86,9 @@ impl Default for FontConfig {
             family: "'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, Monaco, monospace"
                 .to_string(),
             size: 14.0,
+            weight: None,
             ligatures: true,
+            features: Vec::new(),
         }
     }
 }
@@ -202,17 +208,30 @@ impl DhxConfig {
 
     /// Generate CSS custom properties for font configuration.
     ///
-    /// Returns a `<style>` block that overrides the CSS `:root` defaults.
+    /// Returns a raw CSS `:root` block (no `<style>` wrapper) that overrides defaults.
     #[must_use]
     pub fn font_css(&self) -> String {
-        let ligatures = if self.font.ligatures {
-            "normal"
+        let features = if self.font.features.is_empty() {
+            if self.font.ligatures {
+                "normal".to_string()
+            } else {
+                "none".to_string()
+            }
         } else {
-            "none"
+            self.font
+                .features
+                .iter()
+                .map(|f| format!("\"{f}\" 1"))
+                .collect::<Vec<_>>()
+                .join(", ")
         };
+        let weight = self
+            .font
+            .weight
+            .map_or(String::new(), |w| format!(" --font-weight: {w};"));
         format!(
-            "<style>:root {{ --font-mono: {}; --font-size: {}px; --font-ligatures: {}; }}</style>",
-            self.font.family, self.font.size, ligatures
+            ":root {{ --font-mono: {}; --font-size: {}px; --font-ligatures: {};{} }}",
+            self.font.family, self.font.size, features, weight
         )
     }
 }
@@ -255,7 +274,7 @@ mod tests {
     fn font_css_generates_valid_style() {
         let config = DhxConfig::default();
         let css = config.font_css();
-        assert!(css.contains("<style>"));
+        assert!(css.starts_with(":root {"));
         assert!(css.contains("--font-mono:"));
         assert!(css.contains("--font-size: 14px"));
         assert!(css.contains("--font-ligatures: normal"));
@@ -446,5 +465,44 @@ level = "debug"
     fn read_toml_file_returns_none_for_missing_file() {
         let result = DhxConfig::read_toml_file(Path::new("/nonexistent/dhx.toml"));
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn font_css_with_features_overrides_ligatures() {
+        let mut config = DhxConfig::default();
+        config.font.features = vec!["calt".into(), "liga".into(), "ss01".into()];
+        let css = config.font_css();
+        assert!(css.contains(r#""calt" 1, "liga" 1, "ss01" 1"#));
+        assert!(!css.contains("normal"));
+    }
+
+    #[test]
+    fn font_css_with_weight() {
+        let mut config = DhxConfig::default();
+        config.font.weight = Some(400);
+        let css = config.font_css();
+        assert!(css.contains("--font-weight: 400;"));
+    }
+
+    #[test]
+    fn font_css_without_weight_omits_var() {
+        let config = DhxConfig::default();
+        let css = config.font_css();
+        assert!(!css.contains("--font-weight"));
+    }
+
+    #[test]
+    fn deserialize_font_features_and_weight() {
+        let toml_str = r#"
+[font]
+family = "'MonaspiceNe Nerd Font', monospace"
+size = 18.0
+weight = 400
+features = ["calt", "liga", "dlig", "ss01", "ss02"]
+"#;
+        let config = toml::from_str::<DhxConfig>(toml_str).expect("should deserialize");
+        assert_eq!(config.font.weight, Some(400));
+        assert_eq!(config.font.features.len(), 5);
+        assert_eq!(config.font.features[0], "calt");
     }
 }

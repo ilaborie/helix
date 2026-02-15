@@ -23,6 +23,7 @@
     /* Font (overridden by DhxConfig font_css injection) */
     --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, Monaco, monospace;
     --font-size: 14px;
+    --font-weight: 400;
     --font-ligatures: normal;
 
     /* Cursor */
@@ -72,6 +73,7 @@ body {
     padding: 0;
     overflow: hidden;
     font-family: var(--font-mono);
+    font-weight: var(--font-weight);
     background-color: var(--bg-primary);
     color: var(--text);
     user-select: none;

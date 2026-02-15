@@ -139,17 +139,19 @@ pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
     });
 
     // Create app state that can be shared with Dioxus
+    let font_css = config.font_css();
     let app_state = AppState {
         command_tx,
         snapshot: std::sync::Arc::new(parking_lot::Mutex::new(initial_snapshot)),
+        font_css,
     };
 
     // Clone for the closure
     let editor_ctx_clone = editor_ctx.clone();
     let snapshot_ref = app_state.snapshot.clone();
 
-    // Build custom head with font CSS injection and JavaScript
-    let custom_head = format!("{}\n<script>{CUSTOM_SCRIPT}</script>", config.font_css());
+    // Build custom head with JavaScript only (font CSS is injected via document::Style in App)
+    let custom_head = format!("<script>{CUSTOM_SCRIPT}</script>");
 
     // Launch Dioxus desktop app
     dioxus::LaunchBuilder::desktop()
@@ -192,6 +194,8 @@ pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
 pub struct AppState {
     pub command_tx: mpsc::Sender<EditorCommand>,
     pub snapshot: std::sync::Arc<parking_lot::Mutex<EditorSnapshot>>,
+    /// CSS custom properties for font configuration (injected after stylesheet).
+    pub font_css: String,
 }
 
 impl AppState {
