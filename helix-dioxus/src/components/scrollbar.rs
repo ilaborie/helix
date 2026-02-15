@@ -47,6 +47,9 @@ pub fn Scrollbar(
 ) -> Element {
     let app_state = use_context::<AppState>();
 
+    // Store scrollbar height for click calculations
+    let mut scrollbar_height = use_signal(|| 0.0_f64);
+
     // Track hovered marker for tooltip
     let mut hovered_marker = use_signal(|| None::<MarkerTooltip>);
 
@@ -76,26 +79,39 @@ pub fn Scrollbar(
 
     // Handle mousedown on track to scroll to that position
     let track_app_state = app_state.clone();
-    let handle_track_mousedown = move |evt: MouseEvent| {
-        // click_y is relative to .scrollbar-track (the element with the handler)
+    let handle_mousedown = move |evt: MouseEvent| {
+        // Get click position relative to the scrollbar element
         let click_y = evt.element_coordinates().y;
-        let height = document::eval("return getScrollbarTrackHeight()");
+
+        // Use JavaScript to get editor-view height (parent container)
+        let height = document::eval(
+            r#"document.querySelector('.editor-view')?.getBoundingClientRect().height || 0"#,
+        );
+
+        // Clone for the async block
         let app_state_clone = track_app_state.clone();
 
+        // TODO: This doesn't work - getBoundingClientRect returns 0 for scrollbar height
+        // Need to investigate Dioxus desktop element sizing
         spawn(async move {
             if let Ok(val) = height.await {
-                let track_height: f64 = val.as_f64().unwrap_or(0.0);
-                if track_height > 0.0 {
-                    let ratio = (click_y / track_height).clamp(0.0, 1.0);
+                let scrollbar_h: f64 = val.as_f64().unwrap_or(0.0);
+
+                if scrollbar_h > 16.0 {
+                    // The track has 8px padding top and bottom
+                    let track_top = 8.0;
+                    let track_height = scrollbar_h - 16.0;
+
+                    let relative_y = click_y - track_top;
+                    let ratio = (relative_y / track_height).clamp(0.0, 1.0);
                     #[allow(
                         clippy::cast_precision_loss,
                         clippy::cast_possible_truncation,
                         clippy::cast_sign_loss
                     )]
-                    let target_line =
-                        (ratio * total_lines.saturating_sub(viewport_lines) as f64) as usize;
+                    let target_line = (ratio * total_lines as f64) as usize;
 
-                    app_state_clone.send_command(EditorCommand::ScrollToLine(target_line));
+                    app_state_clone.send_command(EditorCommand::GoToLine(target_line));
                     app_state_clone.process_commands_sync();
                 }
             }
@@ -103,6 +119,7 @@ pub fn Scrollbar(
     };
 
     // Handle mousedown on thumb to start dragging
+    // TODO: Drag doesn't work - element height returns 0, see track mousedown TODO
     let handle_thumb_mousedown = move |evt: MouseEvent| {
         evt.prevent_default(); // Prevent text selection during drag
         evt.stop_propagation(); // Prevent track click
@@ -123,14 +140,22 @@ pub fn Scrollbar(
     let handle_mousemove = move |evt: MouseEvent| {
         let current_y = evt.page_coordinates().y;
         let delta_y = current_y - drag_start_y();
-        let height = document::eval("return getScrollbarTrackHeight()");
+
+        // Use JavaScript to get editor-view height (parent container)
+        let height = document::eval(
+            r#"document.querySelector('.editor-view')?.getBoundingClientRect().height || 0"#,
+        );
+
         let app_state_clone = mousemove_app_state.clone();
         let start_ratio = drag_start_scroll_ratio();
 
         spawn(async move {
             if let Ok(val) = height.await {
-                let track_height: f64 = val.as_f64().unwrap_or(0.0);
+                let scrollbar_h: f64 = val.as_f64().unwrap_or(0.0);
+                let track_height = scrollbar_h - 16.0;
+
                 if track_height > 0.0 {
+                    // Convert pixel delta to ratio delta
                     let ratio_delta = delta_y / track_height;
                     let new_ratio = (start_ratio + ratio_delta).clamp(0.0, 1.0);
 
@@ -152,6 +177,14 @@ pub fn Scrollbar(
     // Handle mouseup to end dragging
     let handle_mouseup = move |_evt: MouseEvent| {
         is_dragging.set(false);
+    };
+
+    // Use onmounted to capture the actual height of the scrollbar element
+    // Note: This currently returns 0 - element not laid out yet at mount time
+    let onmounted = move |evt: MountedEvent| async move {
+        if let Ok(rect) = evt.get_client_rect().await {
+            scrollbar_height.set(rect.height());
+        }
     };
 
     // Sort diagnostics by severity (ascending) so errors render last (on top)
@@ -180,10 +213,11 @@ pub fn Scrollbar(
 
         div {
             class: "editor-scrollbar",
+            onmousedown: handle_mousedown,
+            onmounted: onmounted,
 
             div {
                 class: "scrollbar-track",
-                onmousedown: handle_track_mousedown,
 
                 // Search markers first (so diagnostics render on top)
                 for (idx, &line) in search_match_lines.iter().enumerate() {
