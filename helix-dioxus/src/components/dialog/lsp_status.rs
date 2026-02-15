@@ -6,6 +6,7 @@
 use dioxus::prelude::*;
 use lucide_dioxus::{Circle, CircleCheck, CircleX, LoaderCircle, RefreshCw};
 
+use crate::components::KbdKey;
 use crate::lsp::{LspServerSnapshot, LspServerStatus};
 use crate::state::EditorCommand;
 use crate::AppState;
@@ -78,16 +79,16 @@ pub fn LspStatusDialog(
                 div {
                     class: "lsp-dialog-help",
                     span {
-                        kbd { "j" }
-                        kbd { "k" }
+                        KbdKey { label: "j" }
+                        KbdKey { label: "k" }
                         " navigate"
                     }
                     span {
-                        kbd { "r" }
+                        KbdKey { label: "r" }
                         " restart"
                     }
                     span {
-                        kbd { "Esc" }
+                        KbdKey { label: "Esc" }
                         " close"
                     }
                 }

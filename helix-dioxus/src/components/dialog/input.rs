@@ -4,6 +4,7 @@
 
 use dioxus::prelude::*;
 
+use crate::components::KbdKey;
 use crate::state::InputDialogSnapshot;
 
 use crate::components::inline_dialog::{DialogConstraints, DialogPosition, InlineDialogContainer};
@@ -64,12 +65,12 @@ pub fn InputDialog(dialog: InputDialogSnapshot, cursor_line: usize, cursor_col: 
                 class: "input-dialog-help",
 
                 span {
-                    kbd { "Enter" }
+                    KbdKey { label: "Enter" }
                     " Confirm"
                 }
 
                 span {
-                    kbd { "Esc" }
+                    KbdKey { label: "Esc" }
                     " Cancel"
                 }
             }

@@ -4,6 +4,7 @@
 
 use dioxus::prelude::*;
 
+use crate::components::KbdKey;
 use crate::state::{ConfirmationDialogSnapshot, EditorCommand};
 use crate::AppState;
 
@@ -82,8 +83,8 @@ pub fn ConfirmationDialog(
                                 cancel(evt);
                             }
                         },
+                        KbdKey { label: "Esc" }
                         "{dialog.cancel_label}"
-                        kbd { "Esc" }
                     }
 
                     // Deny button (optional - only shown if deny_label is set)
@@ -97,8 +98,8 @@ pub fn ConfirmationDialog(
                                     deny(evt);
                                 }
                             },
+                            KbdKey { label: "n" }
                             "{deny_label}"
-                            kbd { "n" }
                         }
                     }
 
@@ -112,8 +113,8 @@ pub fn ConfirmationDialog(
                                 confirm(evt);
                             }
                         },
+                        KbdKey { label: "y" }
                         "{dialog.confirm_label}"
-                        kbd { "y" }
                     }
                 }
             }
