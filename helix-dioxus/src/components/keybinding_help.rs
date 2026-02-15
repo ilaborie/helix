@@ -86,6 +86,9 @@ fn hints_for_context(mode: &str, pending: PendingKeySequence) -> Vec<(&'static s
         ],
         PendingKeySequence::MatchInside | PendingKeySequence::MatchAround => {
             vec![
+                ("w", "word"),
+                ("W", "WORD"),
+                ("p", "para"),
                 ("(", "parens"),
                 ("[", "brackets"),
                 ("{", "braces"),

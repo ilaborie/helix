@@ -263,34 +263,92 @@ impl SelectionOps for EditorContext {
         );
     }
 
-    /// Select inside a bracket/quote pair (`mi` in Helix).
+    /// Select inside a textobject (`mi` in Helix).
+    ///
+    /// Handles word (`w`/`W`), paragraph (`p`), and pair surround characters.
     fn select_inside_pair(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char) {
         let doc = self.editor.document_mut(doc_id).expect("doc exists");
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
-        let primary = selection.primary();
 
-        if let Ok((open, close)) = helix_core::surround::find_nth_pairs_pos(text, ch, primary, 1) {
-            // Inside: exclude the delimiters
-            let new_anchor = open + 1;
-            let new_head = close;
-            if new_anchor < new_head {
-                doc.set_selection(view_id, helix_core::Selection::single(new_anchor, new_head));
+        let new_selection = selection.transform(|range| match ch {
+            'w' => helix_core::textobject::textobject_word(
+                text,
+                range,
+                helix_core::textobject::TextObject::Inside,
+                1,
+                false,
+            ),
+            'W' => helix_core::textobject::textobject_word(
+                text,
+                range,
+                helix_core::textobject::TextObject::Inside,
+                1,
+                true,
+            ),
+            'p' => helix_core::textobject::textobject_paragraph(
+                text,
+                range,
+                helix_core::textobject::TextObject::Inside,
+                1,
+            ),
+            ch if !ch.is_ascii_alphanumeric() => {
+                if let Ok((open, close)) =
+                    helix_core::surround::find_nth_pairs_pos(text, ch, range, 1)
+                {
+                    let new_anchor = open + 1;
+                    let new_head = close;
+                    if new_anchor < new_head {
+                        return helix_core::Range::new(new_anchor, new_head);
+                    }
+                }
+                range
             }
-        }
+            _ => range,
+        });
+        doc.set_selection(view_id, new_selection);
     }
 
-    /// Select around a bracket/quote pair (`ma` in Helix).
+    /// Select around a textobject (`ma` in Helix).
+    ///
+    /// Handles word (`w`/`W`), paragraph (`p`), and pair surround characters.
     fn select_around_pair(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char) {
         let doc = self.editor.document_mut(doc_id).expect("doc exists");
         let text = doc.text().slice(..);
         let selection = doc.selection(view_id).clone();
-        let primary = selection.primary();
 
-        if let Ok((open, close)) = helix_core::surround::find_nth_pairs_pos(text, ch, primary, 1) {
-            // Around: include the delimiters
-            doc.set_selection(view_id, helix_core::Selection::single(open, close + 1));
-        }
+        let new_selection = selection.transform(|range| match ch {
+            'w' => helix_core::textobject::textobject_word(
+                text,
+                range,
+                helix_core::textobject::TextObject::Around,
+                1,
+                false,
+            ),
+            'W' => helix_core::textobject::textobject_word(
+                text,
+                range,
+                helix_core::textobject::TextObject::Around,
+                1,
+                true,
+            ),
+            'p' => helix_core::textobject::textobject_paragraph(
+                text,
+                range,
+                helix_core::textobject::TextObject::Around,
+                1,
+            ),
+            ch if !ch.is_ascii_alphanumeric() => {
+                if let Ok((open, close)) =
+                    helix_core::surround::find_nth_pairs_pos(text, ch, range, 1)
+                {
+                    return helix_core::Range::new(open, close + 1);
+                }
+                range
+            }
+            _ => range,
+        });
+        doc.set_selection(view_id, new_selection);
     }
 
     /// Select entire buffer (`%` in Helix).
@@ -810,6 +868,56 @@ mod tests {
         let sel = doc.selection(view_id).primary();
         assert_eq!(sel.from(), 0, "should include '['");
         assert_eq!(sel.to(), 7, "should include past ']'");
+    }
+
+    // --- select inside/around word ---
+
+    #[test]
+    fn select_inside_word() {
+        let mut ctx = test_context("foo he#[l|]#lo bar\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.select_inside_pair(doc_id, view_id, 'w');
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        // "hello" is at positions 4..9
+        assert_eq!(sel.from(), 4, "inside word should start at word begin");
+        assert_eq!(sel.to(), 9, "inside word should end at word end");
+    }
+
+    #[test]
+    fn select_around_word() {
+        let mut ctx = test_context("foo he#[l|]#lo bar\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.select_around_pair(doc_id, view_id, 'w');
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        // "hello " is at positions 4..10 (around includes trailing whitespace)
+        assert_eq!(sel.from(), 4, "around word should start at word begin");
+        assert_eq!(sel.to(), 10, "around word should include trailing space");
+    }
+
+    #[test]
+    fn select_inside_long_word() {
+        let mut ctx = test_context("foo he#[l|]#lo.world bar\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.select_inside_pair(doc_id, view_id, 'W');
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        // "hello.world" is at positions 4..15
+        assert_eq!(sel.from(), 4, "inside WORD should start at WORD begin");
+        assert_eq!(sel.to(), 15, "inside WORD should end at WORD end");
+    }
+
+    #[test]
+    fn select_inside_word_ignores_alphanumeric_chars() {
+        // 'z' is alphanumeric and not a textobject — should be a no-op
+        let mut ctx = test_context("foo #[b|]#ar\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.select_inside_pair(doc_id, view_id, 'z');
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert_eq!(sel.from(), 4, "unknown alpha char should not change selection");
+        assert_eq!(sel.to(), 5, "unknown alpha char should not change selection");
     }
 
     // --- extend_selection ---
