@@ -69,6 +69,16 @@ pub struct EditorContext {
     /// Last find/till character motion: (char, forward, till).
     pub(crate) last_find_char: Option<(char, bool, bool)>,
 
+    // Dot-repeat state (last insert session recording)
+    /// The command that last entered insert mode (for dot-repeat).
+    pub(crate) last_insert_entry: EditorCommand,
+    /// Editing commands recorded during the last insert session.
+    pub(crate) last_insert_keys: Vec<EditorCommand>,
+    /// Whether we are currently recording insert-mode commands.
+    insert_recording: bool,
+    /// Whether we are replaying a dot-repeat (prevents re-recording).
+    replaying_insert: bool,
+
     // Picker state - pub(crate) for operations access
     pub(crate) picker_visible: bool,
     pub(crate) picker_items: Vec<PickerItem>,
@@ -299,6 +309,10 @@ impl EditorContext {
             search_input: String::new(),
             last_search: String::new(),
             last_find_char: None,
+            last_insert_entry: EditorCommand::EnterInsertMode,
+            last_insert_keys: Vec::new(),
+            insert_recording: false,
+            replaying_insert: false,
             regex_mode: false,
             regex_split: false,
             regex_input: String::new(),
@@ -403,6 +417,19 @@ impl EditorContext {
             .unwrap_or_else(|| self.editor.config().default_yank_register)
     }
 
+    /// Replay the last insert mode session (dot command).
+    fn replay_last_insert(&mut self) {
+        let entry_cmd = self.last_insert_entry.clone();
+        let insert_cmds = self.last_insert_keys.clone();
+        self.replaying_insert = true;
+        self.handle_command(entry_cmd);
+        for cmd in insert_cmds {
+            self.handle_command(cmd);
+        }
+        self.handle_command(EditorCommand::ExitInsertMode);
+        self.replaying_insert = false;
+    }
+
     /// Process pending commands.
     pub fn process_commands(&mut self) {
         while let Ok(cmd) = self.command_rx.try_recv() {
@@ -422,6 +449,24 @@ impl EditorContext {
 
     /// Handle a single command using operation traits.
     pub(crate) fn handle_command(&mut self, cmd: EditorCommand) {
+        let mode_before = self.editor.mode;
+
+        // Record insert-mode editing commands (before dispatch)
+        if self.insert_recording
+            && !self.replaying_insert
+            && mode_before == Mode::Insert
+            && cmd.is_insert_recordable()
+        {
+            self.last_insert_keys.push(cmd.clone());
+        }
+
+        // Clone the command for potential use as insert entry (only for mode transitions)
+        let cmd_for_entry = if !self.replaying_insert && mode_before != Mode::Insert {
+            Some(cmd.clone())
+        } else {
+            None
+        };
+
         let view_id = self.editor.tree.focus;
         let view = self.editor.tree.get(view_id);
         let doc_id = view.doc;
@@ -1364,6 +1409,28 @@ impl EditorContext {
                 self.command_input = cmd;
                 self.execute_command();
             }
+
+            EditorCommand::RepeatLastInsert => {
+                self.replay_last_insert();
+                // Skip mode-transition detection (replay handles its own lifecycle)
+                return;
+            }
+        }
+
+        let mode_after = self.editor.mode;
+
+        // Detect entering insert mode → start recording
+        if mode_before != Mode::Insert && mode_after == Mode::Insert && !self.replaying_insert {
+            if let Some(entry) = cmd_for_entry {
+                self.last_insert_entry = entry;
+            }
+            self.last_insert_keys.clear();
+            self.insert_recording = true;
+        }
+
+        // Detect exiting insert mode → stop recording
+        if mode_before == Mode::Insert && mode_after != Mode::Insert && !self.replaying_insert {
+            self.insert_recording = false;
         }
     }
 

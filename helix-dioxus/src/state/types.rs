@@ -1034,6 +1034,33 @@ pub enum EditorCommand {
     // CLI passthrough
     /// Execute a CLI command by string (e.g., ":sort", ":reflow").
     CliCommand(String),
+
+    /// Repeat the last insert mode session (dot command).
+    RepeatLastInsert,
+}
+
+impl EditorCommand {
+    /// Whether this command should be recorded for dot-repeat during insert mode.
+    pub(crate) fn is_insert_recordable(&self) -> bool {
+        matches!(
+            self,
+            Self::InsertChar(_)
+                | Self::InsertTab
+                | Self::InsertNewline
+                | Self::InsertText(_)
+                | Self::InsertRegister(_)
+                | Self::DeleteCharBackward
+                | Self::DeleteCharForward
+                | Self::DeleteWordBackward
+                | Self::DeleteWordForward
+                | Self::DeleteToLineStart
+                | Self::KillToLineEnd
+                | Self::IndentLine
+                | Self::UnindentLine
+                | Self::CommitUndoCheckpoint
+                | Self::ToggleLineComment
+        )
+    }
 }
 
 /// Shell pipe behavior for the `|`, `!`, `A-|`, `A-!` commands.
@@ -1416,5 +1443,52 @@ mod tests {
     #[test]
     fn themes_picker_mode_enter_hint() {
         assert!(PickerMode::Themes.enter_hint().contains("select"));
+    }
+
+    // --- EditorCommand::is_insert_recordable ---
+
+    #[test]
+    fn insert_char_is_recordable() {
+        assert!(EditorCommand::InsertChar('a').is_insert_recordable());
+    }
+
+    #[test]
+    fn insert_tab_is_recordable() {
+        assert!(EditorCommand::InsertTab.is_insert_recordable());
+    }
+
+    #[test]
+    fn insert_newline_is_recordable() {
+        assert!(EditorCommand::InsertNewline.is_insert_recordable());
+    }
+
+    #[test]
+    fn insert_text_is_recordable() {
+        assert!(EditorCommand::InsertText("hi".into()).is_insert_recordable());
+    }
+
+    #[test]
+    fn delete_char_backward_is_recordable() {
+        assert!(EditorCommand::DeleteCharBackward.is_insert_recordable());
+    }
+
+    #[test]
+    fn commit_undo_checkpoint_is_recordable() {
+        assert!(EditorCommand::CommitUndoCheckpoint.is_insert_recordable());
+    }
+
+    #[test]
+    fn exit_insert_mode_is_not_recordable() {
+        assert!(!EditorCommand::ExitInsertMode.is_insert_recordable());
+    }
+
+    #[test]
+    fn completion_up_is_not_recordable() {
+        assert!(!EditorCommand::CompletionUp.is_insert_recordable());
+    }
+
+    #[test]
+    fn move_left_is_not_recordable() {
+        assert!(!EditorCommand::MoveLeft.is_insert_recordable());
     }
 }

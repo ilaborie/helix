@@ -398,3 +398,106 @@ fn toggle_option_via_command_mode() {
 
     assert!(ctx.editor.config().cursorline);
 }
+
+// --- Dot-repeat (RepeatLastInsert) ---
+
+#[test]
+fn dot_repeat_insert_chars() {
+    let _guard = crate::test_helpers::init();
+    let mut ctx = test_context("#[|h]#ello\n");
+
+    // Enter insert, type "ab", exit
+    ctx.handle_command(EditorCommand::EnterInsertMode);
+    ctx.handle_command(EditorCommand::InsertChar('a'));
+    ctx.handle_command(EditorCommand::InsertChar('b'));
+    ctx.handle_command(EditorCommand::ExitInsertMode);
+
+    // Move right past 'h'
+    ctx.handle_command(EditorCommand::MoveRight);
+
+    // Dot repeat should insert "ab" again
+    ctx.handle_command(EditorCommand::RepeatLastInsert);
+
+    assert_text(&ctx, "abhabello\n");
+}
+
+#[test]
+fn dot_repeat_preserves_recording_after_replay() {
+    let _guard = crate::test_helpers::init();
+    let mut ctx = test_context("#[|h]#ello\n");
+
+    // Enter insert, type "x", exit
+    ctx.handle_command(EditorCommand::EnterInsertMode);
+    ctx.handle_command(EditorCommand::InsertChar('x'));
+    ctx.handle_command(EditorCommand::ExitInsertMode);
+
+    // Replay
+    ctx.handle_command(EditorCommand::RepeatLastInsert);
+
+    // Recording should still be 1 command (InsertChar('x'))
+    assert_eq!(ctx.last_insert_keys.len(), 1);
+}
+
+#[test]
+fn dot_repeat_open_line_below() {
+    let _guard = crate::test_helpers::init();
+    let mut ctx = test_context("#[|h]#ello\n");
+
+    // OpenLineBelow enters insert mode + opens new line
+    ctx.handle_command(EditorCommand::OpenLineBelow);
+    ctx.handle_command(EditorCommand::InsertChar('x'));
+    ctx.handle_command(EditorCommand::ExitInsertMode);
+
+    // Go back to first line
+    ctx.handle_command(EditorCommand::GotoFirstLine);
+
+    // Dot repeat should open below + insert 'x'
+    ctx.handle_command(EditorCommand::RepeatLastInsert);
+
+    assert_text(&ctx, "hello\nx\nx\n");
+}
+
+#[test]
+fn dot_repeat_with_backspace() {
+    let _guard = crate::test_helpers::init();
+    let mut ctx = test_context("#[|h]#ello\n");
+
+    // Enter insert, type "abc", backspace (delete 'c'), exit
+    ctx.handle_command(EditorCommand::EnterInsertMode);
+    ctx.handle_command(EditorCommand::InsertChar('a'));
+    ctx.handle_command(EditorCommand::InsertChar('b'));
+    ctx.handle_command(EditorCommand::InsertChar('c'));
+    ctx.handle_command(EditorCommand::DeleteCharBackward);
+    ctx.handle_command(EditorCommand::ExitInsertMode);
+
+    // Verify first insert result
+    assert_text(&ctx, "abhello\n");
+
+    // Move right past 'h'
+    ctx.handle_command(EditorCommand::MoveRight);
+
+    // Dot repeat should replay: insert 'a', 'b', 'c', backspace → "ab"
+    ctx.handle_command(EditorCommand::RepeatLastInsert);
+
+    assert_text(&ctx, "abhabello\n");
+}
+
+#[test]
+fn dot_repeat_does_not_record_during_replay() {
+    let _guard = crate::test_helpers::init();
+    let mut ctx = test_context("#[|h]#ello\n");
+
+    // Enter insert, type "y", exit
+    ctx.handle_command(EditorCommand::EnterInsertMode);
+    ctx.handle_command(EditorCommand::InsertChar('y'));
+    ctx.handle_command(EditorCommand::ExitInsertMode);
+
+    // First dot repeat
+    ctx.handle_command(EditorCommand::RepeatLastInsert);
+
+    // Second dot repeat should still insert just "y", not "yy"
+    ctx.handle_command(EditorCommand::RepeatLastInsert);
+
+    assert_text(&ctx, "yyyhello\n");
+    assert_eq!(ctx.last_insert_keys.len(), 1);
+}

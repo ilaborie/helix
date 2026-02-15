@@ -227,6 +227,9 @@ pub fn handle_normal_mode(key: &KeyEvent) -> Vec<EditorCommand> {
         KeyCode::Char('Q') => vec![EditorCommand::ToggleMacroRecording],
         KeyCode::Char('q') => vec![EditorCommand::ReplayMacro],
 
+        // Repeat last insert (dot command)
+        KeyCode::Char('.') => vec![EditorCommand::RepeatLastInsert],
+
         _ => vec![],
     }
 }
@@ -472,6 +475,12 @@ mod tests {
     fn upper_q_toggles_macro_recording() {
         let cmds = handle_normal_mode(&key('Q'));
         assert_single_command!(cmds, EditorCommand::ToggleMacroRecording);
+    }
+
+    #[test]
+    fn dot_repeats_last_insert() {
+        let cmds = handle_normal_mode(&key('.'));
+        assert_single_command!(cmds, EditorCommand::RepeatLastInsert);
     }
 
     #[test]

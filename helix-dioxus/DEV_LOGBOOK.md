@@ -1520,6 +1520,26 @@ Split views are **not planned** for helix-dioxus. For multiple views, users shou
 
 ---
 
+## 2026-02-15: Dot-Repeat (`.` command)
+
+### Progress
+- Implemented the `.` (dot) command to repeat the last insert mode session
+- Records the entry command (e.g., `i`, `a`, `o`, `c`) and all editing commands typed during insert mode
+- On `.` press in normal mode, replays the entry command + recorded edits + ExitInsertMode
+- Added `RepeatLastInsert` variant to `EditorCommand`
+- Added `is_insert_recordable()` method to classify which commands get recorded (insert/delete/indent/comment)
+- Recording uses mode-transition detection in `handle_command()` to start/stop automatically
+- Replay guard (`replaying_insert`) prevents re-recording during playback
+
+### Files Changed
+- `src/state/types.rs` — `RepeatLastInsert` variant, `is_insert_recordable()`, 9 unit tests
+- `src/state/mod.rs` — 4 recording fields on `EditorContext`, mode-transition detection in `handle_command()`, `replay_last_insert()`
+- `src/keybindings/normal.rs` — `.` key mapping, 1 unit test
+- `src/integration_tests.rs` — 5 integration tests (insert chars, preserves recording, open line below, backspace, no re-record during replay)
+- `KEYBINDINGS.md` — added `.` to Normal Mode Matches
+
+---
+
 ## Template for Future Entries
 
 ```markdown

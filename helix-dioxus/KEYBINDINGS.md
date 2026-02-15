@@ -90,6 +90,7 @@ Reference: `helix-term/src/keymap/default.rs`
 | `A-!` | Append shell output | Matches |
 | `q` | Replay macro | Matches |
 | `Q` | Record/stop macro | Matches |
+| `.` | Repeat last insert | Matches |
 
 ### Editing — Deviations
 
