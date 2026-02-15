@@ -153,6 +153,7 @@ impl JumpOps for EditorContext {
         self.picker_mode = PickerMode::JumpList;
         self.last_picker_mode = Some(PickerMode::JumpList);
         self.picker_current_path = None;
+        self.invalidate_picker_cache();
     }
 }
 

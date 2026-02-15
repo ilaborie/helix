@@ -298,6 +298,7 @@ impl VcsOps for EditorContext {
         self.picker_visible = true;
         self.last_picker_mode = Some(PickerMode::ChangedFiles);
         self.picker_current_path = None;
+        self.invalidate_picker_cache();
     }
 }
 

@@ -560,6 +560,8 @@ pub fn App() -> Element {
                     selected: snapshot.picker_selected,
                     filter: snapshot.picker_filter.clone(),
                     total: snapshot.picker_total,
+                    filtered_count: snapshot.picker_filtered_count,
+                    window_offset: snapshot.picker_window_offset,
                     mode: snapshot.picker_mode,
                     current_path: snapshot.picker_current_path.clone(),
                     preview: snapshot.picker_preview.clone(),

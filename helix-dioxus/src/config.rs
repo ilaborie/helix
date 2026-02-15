@@ -12,6 +12,7 @@ use serde::Deserialize;
 /// GUI-specific configuration loaded from `dhx.toml`.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct DhxConfig {
     pub window: WindowConfig,
     pub font: FontConfig,
@@ -62,17 +63,6 @@ pub struct LoggingConfig {
     pub log_file: Option<PathBuf>,
     pub level: String,
     pub suppressed_patterns: Vec<String>,
-}
-
-impl Default for DhxConfig {
-    fn default() -> Self {
-        Self {
-            window: WindowConfig::default(),
-            font: FontConfig::default(),
-            logging: LoggingConfig::default(),
-            dialog: DialogConfig::default(),
-        }
-    }
 }
 
 impl Default for WindowConfig {

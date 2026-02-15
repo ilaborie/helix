@@ -28,7 +28,7 @@ pub use jump::JumpOps;
 pub use lsp::LspOps;
 pub use macro_ops::MacroOps;
 pub use movement::MovementOps;
-pub(crate) use picker_ops::fuzzy_match_with_indices;
+pub(crate) use picker_ops::{compute_filtered_items, fuzzy_match_with_indices};
 pub use picker_ops::PickerOps;
 pub use search::{collect_search_match_lines, SearchOps};
 pub use selection::SelectionOps;

@@ -90,6 +90,10 @@ pub struct EditorContext {
     pub(crate) last_picker_mode: Option<PickerMode>,
     /// Original theme name saved for live preview rollback on Escape.
     pub(crate) theme_before_preview: Option<String>,
+    /// Cached filtered picker items. Invalidated when filter, source items, or picker mode change.
+    cached_filtered_items: Option<Vec<PickerItem>>,
+    /// Cached picker preview keyed by selected item ID.
+    cached_preview: Option<(String, PickerPreview)>,
 
     // Buffer bar state - pub(crate) for operations access
     pub(crate) buffer_bar_scroll: usize,
@@ -324,6 +328,8 @@ impl EditorContext {
             picker_current_path: None,
             last_picker_mode: None,
             theme_before_preview: None,
+            cached_filtered_items: None,
+            cached_preview: None,
             buffer_bar_scroll: 0,
             clipboard: String::new(),
             // LSP state
@@ -402,11 +408,37 @@ impl EditorContext {
         if self.picker_mode != PickerMode::Themes {
             return;
         }
-        let filtered = self.filtered_picker_items();
-        if let Some(item) = filtered.get(self.picker_selected) {
-            let name = item.id.clone();
+        let picker_selected = self.picker_selected;
+        let name = self
+            .get_or_compute_filtered_items()
+            .get(picker_selected)
+            .map(|item| item.id.clone());
+        if let Some(name) = name {
             let _ = self.apply_theme(&name);
         }
+    }
+
+    /// Invalidate the cached filtered picker items and preview.
+    /// Call this whenever picker_filter, picker_items, or picker_mode change.
+    pub(crate) fn invalidate_picker_cache(&mut self) {
+        self.cached_filtered_items = None;
+        self.cached_preview = None;
+    }
+
+    /// Get filtered picker items, computing and caching on first call.
+    /// Subsequent calls return the cached result until invalidated.
+    pub(crate) fn get_or_compute_filtered_items(&mut self) -> &[PickerItem] {
+        if self.cached_filtered_items.is_none() {
+            use crate::operations::compute_filtered_items;
+            let items = compute_filtered_items(
+                &self.picker_filter,
+                &self.picker_items,
+                self.picker_mode,
+                &self.explorer_all_files,
+            );
+            self.cached_filtered_items = Some(items);
+        }
+        self.cached_filtered_items.as_deref().expect("just populated")
     }
 
     /// Take the selected register (consuming it) or return the default yank register.
@@ -848,7 +880,7 @@ impl EditorContext {
                 self.preview_selected_theme();
             }
             EditorCommand::PickerDown => {
-                let filtered_len = self.filtered_picker_items().len();
+                let filtered_len = self.get_or_compute_filtered_items().len();
                 if self.picker_selected + 1 < filtered_len {
                     self.picker_selected += 1;
                 }
@@ -881,15 +913,18 @@ impl EditorContext {
                 self.explorer_expanded.clear();
                 self.explorer_root = None;
                 self.explorer_all_files.clear();
+                self.invalidate_picker_cache();
             }
             EditorCommand::PickerInput(c) => {
                 self.picker_filter.push(c);
                 self.picker_selected = 0;
+                self.invalidate_picker_cache();
                 self.preview_selected_theme();
             }
             EditorCommand::PickerBackspace => {
                 self.picker_filter.pop();
                 self.picker_selected = 0;
+                self.invalidate_picker_cache();
                 // When filter becomes empty in FileExplorer, restore tree view
                 if self.picker_filter.is_empty() && self.picker_mode == PickerMode::FileExplorer {
                     self.rebuild_explorer_items();
@@ -907,7 +942,7 @@ impl EditorContext {
                 self.preview_selected_theme();
             }
             EditorCommand::PickerLast => {
-                let filtered_len = self.filtered_picker_items().len();
+                let filtered_len = self.get_or_compute_filtered_items().len();
                 if filtered_len > 0 {
                     self.picker_selected = filtered_len - 1;
                 }
@@ -918,14 +953,14 @@ impl EditorContext {
                 self.preview_selected_theme();
             }
             EditorCommand::PickerPageDown => {
-                let filtered_len = self.filtered_picker_items().len();
+                let filtered_len = self.get_or_compute_filtered_items().len();
                 self.picker_selected =
                     (self.picker_selected + 10).min(filtered_len.saturating_sub(1));
                 self.preview_selected_theme();
             }
             EditorCommand::PickerConfirmItem(idx) => {
-                let filtered = self.filtered_picker_items();
-                if idx < filtered.len() {
+                let filtered_len = self.get_or_compute_filtered_items().len();
+                if idx < filtered_len {
                     self.picker_selected = idx;
                     self.picker_confirm();
                 }
@@ -2184,10 +2219,27 @@ impl EditorContext {
             regex_split: self.regex_split,
             regex_input: self.regex_input.clone(),
             picker_visible: self.picker_visible,
-            picker_items: self.filtered_picker_items(),
+            picker_items: {
+                let sel = self.picker_selected;
+                let filtered = self.get_or_compute_filtered_items();
+                let count = filtered.len();
+                let (s, e) = centered_window(sel, count, 15);
+                filtered.get(s..e).unwrap_or(&[]).to_vec()
+            },
             picker_filter: self.picker_filter.clone(),
             picker_selected: self.picker_selected,
             picker_total: self.picker_items.len(),
+            picker_filtered_count: self
+                .cached_filtered_items
+                .as_ref()
+                .map_or(0, |v| v.len()),
+            picker_window_offset: {
+                let filtered_count = self
+                    .cached_filtered_items
+                    .as_ref()
+                    .map_or(0, |v| v.len());
+                centered_window(self.picker_selected, filtered_count, 15).0
+            },
             picker_mode: self.picker_mode,
             picker_current_path: self
                 .picker_current_path
@@ -2460,15 +2512,13 @@ impl EditorContext {
         }
     }
 
-    fn compute_picker_preview(&self) -> Option<types::PickerPreview> {
-        use crate::operations::PickerOps;
-
+    fn compute_picker_preview(&mut self) -> Option<types::PickerPreview> {
         if !self.picker_visible || !self.picker_mode.supports_preview() {
             return None;
         }
 
-        let filtered = self.filtered_picker_items();
-        let selected_item = filtered.get(self.picker_selected)?;
+        let cached = self.cached_filtered_items.as_deref()?;
+        let selected_item = cached.get(self.picker_selected)?;
 
         // Skip folders in directory browser / file explorer
         if matches!(
@@ -2478,9 +2528,20 @@ impl EditorContext {
             return None;
         }
 
+        // Return cached preview if the selected item hasn't changed
+        if let Some((ref cached_id, ref preview)) = self.cached_preview {
+            if *cached_id == selected_item.id {
+                return Some(preview.clone());
+            }
+        }
+
+        let item_id = selected_item.id.clone();
         let preview_lines = 20usize;
 
-        let (file_path, target_line) = self.resolve_preview_target(selected_item)?;
+        let (file_path, target_line) = self.resolve_preview_target(
+            // Re-fetch from cache since we need to borrow self for resolve_preview_target
+            &self.cached_filtered_items.as_deref()?[self.picker_selected].clone(),
+        )?;
 
         // Try to load content: first from open documents, then from disk
         let cwd = std::env::current_dir().unwrap_or_default();
@@ -2571,12 +2632,17 @@ impl EditorContext {
             None
         };
 
-        Some(types::PickerPreview {
+        let preview = types::PickerPreview {
             file_path: display_path,
             lines,
             focus_line: target_line,
             search_pattern,
-        })
+        };
+
+        // Cache the preview for this item
+        self.cached_preview = Some((item_id, preview.clone()));
+
+        Some(preview)
     }
 }
 
@@ -4121,6 +4187,7 @@ impl EditorContext {
 
     /// Populate picker items from diagnostics.
     fn populate_diagnostic_picker_items(&mut self) {
+        self.invalidate_picker_cache();
         self.picker_items = self
             .picker_diagnostics
             .iter()
@@ -4181,6 +4248,7 @@ impl EditorContext {
 
     /// Populate picker items from symbols.
     fn populate_symbol_picker_items(&mut self) {
+        self.invalidate_picker_cache();
         self.picker_items = self
             .symbols
             .iter()

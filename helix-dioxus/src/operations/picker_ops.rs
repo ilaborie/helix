@@ -48,7 +48,6 @@ pub trait PickerOps {
     fn show_file_picker(&mut self);
     fn show_files_recursive_picker(&mut self);
     fn show_buffer_picker(&mut self);
-    fn filtered_picker_items(&self) -> Vec<PickerItem>;
     fn picker_confirm(&mut self);
 }
 
@@ -129,6 +128,7 @@ impl PickerOps for EditorContext {
         self.picker_mode = PickerMode::DirectoryBrowser;
         self.last_picker_mode = Some(PickerMode::DirectoryBrowser);
         self.picker_current_path = Some(cwd);
+        self.invalidate_picker_cache();
     }
 
     /// Show recursive file picker using the ignore crate.
@@ -189,6 +189,7 @@ impl PickerOps for EditorContext {
         self.picker_mode = PickerMode::FilesRecursive;
         self.last_picker_mode = Some(PickerMode::FilesRecursive);
         self.picker_current_path = Some(cwd);
+        self.invalidate_picker_cache();
     }
 
     /// Show buffer picker with open documents.
@@ -233,71 +234,17 @@ impl PickerOps for EditorContext {
         self.picker_mode = PickerMode::Buffers;
         self.last_picker_mode = Some(PickerMode::Buffers);
         self.picker_current_path = None;
-    }
-
-    /// Get filtered picker items with match indices populated.
-    fn filtered_picker_items(&self) -> Vec<PickerItem> {
-        if self.picker_filter.is_empty() {
-            return self.picker_items.clone();
-        }
-
-        // FileExplorer: filter against all files (flat search) when filter is non-empty
-        let source = if self.picker_mode == PickerMode::FileExplorer {
-            &self.explorer_all_files
-        } else {
-            &self.picker_items
-        };
-
-        let mut results: Vec<(u16, PickerItem)> = source
-            .iter()
-            .filter_map(|item| {
-                // Match against display name (primary) or secondary path
-                let display_match = fuzzy_match_with_indices(&item.display, &self.picker_filter);
-                let secondary_match = item
-                    .secondary
-                    .as_ref()
-                    .and_then(|s| fuzzy_match_with_indices(s, &self.picker_filter));
-
-                // Use the better match - only highlight display indices, not secondary
-                match (display_match, secondary_match) {
-                    (Some((score1, indices)), Some((score2, _))) if score1 >= score2 => {
-                        // Display match is better or equal - use display indices
-                        let mut new_item = item.clone();
-                        new_item.match_indices = indices;
-                        Some((score1, new_item))
-                    }
-                    (Some((score, indices)), None) => {
-                        // Only display match - use its indices
-                        let mut new_item = item.clone();
-                        new_item.match_indices = indices;
-                        Some((score, new_item))
-                    }
-                    (None, Some((score, _))) => {
-                        // Only secondary match - no indices for display
-                        Some((score, item.clone()))
-                    }
-                    (Some((score1, indices)), Some((score2, _))) if score2 > score1 => {
-                        // Secondary match is better - use its score but display's indices
-                        // (secondary indices don't apply to display text)
-                        let mut new_item = item.clone();
-                        new_item.match_indices = indices;
-                        Some((score2, new_item))
-                    }
-                    _ => None,
-                }
-            })
-            .collect();
-
-        // Sort by score descending
-        results.sort_by(|a, b| b.0.cmp(&a.0));
-
-        results.into_iter().map(|(_, item)| item).collect()
+        self.invalidate_picker_cache();
     }
 
     /// Confirm the current picker selection.
     fn picker_confirm(&mut self) {
-        let filtered = self.filtered_picker_items();
-        if let Some(selected) = filtered.get(self.picker_selected).cloned() {
+        let picker_selected = self.picker_selected;
+        let selected = self
+            .get_or_compute_filtered_items()
+            .get(picker_selected)
+            .cloned();
+        if let Some(selected) = selected {
             match self.picker_mode {
                 PickerMode::DirectoryBrowser => {
                     // Handle parent directory navigation
@@ -594,6 +541,7 @@ impl EditorContext {
         let mut items = Vec::new();
         build_tree_items(&root, &self.explorer_expanded, 0, &mut items);
         self.picker_items = items;
+        self.invalidate_picker_cache();
     }
 
     /// Expand the selected directory in the file explorer.
@@ -601,10 +549,12 @@ impl EditorContext {
         if self.picker_mode != PickerMode::FileExplorer {
             return;
         }
-        let filtered = self.filtered_picker_items();
-        let Some(selected) = filtered.get(self.picker_selected) else {
-            return;
-        };
+        let picker_selected = self.picker_selected;
+        let selected = self
+            .get_or_compute_filtered_items()
+            .get(picker_selected)
+            .cloned();
+        let Some(selected) = selected else { return };
         if selected.icon != PickerIcon::Folder {
             return;
         }
@@ -623,10 +573,12 @@ impl EditorContext {
         if self.picker_mode != PickerMode::FileExplorer {
             return;
         }
-        let filtered = self.filtered_picker_items();
-        let Some(selected) = filtered.get(self.picker_selected) else {
-            return;
-        };
+        let picker_selected = self.picker_selected;
+        let selected = self
+            .get_or_compute_filtered_items()
+            .get(picker_selected)
+            .cloned();
+        let Some(selected) = selected else { return };
         if selected.icon == PickerIcon::FolderOpen {
             // Collapse this directory
             let path = PathBuf::from(&selected.id);
@@ -706,6 +658,7 @@ impl EditorContext {
         self.picker_mode = PickerMode::Registers;
         self.last_picker_mode = Some(PickerMode::Registers);
         self.picker_current_path = None;
+        self.invalidate_picker_cache();
     }
 
     /// Show the command panel with all available editor commands.
@@ -735,6 +688,7 @@ impl EditorContext {
         self.picker_mode = PickerMode::Commands;
         self.last_picker_mode = Some(PickerMode::Commands);
         self.picker_current_path = None;
+        self.invalidate_picker_cache();
     }
 
     /// Show the theme picker with all available themes.
@@ -777,6 +731,7 @@ impl EditorContext {
         self.picker_mode = PickerMode::Themes;
         self.last_picker_mode = Some(PickerMode::Themes);
         self.picker_current_path = None;
+        self.invalidate_picker_cache();
     }
 
     /// Show the emoji picker populated from the `emojis` crate.
@@ -806,6 +761,7 @@ impl EditorContext {
         self.picker_mode = PickerMode::Emojis;
         self.last_picker_mode = Some(PickerMode::Emojis);
         self.picker_current_path = None;
+        self.invalidate_picker_cache();
     }
 
     /// Show the global search picker.
@@ -824,6 +780,7 @@ impl EditorContext {
         self.last_picker_mode = Some(PickerMode::GlobalSearch);
         self.picker_current_path = None;
         self.global_search_results.clear();
+        self.invalidate_picker_cache();
     }
 
     /// Execute global search with the current filter pattern.
@@ -841,6 +798,7 @@ impl EditorContext {
         self.picker_items.clear();
         self.picker_selected = 0;
         self.global_search_running = true;
+        self.invalidate_picker_cache();
 
         // Create cancellation channel
         let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
@@ -918,6 +876,7 @@ impl EditorContext {
                 }
             })
             .collect();
+        self.invalidate_picker_cache();
     }
 
     /// Update picker items from locations (used by References mode).
@@ -948,6 +907,7 @@ impl EditorContext {
                 }
             })
             .collect();
+        self.invalidate_picker_cache();
     }
 
     /// Show references in the generic picker.
@@ -989,6 +949,7 @@ impl EditorContext {
                 }
             })
             .collect();
+        self.invalidate_picker_cache();
     }
 
     /// Show definitions in the generic picker.
@@ -1414,6 +1375,64 @@ fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static 
     ]
 }
 
+/// Compute filtered picker items from source items using fuzzy matching.
+/// This is a free function to avoid borrow conflicts when populating the cache.
+pub(crate) fn compute_filtered_items(
+    filter: &str,
+    picker_items: &[PickerItem],
+    picker_mode: PickerMode,
+    explorer_all_files: &[PickerItem],
+) -> Vec<PickerItem> {
+    if filter.is_empty() {
+        return picker_items.to_vec();
+    }
+
+    // FileExplorer: filter against all files (flat search) when filter is non-empty
+    let source = if picker_mode == PickerMode::FileExplorer {
+        explorer_all_files
+    } else {
+        picker_items
+    };
+
+    let mut results: Vec<(u16, PickerItem)> = source
+        .iter()
+        .filter_map(|item| {
+            // Match against display name (primary) or secondary path
+            let display_match = fuzzy_match_with_indices(&item.display, filter);
+            let secondary_match = item
+                .secondary
+                .as_ref()
+                .and_then(|s| fuzzy_match_with_indices(s, filter));
+
+            // Use the better match - only highlight display indices, not secondary
+            match (display_match, secondary_match) {
+                (Some((score1, indices)), Some((score2, _))) if score1 >= score2 => {
+                    let mut new_item = item.clone();
+                    new_item.match_indices = indices;
+                    Some((score1, new_item))
+                }
+                (Some((score, indices)), None) => {
+                    let mut new_item = item.clone();
+                    new_item.match_indices = indices;
+                    Some((score, new_item))
+                }
+                (None, Some((score, _))) => Some((score, item.clone())),
+                (Some((score1, indices)), Some((score2, _))) if score2 > score1 => {
+                    let mut new_item = item.clone();
+                    new_item.match_indices = indices;
+                    Some((score2, new_item))
+                }
+                _ => None,
+            }
+        })
+        .collect();
+
+    // Sort by score descending
+    results.sort_by(|a, b| b.0.cmp(&a.0));
+
+    results.into_iter().map(|(_, item)| item).collect()
+}
+
 pub(crate) fn fuzzy_match_with_indices(text: &str, pattern: &str) -> Option<(u16, Vec<usize>)> {
     if pattern.is_empty() {
         return Some((0, vec![]));
@@ -1444,8 +1463,7 @@ pub(crate) fn fuzzy_match_with_indices(text: &str, pattern: &str) -> Option<(u16
 
             // Word boundary bonus (after separator)
             if text_idx > 0 {
-                let prev_char = text.chars().nth(text_idx - 1);
-                if matches!(prev_char, Some('/' | '\\' | '_' | '-' | ' ' | '.')) {
+                if matches!(text_lower[text_idx - 1], '/' | '\\' | '_' | '-' | ' ' | '.') {
                     score = score.saturating_add(8);
                 }
             }

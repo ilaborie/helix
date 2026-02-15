@@ -9,7 +9,7 @@ use lucide_dioxus::Search;
 
 use crate::components::KbdKey;
 use crate::config::DialogSearchMode;
-use crate::state::{centered_window, EditorCommand, PickerItem, PickerMode, PickerPreview};
+use crate::state::{EditorCommand, PickerItem, PickerMode, PickerPreview};
 use crate::AppState;
 
 use super::item::PickerItemRow;
@@ -18,10 +18,15 @@ use super::preview::PickerPreviewPanel;
 /// Generic picker component that displays items with filtering and highlighting.
 #[component]
 pub fn GenericPicker(
+    /// Pre-windowed items (already sliced to the visible window).
     items: Vec<PickerItem>,
     selected: usize,
     filter: String,
     total: usize,
+    /// Number of items after filtering (may differ from items.len() due to windowing).
+    filtered_count: usize,
+    /// Start index of the windowed items in the full filtered list.
+    window_offset: usize,
     mode: PickerMode,
     current_path: Option<String>,
     preview: Option<PickerPreview>,
@@ -30,17 +35,12 @@ pub fn GenericPicker(
 ) -> Element {
     let app_state = use_context::<AppState>();
 
-    // Calculate visible window (show 15 items max, centered on selection)
-    let (start, end) = centered_window(selected, items.len(), 15);
+    // Items are pre-windowed — compute absolute indices using offset
     let visible_items: Vec<(usize, &PickerItem)> = items
-        .get(start..end)
-        .unwrap_or(&[])
         .iter()
         .enumerate()
-        .map(|(i, item)| (start + i, item))
+        .map(|(i, item)| (window_offset + i, item))
         .collect();
-
-    let filtered_count = items.len();
 
     let title = mode.title();
 

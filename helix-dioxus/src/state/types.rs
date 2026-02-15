@@ -277,10 +277,16 @@ pub struct EditorSnapshot {
 
     // Picker state
     pub picker_visible: bool,
+    /// Pre-windowed picker items (only the visible ~15 items, not all filtered items).
     pub picker_items: Vec<PickerItem>,
     pub picker_filter: String,
     pub picker_selected: usize,
+    /// Total number of unfiltered source items.
     pub picker_total: usize,
+    /// Number of items after filtering (may differ from picker_items.len() due to windowing).
+    pub picker_filtered_count: usize,
+    /// Start index of the windowed items in the full filtered list.
+    pub picker_window_offset: usize,
     pub picker_mode: PickerMode,
     pub picker_current_path: Option<String>,
     /// File preview for the selected picker item.
