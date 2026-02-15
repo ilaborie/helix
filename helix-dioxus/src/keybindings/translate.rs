@@ -7,9 +7,22 @@ use dioxus::prelude::*;
 use helix_view::input::{KeyCode, KeyEvent, KeyModifiers};
 
 /// Translate a Dioxus keyboard event to a helix KeyEvent.
+///
+/// Normalizes SHIFT for character keys: Dioxus reports `Shift` in modifiers
+/// for all shifted characters (`:`, `D`, `!`, etc.), but helix's keymap
+/// stores them as plain `Char(':')` / `Char('D')` with no SHIFT modifier
+/// (the shift is already encoded in the character). We strip SHIFT for
+/// `Char` codes so the trie lookup matches correctly.
 pub fn translate_key_event(evt: &KeyboardEvent) -> Option<KeyEvent> {
     let code = translate_key_code(evt)?;
-    let modifiers = translate_modifiers(evt);
+    let mut modifiers = translate_modifiers(evt);
+
+    // Strip SHIFT for character keys — the character itself already encodes
+    // the shift (e.g., ':' vs ';', 'D' vs 'd'). Keep SHIFT only for
+    // non-character keys like Shift+Tab, Shift+Left, etc.
+    if matches!(code, KeyCode::Char(_)) {
+        modifiers.remove(KeyModifiers::SHIFT);
+    }
 
     Some(KeyEvent { code, modifiers })
 }
