@@ -26,6 +26,9 @@
     --font-weight: 400;
     --font-ligatures: normal;
 
+    /* Editor */
+    --editor-line-height: 1.5;
+
     /* Cursor */
     --cursor-normal: #61afef;
     --cursor-select: #c678dd;
@@ -134,7 +137,7 @@ body {
     overflow: hidden;
     font-size: var(--font-size);
     font-feature-settings: var(--font-ligatures);
-    line-height: 1.5;
+    line-height: var(--editor-line-height);
 }
 
 /* Gutter (line numbers) */
@@ -150,6 +153,7 @@ body {
 .gutter-line, .gutter-line-active {
     position: relative;
     background-color: var(--bg-secondary);
+    min-height: calc(var(--editor-line-height) * 1em);
 }
 .gutter-line-active {
     color: var(--text);
@@ -163,75 +167,68 @@ body {
     overflow-y: hidden;
     white-space: pre;
     user-select: none;
+    position: relative;
+}
+
+/* Whitespace characters */
+.whitespace-char {
+    color: var(--virtual-whitespace) !important;
+}
+
+/* Rulers (vertical column guides) */
+.ruler {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background-color: var(--virtual-ruler-bg);
+    pointer-events: none;
+    z-index: 0;
 }
 
 /* Line styles */
 .line {
-    min-height: 1.5em;
+    min-height: calc(var(--editor-line-height) * 1em);
     position: relative;
 }
 .line-cursor {
     background-color: var(--bg-highlight);
-    min-height: 1.5em;
+    min-height: calc(var(--editor-line-height) * 1em);
     position: relative;
 }
 .line-selected {
     background-color: var(--bg-selection);
-    min-height: 1.5em;
+    min-height: calc(var(--editor-line-height) * 1em);
     position: relative;
 }
 
 /* ───── Cursor ───── */
-@keyframes cursor-pulse {
-    0%, 100% { box-shadow: 0 0 0 2px var(--cursor-normal), 0 0 6px 2px var(--cursor-normal); }
-    50% { box-shadow: 0 0 0 2px var(--cursor-normal), 0 0 14px 4px var(--cursor-normal); }
-}
-@keyframes cursor-pulse-select {
-    0%, 100% { box-shadow: 0 0 0 2px var(--cursor-select), 0 0 4px 1px var(--cursor-select); }
-    50% { box-shadow: 0 0 0 2px var(--cursor-select), 0 0 10px 3px var(--cursor-select); }
-}
-@keyframes cursor-pulse-insert {
-    0%, 100% { box-shadow: -3px 0 0 0 var(--cursor-normal), -3px 0 6px 0 var(--cursor-normal); }
-    50% { box-shadow: -3px 0 0 0 var(--cursor-normal), -3px 0 12px 0 var(--cursor-normal); }
-}
 .cursor-block-normal {
     background-color: var(--cursor-normal);
     color: var(--cursor-fg);
     position: relative;
     z-index: 1;
-    box-shadow: 0 0 0 2px var(--cursor-normal), 0 0 6px 2px var(--cursor-normal);
-    animation: cursor-pulse 1.5s ease-in-out infinite;
 }
 .cursor-block-select {
     background-color: var(--cursor-select);
     color: var(--cursor-fg);
     position: relative;
     z-index: 1;
-    box-shadow: 0 0 0 2px var(--cursor-select), 0 0 4px 1px var(--cursor-select);
-    animation: cursor-pulse-select 1.5s ease-in-out infinite;
 }
 .cursor-line-insert {
-    box-shadow: -3px 0 0 0 var(--cursor-normal);
-    animation: cursor-pulse-insert 1.5s ease-in-out infinite;
+    border-left: 2px solid var(--cursor-normal);
 }
 
-@keyframes cursor-pulse-in-selection {
-    0%, 100% { box-shadow: 0 0 0 2px var(--cursor-in-selection), 0 0 8px 3px var(--cursor-in-selection); }
-    50% { box-shadow: 0 0 0 3px var(--cursor-in-selection), 0 0 16px 5px var(--cursor-in-selection); }
-}
-
-/* Cursor inside selection: shift to orange for contrast with stronger glow */
+/* Cursor inside selection: shift to orange for contrast */
 .line-selected .cursor-block-normal {
     background-color: var(--cursor-in-selection);
     color: var(--cursor-fg);
-    box-shadow: 0 0 0 2px var(--cursor-in-selection), 0 0 8px 3px var(--cursor-in-selection);
-    animation: cursor-pulse-in-selection 1.2s ease-in-out infinite;
 }
 
-/* Select mode cursor inside selection: keep purple but solid */
+/* Select mode cursor inside selection: keep purple */
 .line-selected .cursor-block-select {
-    box-shadow: 0 0 0 2px var(--cursor-select), 0 0 6px 2px var(--cursor-select);
-    animation: none;
+    background-color: var(--cursor-select);
+    color: var(--cursor-fg);
 }
 
 /* ───── Secondary Cursors (multi-cursor) ───── */
@@ -241,7 +238,6 @@ body {
     position: relative;
     z-index: 1;
     opacity: 0.7;
-    box-shadow: 0 0 0 1px var(--cursor-normal);
 }
 .cursor-secondary-select {
     background-color: var(--cursor-select);
@@ -249,16 +245,14 @@ body {
     position: relative;
     z-index: 1;
     opacity: 0.7;
-    box-shadow: 0 0 0 1px var(--cursor-select);
 }
 .cursor-secondary-insert {
-    box-shadow: -3px 0 0 0 var(--cursor-normal);
+    border-left: 2px solid var(--cursor-normal);
     opacity: 0.7;
 }
 .line-selected .cursor-secondary-normal {
     background-color: var(--cursor-in-selection);
     color: var(--cursor-fg);
-    box-shadow: 0 0 0 1px var(--cursor-in-selection);
 }
 
 /* ───── Buffer bar ───── */
@@ -769,7 +763,7 @@ kbd {
 }
 
 .indicator-gutter-line {
-    height: 1.5em;
+    height: calc(var(--editor-line-height) * 1em);
     position: relative;
 }
 

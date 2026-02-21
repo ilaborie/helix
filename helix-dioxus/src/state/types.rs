@@ -5,6 +5,7 @@
 
 use std::path::{Path, PathBuf};
 
+use helix_core::Position;
 use helix_view::DocumentId;
 
 use crate::config::DialogSearchMode;
@@ -34,10 +35,10 @@ pub fn centered_window(selected: usize, total: usize, window_size: usize) -> (us
 pub enum StartupAction {
     /// No argument provided - open scratch buffer.
     None,
-    /// Single file to open.
-    OpenFile(PathBuf),
+    /// Single file to open at an optional position.
+    OpenFile(PathBuf, Position),
     /// Multiple files to open (from glob pattern or multiple args).
-    OpenFiles(Vec<PathBuf>),
+    OpenFiles(Vec<(PathBuf, Position)>),
     /// Directory argument - open file picker in that directory.
     OpenFilePicker,
 }
@@ -266,6 +267,19 @@ pub struct ScrollbarDiagnostic {
     pub message: String,
 }
 
+/// Whitespace rendering configuration snapshot (from editor config).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct WhitespaceSnapshot {
+    /// Character to display for spaces (e.g., '·'), or None if spaces not rendered.
+    pub space: Option<char>,
+    /// Character to display for tabs (e.g., '→'), or None if tabs not rendered.
+    pub tab: Option<char>,
+    /// Character to display for nbsp (e.g., '⍽'), or None if nbsp not rendered.
+    pub nbsp: Option<char>,
+    /// Character to display for newlines (e.g., '⏎'), or None if newlines not rendered.
+    pub newline: Option<char>,
+}
+
 /// A snapshot of the editor state for rendering.
 /// This is Clone + Send + Sync so it can be used with Dioxus.
 #[derive(Debug, Clone, Default)]
@@ -420,6 +434,12 @@ pub struct EditorSnapshot {
     pub selected_register: Option<char>,
     /// Register currently being recorded to (None if not recording).
     pub macro_recording: Option<char>,
+
+    // Whitespace / rulers
+    /// Ruler columns (vertical column guides).
+    pub rulers: Vec<u16>,
+    /// Whitespace rendering config.
+    pub whitespace: WhitespaceSnapshot,
 
     // Theme state
     /// Current theme name.
@@ -803,6 +823,8 @@ pub enum EditorCommand {
     /// Show file picker in the current buffer's directory (Space F).
     ShowFilePickerInBufferDir,
     OpenFile(PathBuf),
+    /// Open a file at a specific position (from CLI args or multiple-file open).
+    OpenFileAtPosition(PathBuf, Position),
     /// Save document to a specific path (used by Save As dialog).
     SaveDocumentToPath(PathBuf),
 

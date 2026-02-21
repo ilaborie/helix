@@ -13,7 +13,7 @@ use crate::components::{
 };
 use crate::hooks::use_editor_snapshot;
 use crate::lsp::DiagnosticSnapshot;
-use crate::state::{DiffLineType, LineSnapshot, TokenSpan, WordJumpLabel};
+use crate::state::{DiffLineType, LineSnapshot, TokenSpan, WhitespaceSnapshot, WordJumpLabel};
 
 /// Editor view component that renders the document content.
 #[component]
@@ -128,6 +128,16 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
             // Document content
             div {
                 class: "content",
+
+                // Rulers (vertical column guides)
+                for &col in &snapshot.rulers {
+                    div {
+                        key: "ruler-{col}",
+                        class: "ruler",
+                        style: "left: {col}ch;",
+                    }
+                }
+
                 for (idx, line) in snapshot.lines.iter().enumerate() {
                     // Include version and selection state in key to force re-render
                     {
@@ -176,6 +186,7 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                                 key: "{key}",
                                 line: line.clone(),
                                 mode: mode.clone(),
+                                whitespace: snapshot.whitespace.clone(),
                                 diagnostics: line_diags,
                                 error_lens_diagnostic: error_lens_diag,
                                 jump_labels: line_jump_labels,
@@ -205,6 +216,7 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
 fn Line(
     line: LineSnapshot,
     mode: String,
+    #[props(default)] whitespace: WhitespaceSnapshot,
     diagnostics: Vec<DiagnosticSnapshot>,
     error_lens_diagnostic: Option<DiagnosticSnapshot>,
     #[props(default)] jump_labels: Vec<WordJumpLabel>,
@@ -251,7 +263,13 @@ fn Line(
     rsx! {
         div {
             class: "{line_class}",
-            {render_styled_content(&chars, &line.tokens, cursor_cols, primary_cursor_col, cursor_class, secondary_cursor_class, selection_ranges)}
+            {render_styled_content(&chars, &line.tokens, cursor_cols, primary_cursor_col, cursor_class, secondary_cursor_class, selection_ranges, &whitespace)}
+            // Visible newline character
+            if let Some(nl_char) = whitespace.newline {
+                if line.content.ends_with('\n') {
+                    span { class: "whitespace-char", "{nl_char}" }
+                }
+            }
             // Diagnostic underlines (wavy lines under errors/warnings)
             for (idx, diag) in diagnostics.iter().enumerate() {
                 DiagnosticUnderline {
@@ -297,7 +315,7 @@ fn Line(
 }
 
 /// Render content with syntax highlighting tokens, cursors, and selection.
-#[allow(clippy::indexing_slicing)] // Indices are bounded by len checks and .min(len) guards
+#[allow(clippy::indexing_slicing, clippy::too_many_arguments)]
 fn render_styled_content(
     chars: &[char],
     tokens: &[TokenSpan],
@@ -306,6 +324,7 @@ fn render_styled_content(
     primary_cursor_class: &str,
     secondary_cursor_class: &str,
     selection_ranges: &[(usize, usize)],
+    whitespace: &WhitespaceSnapshot,
 ) -> Element {
     // Build a list of spans to render
     let mut spans: Vec<Element> = Vec::new();
@@ -371,8 +390,22 @@ fn render_styled_content(
             .iter()
             .any(|&(sel_start, sel_end)| pos >= sel_start && pos < sel_end);
 
-        // Build the text content for this span
-        let text: String = chars[pos..next_pos.min(len)].iter().collect();
+        // Build the text content for this span, replacing whitespace chars
+        let span_chars = &chars[pos..next_pos.min(len)];
+        let has_visible_ws = span_chars.iter().any(|&ch| {
+            (ch == ' ' && whitespace.space.is_some())
+                || (ch == '\t' && whitespace.tab.is_some())
+                || (ch == '\u{00A0}' && whitespace.nbsp.is_some())
+        });
+        let text: String = span_chars
+            .iter()
+            .map(|&ch| match ch {
+                ' ' => whitespace.space.unwrap_or(ch),
+                '\t' => whitespace.tab.unwrap_or(ch),
+                '\u{00A0}' => whitespace.nbsp.unwrap_or(ch),
+                _ => ch,
+            })
+            .collect();
         let text = if text.is_empty() && is_cursor {
             " ".to_string()
         } else {
@@ -406,6 +439,8 @@ fn render_styled_content(
                     rsx! { span { key: "{pos}", class: "{secondary_cursor_class}", style: "{style}", "{text}" } },
                 );
             }
+        } else if has_visible_ws {
+            spans.push(rsx! { span { key: "{pos}", class: "whitespace-char", style: "{style}", "{text}" } });
         } else if style.is_empty() {
             spans.push(rsx! { span { key: "{pos}", "{text}" } });
         } else {

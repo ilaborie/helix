@@ -18,7 +18,8 @@ pub use types::{
     ConfirmationDialogSnapshot, DiffLineType, Direction, EditorCommand, EditorSnapshot, GlobalSearchResult,
     InputDialogKind, InputDialogSnapshot, LineSnapshot, NotificationSeverity, NotificationSnapshot,
     PendingKeySequence, PickerIcon, PickerItem, PickerMode, PickerPreview, PreviewContent, PreviewLine,
-    RegisterSnapshot, ScrollbarDiagnostic, ShellBehavior, StartupAction, TokenSpan, WordJumpLabel,
+    RegisterSnapshot, ScrollbarDiagnostic, ShellBehavior, StartupAction, TokenSpan, WhitespaceSnapshot,
+    WordJumpLabel,
 };
 
 use std::path::PathBuf;
@@ -29,6 +30,7 @@ use anyhow::Result;
 use helix_core::syntax::config::LanguageServerFeature;
 use helix_lsp::lsp;
 use helix_view::document::Mode;
+use helix_view::editor::WhitespaceRenderValue;
 
 use crate::lsp::{
     convert_code_actions, convert_completion_response, convert_document_colors, convert_document_symbols,
@@ -241,7 +243,7 @@ impl EditorContext {
     /// Create a new editor context with the given file.
     pub fn new(
         dhx_config: &crate::config::DhxConfig,
-        file: Option<PathBuf>,
+        file: Option<(PathBuf, helix_core::Position)>,
         command_rx: mpsc::Receiver<EditorCommand>,
         command_tx: mpsc::Sender<EditorCommand>,
     ) -> Result<Self> {
@@ -295,9 +297,25 @@ impl EditorContext {
 
         // Open file if provided
         // Note: Use VerticalSplit for initial file - Replace assumes an existing view
-        if let Some(path) = file {
+        if let Some((path, pos)) = file {
             let path = helix_stdx::path::canonicalize(&path);
             editor.open(&path, helix_view::editor::Action::VerticalSplit)?;
+
+            // Apply cursor position if specified
+            if pos != helix_core::Position::default() {
+                let (view, doc) = helix_view::current_ref!(editor);
+                let text = doc.text().slice(..);
+                let offset = helix_core::pos_at_coords(text, pos, true);
+                let selection = helix_core::Selection::point(offset);
+                let view_id = view.id;
+                let doc_id = doc.id();
+                editor
+                    .document_mut(doc_id)
+                    .expect("document just opened")
+                    .set_selection(view_id, selection);
+                let (view, doc) = helix_view::current!(editor);
+                helix_view::align_view(doc, view, helix_view::Align::Center);
+            }
         } else {
             // Create a scratch buffer
             editor.new_file(helix_view::editor::Action::VerticalSplit);
@@ -1049,6 +1067,12 @@ impl EditorContext {
             }
             EditorCommand::OpenFile(path) => {
                 self.open_file(&path);
+            }
+            EditorCommand::OpenFileAtPosition(path, pos) => {
+                self.open_file(&path);
+                if pos != helix_core::Position::default() {
+                    self.goto_line_column(pos.row, pos.col);
+                }
             }
             EditorCommand::SaveDocumentToPath(path) => {
                 self.save_document(Some(path), false);
@@ -2195,6 +2219,23 @@ impl EditorContext {
             lines
         });
 
+        // Whitespace rendering config
+        let ws_config = &self.editor.config().whitespace;
+        let ws_chars = &ws_config.characters;
+        let whitespace = types::WhitespaceSnapshot {
+            space: (ws_config.render.space() == WhitespaceRenderValue::All).then_some(ws_chars.space),
+            tab: (ws_config.render.tab() == WhitespaceRenderValue::All).then_some(ws_chars.tab),
+            nbsp: (ws_config.render.nbsp() == WhitespaceRenderValue::All).then_some(ws_chars.nbsp),
+            newline: (ws_config.render.newline() == WhitespaceRenderValue::All).then_some(ws_chars.newline),
+        };
+
+        // Rulers: language-specific override, else editor config
+        let rulers = doc
+            .language_config()
+            .and_then(|lc| lc.rulers.as_ref())
+            .unwrap_or(&self.editor.config().rulers)
+            .clone();
+
         let (open_buffers, buffer_scroll_offset) = self.buffer_bar_snapshot();
 
         // Increment snapshot version for change detection
@@ -2323,6 +2364,8 @@ impl EditorContext {
             registers: self.collect_register_snapshots(),
             selected_register: self.editor.selected_register,
             macro_recording: self.editor.macro_recording.as_ref().map(|(reg, _)| *reg),
+            rulers,
+            whitespace,
             current_theme: self.current_theme_name().to_string(),
             theme_css_vars: self.theme_to_css_vars(),
             dialog_search_mode: self.dialog_search_mode,

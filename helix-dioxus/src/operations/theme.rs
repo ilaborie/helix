@@ -96,6 +96,8 @@ const DARK_DEFAULTS: &[(&str, &str)] = &[
     ("--kbd-text", "#abb2bf"),
     ("--scrollbar-thumb", "rgba(92, 99, 112, 0.5)"),
     ("--scrollbar-thumb-hover", "rgba(108, 115, 128, 0.6)"),
+    ("--virtual-whitespace", "#4b5263"),
+    ("--virtual-ruler-bg", "#2c313a"),
 ];
 
 /// Light theme fallback defaults for CSS variables.
@@ -135,6 +137,8 @@ const LIGHT_DEFAULTS: &[(&str, &str)] = &[
     ("--kbd-text", "#383a42"),
     ("--scrollbar-thumb", "rgba(160, 161, 167, 0.5)"),
     ("--scrollbar-thumb-hover", "rgba(140, 141, 147, 0.6)"),
+    ("--virtual-whitespace", "#a0a1a7"),
+    ("--virtual-ruler-bg", "#e8e8e8"),
 ];
 
 impl ThemeOps for EditorContext {
@@ -198,6 +202,9 @@ impl ThemeOps for EditorContext {
             ("diagnostic.info", "--info", false),
             ("diagnostic.hint", "--hint", false),
             ("diff.plus", "--success", false),
+            // Virtual elements
+            ("ui.virtual.whitespace", "--virtual-whitespace", false),
+            ("ui.virtual.ruler", "--virtual-ruler-bg", true),
             // Mode colors (statusline)
             ("ui.statusline.normal", "--mode-normal-bg", true),
             ("ui.statusline.normal", "--mode-normal-fg", false),
