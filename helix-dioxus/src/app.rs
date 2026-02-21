@@ -270,8 +270,8 @@ pub fn App() -> Element {
     let font_css = &app_state.font_css;
 
     rsx! {
-        // Load external stylesheet
-        document::Stylesheet { href: asset!("/assets/styles.css") }
+        // Embed stylesheet (include_str! works with both `cargo build` and `dx bundle`)
+        document::Style { {include_str!("../assets/styles.css")} }
 
         // Font config overrides (must come after stylesheet to win in cascade)
         document::Style { {font_css.clone()} }
