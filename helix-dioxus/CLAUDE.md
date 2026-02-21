@@ -35,10 +35,9 @@ helix-dioxus/src/
 │   ├── logos.rs                 # 1 logo icon (Go)
 │   └── vscode_icons.rs         # 37 VSCode file type icon constants (colorful SVGs)
 │
-├── bin/dhx/                    # Binary entry point
-│   ├── main.rs                 # CLI: loads config, inits tracing/loader, launches app
-│   ├── args.rs                 # Command-line argument parsing → StartupAction
-│   └── tracing_setup.rs        # Tracing subscriber init from LoggingConfig
+├── main.rs                     # Binary entry point: loads config, inits tracing/loader, launches app
+├── args.rs                     # Command-line argument parsing → StartupAction
+├── tracing_setup.rs            # Tracing subscriber init from LoggingConfig
 │
 ├── lsp/                        # LSP Data & Logic
 │   ├── mod.rs                  # Re-exports types and conversions

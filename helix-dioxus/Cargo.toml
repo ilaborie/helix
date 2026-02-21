@@ -16,7 +16,7 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "dhx"
-path = "src/bin/dhx/main.rs"
+path = "src/main.rs"
 
 [features]
 default = ["git"]
