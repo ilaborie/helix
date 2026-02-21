@@ -3,7 +3,7 @@
 //! This module contains all shared data structures used for state management
 //! and communication between the editor core and UI components.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use helix_view::DocumentId;
 
@@ -214,17 +214,45 @@ pub struct PreviewLine {
     pub is_focus_line: bool,
 }
 
+/// Image file extensions supported for preview.
+const IMAGE_EXTENSIONS: &[&str] = &[
+    "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif", "tiff", "tif", "heic",
+    "heif", "apng", "jfif",
+];
+
+/// Check if a path refers to an image file based on its extension.
+#[must_use]
+pub fn is_image_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|ext| IMAGE_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
+}
+
+/// Content variants for picker preview.
+#[derive(Debug, Clone, PartialEq)]
+pub enum PreviewContent {
+    /// Syntax-highlighted text preview.
+    Text {
+        lines: Vec<PreviewLine>,
+        focus_line: Option<usize>,
+        search_pattern: Option<String>,
+    },
+    /// Image preview with metadata.
+    Image {
+        absolute_path: String,
+        file_size: u64,
+        dimensions: Option<(usize, usize)>,
+        format: String,
+    },
+}
+
 /// File preview data for the picker panel.
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PickerPreview {
     /// Display path (relative if possible).
     pub file_path: String,
-    /// Visible preview lines (~20 lines).
-    pub lines: Vec<PreviewLine>,
-    /// 1-indexed focus line number.
-    pub focus_line: Option<usize>,
-    /// Search pattern for highlighting matches (`GlobalSearch` mode).
-    pub search_pattern: Option<String>,
+    /// Preview content (text or image).
+    pub content: PreviewContent,
 }
 
 /// Minimal diagnostic info for scrollbar markers.
@@ -1498,5 +1526,39 @@ mod tests {
     #[test]
     fn move_left_is_not_recordable() {
         assert!(!EditorCommand::MoveLeft.is_insert_recordable());
+    }
+
+    // --- is_image_file ---
+
+    #[test]
+    fn is_image_file_common_formats() {
+        assert!(is_image_file(Path::new("photo.png")));
+        assert!(is_image_file(Path::new("photo.jpg")));
+        assert!(is_image_file(Path::new("photo.jpeg")));
+        assert!(is_image_file(Path::new("photo.gif")));
+        assert!(is_image_file(Path::new("photo.webp")));
+        assert!(is_image_file(Path::new("photo.svg")));
+        assert!(is_image_file(Path::new("photo.bmp")));
+        assert!(is_image_file(Path::new("photo.ico")));
+    }
+
+    #[test]
+    fn is_image_file_case_insensitive() {
+        assert!(is_image_file(Path::new("photo.PNG")));
+        assert!(is_image_file(Path::new("photo.Jpg")));
+        assert!(is_image_file(Path::new("photo.WEBP")));
+    }
+
+    #[test]
+    fn is_image_file_non_image_returns_false() {
+        assert!(!is_image_file(Path::new("file.rs")));
+        assert!(!is_image_file(Path::new("file.txt")));
+        assert!(!is_image_file(Path::new("file.toml")));
+        assert!(!is_image_file(Path::new("Makefile")));
+    }
+
+    #[test]
+    fn is_image_file_no_extension_returns_false() {
+        assert!(!is_image_file(Path::new("README")));
     }
 }

@@ -14,10 +14,11 @@ mod lsp_events;
 mod types;
 
 pub use types::{
-    centered_window, BufferInfo, CommandCompletionItem, ConfirmationAction, ConfirmationDialogSnapshot, DiffLineType,
-    Direction, EditorCommand, EditorSnapshot, GlobalSearchResult, InputDialogKind, InputDialogSnapshot, LineSnapshot,
-    NotificationSeverity, NotificationSnapshot, PendingKeySequence, PickerIcon, PickerItem, PickerMode, PickerPreview,
-    PreviewLine, RegisterSnapshot, ScrollbarDiagnostic, ShellBehavior, StartupAction, TokenSpan, WordJumpLabel,
+    centered_window, is_image_file, BufferInfo, CommandCompletionItem, ConfirmationAction,
+    ConfirmationDialogSnapshot, DiffLineType, Direction, EditorCommand, EditorSnapshot, GlobalSearchResult,
+    InputDialogKind, InputDialogSnapshot, LineSnapshot, NotificationSeverity, NotificationSnapshot,
+    PendingKeySequence, PickerIcon, PickerItem, PickerMode, PickerPreview, PreviewContent, PreviewLine,
+    RegisterSnapshot, ScrollbarDiagnostic, ShellBehavior, StartupAction, TokenSpan, WordJumpLabel,
 };
 
 use std::path::PathBuf;
@@ -2505,6 +2506,30 @@ impl EditorContext {
             .to_string_lossy()
             .to_string();
 
+        // Early-return for image files — render image preview instead of text
+        if types::is_image_file(&file_path) {
+            let metadata = std::fs::metadata(&file_path).ok()?;
+            let dimensions = imagesize::size(&file_path)
+                .ok()
+                .map(|s| (s.width, s.height));
+            let format = file_path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("unknown")
+                .to_uppercase();
+            let preview = types::PickerPreview {
+                file_path: display_path,
+                content: types::PreviewContent::Image {
+                    absolute_path: file_path.to_string_lossy().to_string(),
+                    file_size: metadata.len(),
+                    dimensions,
+                    format,
+                },
+            };
+            self.cached_preview = Some((item_id, preview.clone()));
+            return Some(preview);
+        }
+
         // Try open document first (match by path)
         let open_doc = self
             .editor
@@ -2580,9 +2605,11 @@ impl EditorContext {
 
         let preview = types::PickerPreview {
             file_path: display_path,
-            lines,
-            focus_line: target_line,
-            search_pattern,
+            content: types::PreviewContent::Text {
+                lines,
+                focus_line: target_line,
+                search_pattern,
+            },
         };
 
         // Cache the preview for this item

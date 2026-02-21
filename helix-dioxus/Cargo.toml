@@ -81,6 +81,9 @@ rfd = "0.15"
 # Emoji data (Unicode 17.0)
 emojis = "0.8"
 
+# Image dimension reading (lightweight, header-only)
+imagesize = "0.13"
+
 # Markdown rendering
 pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 

@@ -5,7 +5,7 @@
 
 use dioxus::prelude::*;
 
-use crate::state::{PickerPreview, PreviewLine, TokenSpan};
+use crate::state::{PickerPreview, PreviewContent, PreviewLine, TokenSpan};
 
 /// Render syntax-highlighted tokens for a preview line.
 /// Simplified version of `render_styled_content` without cursor/selection logic.
@@ -159,6 +159,18 @@ fn render_with_search_highlight(content: &str, tokens: &[TokenSpan], pattern: &s
     }
 }
 
+/// Format a file size in bytes to a human-readable string (B, KB, MB).
+#[allow(clippy::cast_precision_loss)] // File sizes don't need sub-byte precision
+fn format_file_size(bytes: u64) -> String {
+    if bytes < 1024 {
+        format!("{bytes} B")
+    } else if bytes < 1024 * 1024 {
+        format!("{:.1} KB", bytes as f64 / 1024.0)
+    } else {
+        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
+    }
+}
+
 /// File preview panel for the picker.
 #[component]
 pub fn PickerPreviewPanel(preview: PickerPreview) -> Element {
@@ -172,39 +184,60 @@ pub fn PickerPreviewPanel(preview: PickerPreview) -> Element {
                 "{preview.file_path}"
             }
 
-            // Content area with lines
-            div {
-                class: "picker-preview-content",
+            {match &preview.content {
+                PreviewContent::Text { lines, search_pattern, .. } => rsx! {
+                    div {
+                        class: "picker-preview-content",
 
-                for line in preview.lines.iter() {
-                    {
-                        let line_class = if line.is_focus_line {
-                            "picker-preview-line picker-preview-line-focus"
-                        } else {
-                            "picker-preview-line"
-                        };
-                        let line_num = line.line_number;
-                        rsx! {
-                            div {
-                                key: "{line_num}",
-                                class: "{line_class}",
+                        for line in lines.iter() {
+                            {
+                                let line_class = if line.is_focus_line {
+                                    "picker-preview-line picker-preview-line-focus"
+                                } else {
+                                    "picker-preview-line"
+                                };
+                                let line_num = line.line_number;
+                                rsx! {
+                                    div {
+                                        key: "{line_num}",
+                                        class: "{line_class}",
 
-                                // Line number gutter
-                                span {
-                                    class: "picker-preview-gutter",
-                                    "{line_num}"
-                                }
+                                        span {
+                                            class: "picker-preview-gutter",
+                                            "{line_num}"
+                                        }
 
-                                // Code content
-                                span {
-                                    class: "picker-preview-code",
-                                    {render_line_content(line, preview.search_pattern.as_deref())}
+                                        span {
+                                            class: "picker-preview-code",
+                                            {render_line_content(line, search_pattern.as_deref())}
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
+                },
+                PreviewContent::Image { absolute_path, file_size, dimensions, format } => {
+                    let meta = match dimensions {
+                        Some((w, h)) => format!("{w} \u{00d7} {h} \u{00b7} {format} \u{00b7} {}", format_file_size(*file_size)),
+                        None => format!("{format} \u{00b7} {}", format_file_size(*file_size)),
+                    };
+                    let src = format!("file://{absolute_path}");
+                    rsx! {
+                        div {
+                            class: "picker-preview-meta",
+                            "{meta}"
+                        }
+                        div {
+                            class: "picker-preview-image",
+                            img {
+                                src: "{src}",
+                                alt: "{preview.file_path}",
+                            }
+                        }
+                    }
                 }
-            }
+            }}
         }
     }
 }

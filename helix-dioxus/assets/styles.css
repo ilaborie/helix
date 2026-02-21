@@ -592,6 +592,39 @@ body {
     border-radius: 2px;
 }
 
+.picker-preview-meta {
+    padding: 6px 12px;
+    color: var(--text-dim);
+    font-size: 11px;
+    border-bottom: 1px solid var(--bg-selection);
+    flex-shrink: 0;
+}
+
+.picker-preview-image {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    overflow: hidden;
+}
+
+.picker-preview-image img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 4px;
+    /* Checkerboard pattern for transparency visibility */
+    background-image:
+        linear-gradient(45deg, #808080 25%, transparent 25%),
+        linear-gradient(-45deg, #808080 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #808080 75%),
+        linear-gradient(-45deg, transparent 75%, #808080 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+    background-color: #c0c0c0;
+}
+
 kbd {
     background-color: var(--kbd-bg);
     color: var(--kbd-text);
