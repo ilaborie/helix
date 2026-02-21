@@ -1606,10 +1606,8 @@ Massive sprint bringing helix-dioxus to 100% keybinding coverage and full LSP in
 
 ### Remaining TODOs
 - [ ] Scrollbar interactions (track click, thumb drag) — **BLOCKED** by Dioxus element height issue (see [SCROLLBAR_FIX_INVESTIGATION.md](SCROLLBAR_FIX_INVESTIGATION.md))
-- [ ] Signature help parameter position highlighting
 - [ ] Buffer bar: hide option
 - [ ] macOS dock icon (needs .app bundle)
-- [ ] Configurable keymaps via `[keys]` in config.toml (trie infrastructure in `keymap/` module — not yet wired to key dispatch)
 
 ### Architecture Note
 Split views are **not planned** for helix-dioxus. For multiple views, users should launch multiple editor instances. This keeps the architecture simpler and aligns with a single-document-focus paradigm.
@@ -1792,6 +1790,40 @@ DAP/Debug is **not supported** — `Space G` sub-menu will not be implemented.
 ### Technical Notes
 - Function handles nested placeholders, escaped `\$`, and mixed plain text + snippet syntax
 - Applied during `CompletionConfirm` command processing before text insertion
+
+---
+
+## 2026-02-21: Configurable Keymap System
+
+### Progress
+- Migrated Normal, Insert, and Select mode dispatch from hardcoded `handle_normal_mode`/`handle_insert_mode`/`handle_select_mode` handlers to a trie-based `DhxKeymaps` system in the `keymap/` module
+- User keymaps loaded from `config.toml` `[keys]` section and merged with defaults via `merge_keys()`
+- ~150 command registry entries mapping command names to `EditorCommand` variants
+- Supports await-char commands (f/F/t/T/r), sticky nodes (g, Space, m, brackets), and multi-key sequences
+- Deleted old hardcoded handler files: `keybindings/normal.rs`, `keybindings/insert.rs`, `keybindings/select.rs`
+
+### Architecture
+- `keymap/trie.rs` — `DhxKeyTrie`/`DhxKeyTrieNode` data structure with `TrieSearchResult` (Found, Prefix, NotFound)
+- `keymap/command.rs` — `CommandSlot` enum (Single, AwaitChar), `AwaitCharKind`, command name → `EditorCommand` mapping
+- `keymap/default.rs` — Default keymaps for all modes (normal, insert, select, g-prefix, Space-prefix, etc.)
+- `keymap/mod.rs` — `DhxKeymapResult`, dispatch logic, key sequence state management
+
+### Files Deleted
+- `src/keybindings/normal.rs` — replaced by keymap trie dispatch
+- `src/keybindings/insert.rs` — replaced by keymap trie dispatch
+- `src/keybindings/select.rs` — replaced by keymap trie dispatch
+
+### Technical Notes
+- Dialog/prompt modes (command, search, picker, regex, completion, confirmation, input, shell) still use dedicated handlers in `keybindings/`
+- The trie approach enables user customization without code changes — users can remap any key in any mode via `config.toml`
+
+---
+
+## 2026-02-21: Signature Help Parameter Highlighting
+
+### Progress
+- Active parameter in signature help popup is now visually highlighted
+- Uses bold + accent color to distinguish the current parameter from the rest of the signature
 
 ---
 

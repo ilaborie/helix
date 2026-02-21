@@ -121,9 +121,6 @@ helix-dioxus/src/
     ├── mod.rs                  # Re-exports + shared helpers (direction_from_key, handle_move_keys, etc.)
     ├── translate.rs            # Dioxus KeyboardEvent → helix KeyEvent translation
     ├── completion.rs           # handle_completion_mode, location_picker, code_actions, lsp_dialog
-    ├── normal.rs               # handle_normal_mode
-    ├── insert.rs               # handle_insert_mode
-    ├── select.rs               # handle_select_mode
     ├── command.rs              # handle_command_mode
     ├── picker.rs               # handle_picker_mode
     ├── regex.rs                # handle_regex_mode (select/split regex prompt)
@@ -314,6 +311,8 @@ Shared keybinding logic lives in `keybindings/mod.rs`:
 - `handle_extend_keys(code)` → direction → `ExtendLeft/Right/Up/Down`
 - `handle_text_input_keys(code, esc, enter, backspace, char_fn)` → shared Esc/Enter/Backspace/Char pattern (used by search/command/regex modes)
 - `handle_list_navigation_keys(code, esc, up, down, enter, backspace?, char_fn?)` → shared list navigation (used by location picker, code actions)
+
+Normal, Insert, and Select modes use trie-based dispatch via the `keymap/` module (configurable via `[keys]` in `config.toml`). Dialog and prompt modes (command, search, picker, regex, completion, confirmation, input, shell) still use dedicated handlers in `keybindings/`.
 
 Multi-key sequences (f/F/t/T, g, Space, [, ], r, m, ") are handled via `PendingKeySequence` enum in `app.rs`.
 
