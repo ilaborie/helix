@@ -6,5 +6,6 @@ mod generic;
 mod highlight;
 mod item;
 mod preview;
+mod scrollbar;
 
 pub use generic::GenericPicker;

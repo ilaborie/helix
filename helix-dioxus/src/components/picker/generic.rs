@@ -10,11 +10,12 @@ use dioxus::prelude::*;
 use crate::components::KbdKey;
 use crate::config::DialogSearchMode;
 use crate::hooks::use_snapshot_signal;
-use crate::state::{EditorCommand, PickerItem, PickerMode, PickerPreview};
+use crate::state::{EditorCommand, PickerItem, PickerMode, PickerPreview, PICKER_WINDOW_SIZE};
 use crate::AppState;
 
 use super::item::PickerItemRow;
 use super::preview::PickerPreviewPanel;
+use super::scrollbar::PickerScrollbar;
 
 /// Generic picker component that displays items with filtering and highlighting.
 #[component]
@@ -169,40 +170,50 @@ pub fn GenericPicker(
                         div {
                             class: "picker-list",
 
-                            if items.is_empty() {
-                                div {
-                                    class: "picker-empty",
-                                    if mode == PickerMode::GlobalSearch {
-                                        if filter.is_empty() {
-                                            "Type a pattern and press Enter to search"
+                            div {
+                                class: "picker-list-items",
+
+                                if items.is_empty() {
+                                    div {
+                                        class: "picker-empty",
+                                        if mode == PickerMode::GlobalSearch {
+                                            if filter.is_empty() {
+                                                "Type a pattern and press Enter to search"
+                                            } else {
+                                                "Press Enter to search"
+                                            }
+                                        } else if filter.is_empty() {
+                                            "No items"
                                         } else {
-                                            "Press Enter to search"
+                                            "No matches found"
                                         }
-                                    } else if filter.is_empty() {
-                                        "No items"
-                                    } else {
-                                        "No matches found"
                                     }
-                                }
-                            } else {
-                                for (idx, item) in visible_items {
-                                    {
-                                        let item_app_state = app_state.clone();
-                                        let handle_click = move |evt: MouseEvent| {
-                                            evt.stop_propagation();
-                                            item_app_state.send_command(EditorCommand::PickerConfirmItem(idx));
-                                            item_app_state.process_and_notify(&mut snapshot_signal);
-                                        };
-                                        rsx! {
-                                            PickerItemRow {
-                                                key: "{idx}",
-                                                item: item.clone(),
-                                                is_selected: idx == selected,
-                                                on_click: handle_click,
+                                } else {
+                                    for (idx, item) in visible_items {
+                                        {
+                                            let item_app_state = app_state.clone();
+                                            let handle_click = move |evt: MouseEvent| {
+                                                evt.stop_propagation();
+                                                item_app_state.send_command(EditorCommand::PickerConfirmItem(idx));
+                                                item_app_state.process_and_notify(&mut snapshot_signal);
+                                            };
+                                            rsx! {
+                                                PickerItemRow {
+                                                    key: "{idx}",
+                                                    item: item.clone(),
+                                                    is_selected: idx == selected,
+                                                    on_click: handle_click,
+                                                }
                                             }
                                         }
                                     }
                                 }
+                            }
+
+                            PickerScrollbar {
+                                visible_count: PICKER_WINDOW_SIZE,
+                                window_offset,
+                                filtered_count,
                             }
                         }
                     }

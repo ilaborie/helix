@@ -14,6 +14,9 @@ use crate::lsp::{
     DiagnosticSnapshot, InlayHintSnapshot, LocationSnapshot, LspServerSnapshot, SignatureHelpSnapshot,
 };
 
+/// Number of items visible in the picker's sliding window.
+pub const PICKER_WINDOW_SIZE: usize = 15;
+
 /// Compute a visible window of `window_size` items centered on `selected`,
 /// clamped to `[0, total)`. Returns `(start, end)`.
 #[must_use]
@@ -28,6 +31,21 @@ pub fn centered_window(selected: usize, total: usize, window_size: usize) -> (us
     };
     let end = (start + window_size).min(total);
     (start, end)
+}
+
+/// Compute scrollbar thumb position and size as percentages.
+///
+/// Returns `Some((top_pct, height_pct))` when scrollbar is needed
+/// (i.e. `total > visible`), or `None` when the full list fits.
+#[must_use]
+#[allow(clippy::cast_precision_loss)] // CSS percentages — precision loss irrelevant
+pub fn scrollbar_thumb_geometry(visible: usize, offset: usize, total: usize) -> Option<(f64, f64)> {
+    if total == 0 || total <= visible {
+        return None;
+    }
+    let height_pct = (visible as f64 / total as f64) * 100.0;
+    let top_pct = (offset as f64 / total as f64) * 100.0;
+    Some((top_pct, height_pct))
 }
 
 /// Determines what action to take on startup.
@@ -1371,6 +1389,47 @@ mod tests {
     #[test]
     fn centered_window_empty() {
         assert_eq!(centered_window(0, 0, 15), (0, 0));
+    }
+
+    // --- scrollbar_thumb_geometry ---
+
+    #[test]
+    fn scrollbar_none_when_empty() {
+        assert_eq!(scrollbar_thumb_geometry(15, 0, 0), None);
+    }
+
+    #[test]
+    fn scrollbar_none_when_fits() {
+        assert_eq!(scrollbar_thumb_geometry(15, 0, 15), None);
+        assert_eq!(scrollbar_thumb_geometry(15, 0, 10), None);
+    }
+
+    #[test]
+    fn scrollbar_at_top() {
+        let (top, height) = scrollbar_thumb_geometry(15, 0, 100).expect("should need scrollbar");
+        assert!((top - 0.0).abs() < f64::EPSILON);
+        assert!((height - 15.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn scrollbar_at_bottom() {
+        let (top, height) = scrollbar_thumb_geometry(15, 85, 100).expect("should need scrollbar");
+        assert!((top - 85.0).abs() < f64::EPSILON);
+        assert!((height - 15.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn scrollbar_mid_position() {
+        let (top, height) = scrollbar_thumb_geometry(15, 43, 100).expect("should need scrollbar");
+        assert!((top - 43.0).abs() < f64::EPSILON);
+        assert!((height - 15.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn scrollbar_large_list() {
+        let (top, height) = scrollbar_thumb_geometry(15, 500, 1000).expect("should need scrollbar");
+        assert!((top - 50.0).abs() < f64::EPSILON);
+        assert!((height - 1.5).abs() < f64::EPSILON);
     }
 
     // --- DiffLineType ---

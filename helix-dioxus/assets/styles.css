@@ -489,8 +489,35 @@ body {
 }
 
 .picker-list {
-    overflow-y: auto;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
     max-height: 340px;
+}
+
+.picker-list-items {
+    flex: 1;
+    min-width: 0;
+}
+
+.picker-scrollbar-track {
+    width: 6px;
+    flex-shrink: 0;
+    position: relative;
+    margin: 4px 2px;
+}
+
+.picker-scrollbar-thumb {
+    position: absolute;
+    left: 0;
+    right: 0;
+    background: var(--scrollbar-thumb);
+    border-radius: 3px;
+    min-height: 12px;
+}
+
+.picker-scrollbar-track:hover .picker-scrollbar-thumb {
+    background: var(--scrollbar-thumb-hover);
 }
 
 .picker-empty {

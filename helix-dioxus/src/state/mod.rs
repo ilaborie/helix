@@ -14,11 +14,12 @@ mod lsp_events;
 mod types;
 
 pub use types::{
-    centered_window, is_image_file, BufferInfo, CommandCompletionItem, ConfirmationAction, ConfirmationDialogSnapshot,
-    DiffLineType, Direction, EditorCommand, EditorSnapshot, GlobalSearchResult, InputDialogKind, InputDialogSnapshot,
-    LineSnapshot, NotificationSeverity, NotificationSnapshot, PendingKeySequence, PickerIcon, PickerItem, PickerMode,
-    PickerPreview, PreviewContent, PreviewLine, RegisterSnapshot, ScrollbarDiagnostic, ShellBehavior, StartupAction,
-    TokenSpan, WhitespaceSnapshot, WordJumpLabel,
+    centered_window, is_image_file, scrollbar_thumb_geometry, BufferInfo, CommandCompletionItem, ConfirmationAction,
+    ConfirmationDialogSnapshot, DiffLineType, Direction, EditorCommand, EditorSnapshot, GlobalSearchResult,
+    InputDialogKind, InputDialogSnapshot, LineSnapshot, NotificationSeverity, NotificationSnapshot,
+    PendingKeySequence, PickerIcon, PickerItem, PickerMode, PickerPreview, PreviewContent, PreviewLine,
+    RegisterSnapshot, ScrollbarDiagnostic, ShellBehavior, StartupAction, TokenSpan, WhitespaceSnapshot,
+    WordJumpLabel, PICKER_WINDOW_SIZE,
 };
 
 use std::path::PathBuf;
@@ -2501,7 +2502,7 @@ impl EditorContext {
                 let sel = self.picker_selected;
                 let filtered = self.get_or_compute_filtered_items();
                 let count = filtered.len();
-                let (win_start, win_end) = centered_window(sel, count, 15);
+                let (win_start, win_end) = centered_window(sel, count, PICKER_WINDOW_SIZE);
                 filtered.get(win_start..win_end).unwrap_or(&[]).to_vec()
             },
             picker_filter: self.picker_filter.clone(),
@@ -2510,7 +2511,7 @@ impl EditorContext {
             picker_filtered_count: self.cached_filtered_items.as_ref().map_or(0, std::vec::Vec::len),
             picker_window_offset: {
                 let filtered_count = self.cached_filtered_items.as_ref().map_or(0, std::vec::Vec::len);
-                centered_window(self.picker_selected, filtered_count, 15).0
+                centered_window(self.picker_selected, filtered_count, PICKER_WINDOW_SIZE).0
             },
             picker_mode: self.picker_mode,
             picker_current_path: self

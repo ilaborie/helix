@@ -197,7 +197,8 @@ Functions defined in `script.js`:
 - `.gutter-line`, `.gutter-line-active` (line number row styles)
 - `.buffer-bar`, `.buffer-tab`, `.buffer-tabs`, `.buffer-tab-name`, `.scroll-button` (tab bar)
 - `.statusline`, `.statusline-lsp`, `.statusline-recording` (status bar)
-- `.picker-*` (overlay, container, header, list, item, body, left, preview)
+- `.picker-*` (overlay, container, header, list, list-items, item, body, left, preview)
+- `.picker-scrollbar-track`, `.picker-scrollbar-thumb` (picker list scrollbar)
 - `.prompt`, `.prompt-cursor`
 - `.completion-*`, `.hover-*`, `.code-action-*` (LSP popups)
 - `.inline-dialog`, `.inline-dialog-list`, `.inline-dialog-item` (cursor-positioned popups)
