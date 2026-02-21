@@ -6,6 +6,7 @@
 use dioxus::prelude::*;
 
 use super::KbdKey;
+use crate::hooks::use_snapshot_signal;
 use crate::state::{EditorCommand, PendingKeySequence, RegisterSnapshot};
 use crate::AppState;
 
@@ -336,6 +337,7 @@ pub fn KeybindingHelpBar(
 #[component]
 fn RegisterDialog(name: char, content: String, on_close: EventHandler) -> Element {
     let app_state = use_context::<AppState>();
+    let mut snapshot_signal = use_snapshot_signal();
     let label = register_label(name);
     let has_content = !content.is_empty();
     let clearable = can_clear(name) && has_content;
@@ -396,7 +398,7 @@ fn RegisterDialog(name: char, content: String, on_close: EventHandler) -> Elemen
                         class: "register-dialog-clear-btn",
                         onclick: move |_| {
                             app_state.send_command(EditorCommand::ClearRegister(name));
-                            app_state.process_commands_sync();
+                            app_state.process_and_notify(&mut snapshot_signal);
                             on_close.call(());
                         },
                         "Clear"

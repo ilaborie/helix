@@ -5,7 +5,7 @@
 use crate::icons::{lucide, Icon};
 use dioxus::prelude::*;
 
-use crate::hooks::use_editor_snapshot;
+use crate::hooks::{use_snapshot, use_snapshot_signal};
 use crate::state::{BufferInfo, EditorCommand};
 use crate::AppState;
 
@@ -16,8 +16,10 @@ const MAX_VISIBLE_TABS: usize = 8;
 
 /// Buffer bar component that displays open buffers as clickable tabs.
 #[component]
-pub fn BufferBar(version: ReadSignal<usize>, on_change: EventHandler<()>) -> Element {
-    let (app_state, snapshot) = use_editor_snapshot(version);
+pub fn BufferBar() -> Element {
+    let app_state = use_context::<AppState>();
+    let snapshot = use_snapshot();
+    let mut snapshot_signal = use_snapshot_signal();
 
     let buffers = &snapshot.open_buffers;
     let scroll_offset = snapshot.buffer_scroll_offset;
@@ -50,8 +52,7 @@ pub fn BufferBar(version: ReadSignal<usize>, on_change: EventHandler<()>) -> Ele
                     direction: "left",
                     onclick: move |_| {
                         app_state_left.send_command(EditorCommand::BufferBarScrollLeft);
-                        app_state_left.process_commands_sync();
-                        on_change.call(());
+                        app_state_left.process_and_notify(&mut snapshot_signal);
                     },
                 }
             }
@@ -63,9 +64,6 @@ pub fn BufferBar(version: ReadSignal<usize>, on_change: EventHandler<()>) -> Ele
                     BufferTab {
                         key: "{buffer.id:?}",
                         buffer: buffer.clone(),
-                        on_action: move |()| {
-                            on_change.call(());
-                        },
                     }
                 }
             }
@@ -76,8 +74,7 @@ pub fn BufferBar(version: ReadSignal<usize>, on_change: EventHandler<()>) -> Ele
                     direction: "right",
                     onclick: move |_| {
                         app_state_right.send_command(EditorCommand::BufferBarScrollRight);
-                        app_state_right.process_commands_sync();
-                        on_change.call(());
+                        app_state_right.process_and_notify(&mut snapshot_signal);
                     },
                 }
             }
@@ -87,14 +84,11 @@ pub fn BufferBar(version: ReadSignal<usize>, on_change: EventHandler<()>) -> Ele
 
 /// Individual buffer tab component.
 #[component]
-fn BufferTab(buffer: BufferInfo, on_action: EventHandler<()>) -> Element {
+fn BufferTab(buffer: BufferInfo) -> Element {
     let app_state = use_context::<AppState>();
-    let app_state_switch = app_state.clone();
+    let mut snapshot_signal = use_snapshot_signal();
+
     let app_state_close = app_state.clone();
-
-    let on_action_switch = on_action;
-    let on_action_close = on_action;
-
     let doc_id = buffer.id;
     let doc_id_close = buffer.id;
 
@@ -128,9 +122,8 @@ fn BufferTab(buffer: BufferInfo, on_action: EventHandler<()>) -> Element {
             onmousedown: move |evt| {
                 evt.stop_propagation();
                 log::info!("Buffer tab clicked: {doc_id:?}");
-                app_state_switch.send_command(EditorCommand::SwitchToBuffer(doc_id));
-                app_state_switch.process_commands_sync();
-                on_action_switch.call(());
+                app_state.send_command(EditorCommand::SwitchToBuffer(doc_id));
+                app_state.process_and_notify(&mut snapshot_signal);
             },
 
             // Modified indicator (before file icon for visibility)
@@ -161,8 +154,7 @@ fn BufferTab(buffer: BufferInfo, on_action: EventHandler<()>) -> Element {
                     evt.stop_propagation();
                     log::info!("Close button clicked: {doc_id_close:?}");
                     app_state_close.send_command(EditorCommand::CloseBuffer(doc_id_close));
-                    app_state_close.process_commands_sync();
-                    on_action_close.call(());
+                    app_state_close.process_and_notify(&mut snapshot_signal);
                 },
                 span {
                     class: "icon-wrapper",

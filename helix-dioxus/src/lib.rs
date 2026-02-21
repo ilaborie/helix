@@ -100,12 +100,7 @@ pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
             Vec::new(),
         ),
         StartupAction::OpenFile(path, pos) => (
-            EditorContext::new(
-                &config,
-                Some((path.clone(), *pos)),
-                command_rx,
-                command_tx.clone(),
-            )?,
+            EditorContext::new(&config, Some((path.clone(), *pos)), command_rx, command_tx.clone())?,
             Vec::new(),
         ),
         StartupAction::OpenFiles(files) => {
@@ -178,9 +173,7 @@ pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
                     // Handle window events for resize and scale factor changes
                     if let dioxus::desktop::tao::event::Event::WindowEvent { event: win_event, .. } = event {
                         match win_event {
-                            dioxus::desktop::tao::event::WindowEvent::ScaleFactorChanged {
-                                scale_factor, ..
-                            } => {
+                            dioxus::desktop::tao::event::WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
                                 if let Ok(mut ctx) = editor_ctx_clone.try_borrow_mut() {
                                     ctx.scale_factor = *scale_factor;
                                     log::info!("scale factor changed: {scale_factor}");
@@ -327,5 +320,14 @@ impl AppState {
     #[must_use]
     pub fn get_snapshot(&self) -> EditorSnapshot {
         self.snapshot.lock().clone()
+    }
+
+    /// Process pending commands, update the mutex snapshot, and push to the Dioxus signal.
+    ///
+    /// This is the primary way components trigger re-renders after sending commands.
+    pub fn process_and_notify(&self, signal: &mut dioxus::prelude::Signal<EditorSnapshot>) {
+        use dioxus::prelude::*;
+        self.process_commands_sync();
+        signal.set(self.get_snapshot());
     }
 }

@@ -9,6 +9,7 @@ use dioxus::prelude::*;
 
 use crate::components::KbdKey;
 use crate::config::DialogSearchMode;
+use crate::hooks::use_snapshot_signal;
 use crate::state::{EditorCommand, PickerItem, PickerMode, PickerPreview};
 use crate::AppState;
 
@@ -34,6 +35,7 @@ pub fn GenericPicker(
     search_focused: bool,
 ) -> Element {
     let app_state = use_context::<AppState>();
+    let mut snapshot_signal = use_snapshot_signal();
 
     // Items are pre-windowed — compute absolute indices using offset
     let visible_items: Vec<(usize, &PickerItem)> = items
@@ -189,7 +191,7 @@ pub fn GenericPicker(
                                         let handle_click = move |evt: MouseEvent| {
                                             evt.stop_propagation();
                                             item_app_state.send_command(EditorCommand::PickerConfirmItem(idx));
-                                            item_app_state.process_commands_sync();
+                                            item_app_state.process_and_notify(&mut snapshot_signal);
                                         };
                                         rsx! {
                                             PickerItemRow {

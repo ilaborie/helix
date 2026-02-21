@@ -5,9 +5,10 @@
 use crate::icons::{lucide, Icon};
 use dioxus::prelude::*;
 
-use crate::hooks::use_editor_snapshot;
+use crate::hooks::{use_snapshot, use_snapshot_signal};
 use crate::lsp::{LspServerSnapshot, LspServerStatus};
 use crate::state::EditorCommand;
+use crate::AppState;
 
 /// Determine the aggregate status for display.
 fn aggregate_lsp_status(servers: &[LspServerSnapshot]) -> LspServerStatus {
@@ -87,8 +88,10 @@ fn LspStatusBlock(servers: Vec<LspServerSnapshot>, on_click: EventHandler<MouseE
 
 /// Status line component that shows editor state.
 #[component]
-pub fn StatusLine(version: ReadSignal<usize>, on_change: EventHandler<()>) -> Element {
-    let (app_state, snapshot) = use_editor_snapshot(version);
+pub fn StatusLine() -> Element {
+    let app_state = use_context::<AppState>();
+    let snapshot = use_snapshot();
+    let mut snapshot_signal = use_snapshot_signal();
 
     let mode = &snapshot.mode;
     let file_name = &snapshot.file_name;
@@ -170,8 +173,7 @@ pub fn StatusLine(version: ReadSignal<usize>, on_change: EventHandler<()>) -> El
                 servers: lsp_servers,
                 on_click: move |_| {
                     app_state.send_command(EditorCommand::ToggleLspDialog);
-                    app_state.process_commands_sync();
-                    on_change.call(());
+                    app_state.process_and_notify(&mut snapshot_signal);
                 },
             }
 

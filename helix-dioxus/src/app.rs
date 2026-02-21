@@ -68,21 +68,18 @@ pub fn App() -> Element {
     // Get app state from context
     let app_state = use_context::<AppState>();
 
-    // Track version for re-renders when editor state changes
-    let mut version = use_signal(|| 0_usize);
+    // Provide Signal<EditorSnapshot> as context for all child components
+    let mut snapshot_signal = use_context_provider(|| Signal::new(app_state.get_snapshot()));
 
     // Track pending key sequence for multi-key commands (display only — dispatch is via keymap)
     let mut pending_key = use_signal(PendingKeySequence::default);
-
-    // Read the signal to subscribe to changes and trigger re-render of this component
-    let _ = version();
 
     // Auto-focus the app container on mount
     use_effect(|| {
         document::eval("focusAppContainer();");
     });
 
-    // Track the last seen snapshot version to avoid unnecessary re-renders
+    // Track the last seen snapshot version to avoid unnecessary signal writes
     let mut last_snapshot_version = use_signal(|| 0_u64);
 
     // Background coroutine to poll for LSP events (diagnostics, etc.)
@@ -112,7 +109,7 @@ pub fn App() -> Element {
                         snapshot.warning_count
                     );
                     last_snapshot_version.set(current_version);
-                    version += 1;
+                    snapshot_signal.set(snapshot);
                 }
             }
         }
@@ -244,11 +241,11 @@ pub fn App() -> Element {
                 app_state_for_handler.send_command(cmd);
             }
 
-            // Process commands synchronously and update snapshot before triggering re-render
-            app_state_for_handler.process_commands_sync();
+            // Process commands synchronously and update snapshot signal
+            app_state_for_handler.process_and_notify(&mut snapshot_signal);
 
             // Sync word jump pending state with EditorContext
-            let post_snapshot = app_state_for_handler.get_snapshot();
+            let post_snapshot = snapshot_signal.read().clone();
             if post_snapshot.word_jump_active && pending_key() == PendingKeySequence::None {
                 if post_snapshot.word_jump_first_char.is_some() {
                     pending_key.set(PendingKeySequence::WordJumpSecondChar);
@@ -257,16 +254,13 @@ pub fn App() -> Element {
                 }
             }
 
-            // Trigger re-render with updated snapshot
-            version += 1;
-
             // Prevent default browser behavior for handled keys
             evt.prevent_default();
         }
     };
 
-    // Get snapshot for conditional rendering
-    let snapshot = app_state.get_snapshot();
+    // Read snapshot from signal for conditional rendering (auto-subscribes)
+    let snapshot = snapshot_signal.read().clone();
 
     // Convert absolute 1-indexed cursor position to viewport-relative 0-indexed
     let viewport_cursor_line = (snapshot.cursor_line.saturating_sub(1)).saturating_sub(snapshot.visible_start);
@@ -293,17 +287,12 @@ pub fn App() -> Element {
             style: "position: relative; {snapshot.theme_css_vars}",
 
             // Buffer bar at the top
-            BufferBar {
-                version: version,
-                on_change: move |()| {
-                    version += 1;
-                },
-            }
+            BufferBar {}
 
             // Editor view takes up most of the space
             div {
                 style: "flex: 1; overflow: hidden;",
-                EditorView { version: version }
+                EditorView {}
             }
 
             // Command completion popup (shown above command prompt)
@@ -351,12 +340,7 @@ pub fn App() -> Element {
             }
 
             // Status line at the bottom
-            StatusLine {
-                version: version,
-                on_change: move |()| {
-                    version += 1;
-                },
-            }
+            StatusLine {}
 
             // Generic picker overlay (shown when picker is visible)
             if snapshot.picker_visible {
@@ -433,9 +417,6 @@ pub fn App() -> Element {
                 LspStatusDialog {
                     servers: snapshot.lsp_servers.clone(),
                     selected: snapshot.lsp_server_selected,
-                    on_change: move |()| {
-                        version += 1;
-                    },
                 }
             }
 
@@ -452,9 +433,6 @@ pub fn App() -> Element {
             if snapshot.confirmation_dialog_visible {
                 ConfirmationDialog {
                     dialog: snapshot.confirmation_dialog.clone(),
-                    on_change: move |()| {
-                        version += 1;
-                    },
                 }
             }
 

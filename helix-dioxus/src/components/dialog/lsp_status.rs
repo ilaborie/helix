@@ -7,14 +7,16 @@ use crate::icons::{lucide, Icon};
 use dioxus::prelude::*;
 
 use crate::components::KbdKey;
+use crate::hooks::use_snapshot_signal;
 use crate::lsp::{LspServerSnapshot, LspServerStatus};
 use crate::state::EditorCommand;
 use crate::AppState;
 
 /// LSP status dialog component.
 #[component]
-pub fn LspStatusDialog(servers: Vec<LspServerSnapshot>, selected: usize, on_change: EventHandler<()>) -> Element {
+pub fn LspStatusDialog(servers: Vec<LspServerSnapshot>, selected: usize) -> Element {
     let app_state = use_context::<AppState>();
+    let mut snapshot_signal = use_snapshot_signal();
 
     rsx! {
         // Overlay
@@ -24,8 +26,7 @@ pub fn LspStatusDialog(servers: Vec<LspServerSnapshot>, selected: usize, on_chan
                 let app_state = app_state.clone();
                 move |_| {
                     app_state.send_command(EditorCommand::CloseLspDialog);
-                    app_state.process_commands_sync();
-                    on_change.call(());
+                    app_state.process_and_notify(&mut snapshot_signal);
                 }
             },
 
@@ -62,8 +63,7 @@ pub fn LspStatusDialog(servers: Vec<LspServerSnapshot>, selected: usize, on_chan
                                     let name = server.name.clone();
                                     move |_| {
                                         app_state.send_command(EditorCommand::RestartLspServer(name.clone()));
-                                        app_state.process_commands_sync();
-                                        on_change.call(());
+                                        app_state.process_and_notify(&mut snapshot_signal);
                                     }
                                 },
                             }

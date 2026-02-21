@@ -14,12 +14,11 @@ mod lsp_events;
 mod types;
 
 pub use types::{
-    centered_window, is_image_file, BufferInfo, CommandCompletionItem, ConfirmationAction,
-    ConfirmationDialogSnapshot, DiffLineType, Direction, EditorCommand, EditorSnapshot, GlobalSearchResult,
-    InputDialogKind, InputDialogSnapshot, LineSnapshot, NotificationSeverity, NotificationSnapshot,
-    PendingKeySequence, PickerIcon, PickerItem, PickerMode, PickerPreview, PreviewContent, PreviewLine,
-    RegisterSnapshot, ScrollbarDiagnostic, ShellBehavior, StartupAction, TokenSpan, WhitespaceSnapshot,
-    WordJumpLabel,
+    centered_window, is_image_file, BufferInfo, CommandCompletionItem, ConfirmationAction, ConfirmationDialogSnapshot,
+    DiffLineType, Direction, EditorCommand, EditorSnapshot, GlobalSearchResult, InputDialogKind, InputDialogSnapshot,
+    LineSnapshot, NotificationSeverity, NotificationSnapshot, PendingKeySequence, PickerIcon, PickerItem, PickerMode,
+    PickerPreview, PreviewContent, PreviewLine, RegisterSnapshot, ScrollbarDiagnostic, ShellBehavior, StartupAction,
+    TokenSpan, WhitespaceSnapshot, WordJumpLabel,
 };
 
 use std::path::PathBuf;
@@ -35,10 +34,9 @@ use helix_view::editor::WhitespaceRenderValue;
 use crate::lsp::{
     convert_code_actions, convert_completion_response, convert_document_colors, convert_document_symbols,
     convert_goto_response, convert_hover, convert_inlay_hints, convert_references_response, convert_signature_help,
-    convert_workspace_symbols,
-    CompletionItemSnapshot, DiagnosticPickerEntry, DiagnosticSeverity, DiagnosticSnapshot, HoverSnapshot,
-    InlayHintSnapshot, LocationSnapshot, LspResponse, LspServerSnapshot, LspServerStatus, SignatureHelpSnapshot,
-    StoredCodeAction, SymbolKind, SymbolSnapshot,
+    convert_workspace_symbols, CompletionItemSnapshot, DiagnosticPickerEntry, DiagnosticSeverity, DiagnosticSnapshot,
+    HoverSnapshot, InlayHintSnapshot, LocationSnapshot, LspResponse, LspServerSnapshot, LspServerStatus,
+    SignatureHelpSnapshot, StoredCodeAction, SymbolKind, SymbolSnapshot,
 };
 use crate::operations::{
     collect_search_match_lines, BufferOps, CliOps, ClipboardOps, EditingOps, JumpOps, LspOps, MacroOps, MovementOps,
@@ -267,7 +265,9 @@ pub fn compute_viewport_lines(window_height: f64, font_size: f64) -> usize {
     let line_height_px = font_size * LINE_HEIGHT_RATIO;
     let editor_height = (window_height - CHROME_HEIGHT_PX).max(line_height_px);
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    { (editor_height / line_height_px).floor() as usize }
+    {
+        (editor_height / line_height_px).floor() as usize
+    }
 }
 
 // --- Soft wrap helpers ---
@@ -399,6 +399,11 @@ fn clip_inlay_hints(
 
 impl EditorContext {
     /// Create a new editor context with the given file.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a file is opened with a non-default cursor position and the
+    /// document cannot be found immediately after opening (should never happen).
     pub fn new(
         dhx_config: &crate::config::DhxConfig,
         file: Option<(PathBuf, helix_core::Position)>,
@@ -605,8 +610,7 @@ impl EditorContext {
         let cols = ((window_width - HORIZONTAL_CHROME_PX).max(0.0) / char_width).floor() as u16;
         #[allow(clippy::cast_possible_truncation)]
         let rows = self.viewport_lines as u16;
-        self.editor
-            .resize(helix_view::graphics::Rect::new(0, 0, cols, rows));
+        self.editor.resize(helix_view::graphics::Rect::new(0, 0, cols, rows));
         log::info!(
             "viewport resized: {window_width}x{window_height} → {cols}x{rows} ({} lines)",
             self.viewport_lines
@@ -2804,9 +2808,7 @@ impl EditorContext {
         // Early-return for image files — render image preview instead of text
         if types::is_image_file(&file_path) {
             let metadata = std::fs::metadata(&file_path).ok()?;
-            let dimensions = imagesize::size(&file_path)
-                .ok()
-                .map(|s| (s.width, s.height));
+            let dimensions = imagesize::size(&file_path).ok().map(|s| (s.width, s.height));
             let format = file_path
                 .extension()
                 .and_then(|e| e.to_str())
@@ -4979,16 +4981,24 @@ mod tests {
     #[test]
     fn soft_wrap_clips_tokens() {
         let tokens = vec![
-            TokenSpan { start: 0, end: 3, color: "red".to_string() },
-            TokenSpan { start: 5, end: 8, color: "blue".to_string() },
+            TokenSpan {
+                start: 0,
+                end: 3,
+                color: "red".to_string(),
+            },
+            TokenSpan {
+                start: 5,
+                end: 8,
+                color: "blue".to_string(),
+            },
         ];
         let clipped = clip_tokens(&tokens, 2, 6);
         assert_eq!(clipped.len(), 2);
         assert_eq!(clipped[0].start, 0); // 2-2
-        assert_eq!(clipped[0].end, 1);   // 3-2
+        assert_eq!(clipped[0].end, 1); // 3-2
         assert_eq!(clipped[0].color, "red");
         assert_eq!(clipped[1].start, 3); // 5-2
-        assert_eq!(clipped[1].end, 4);   // min(8,6)-2
+        assert_eq!(clipped[1].end, 4); // min(8,6)-2
         assert_eq!(clipped[1].color, "blue");
     }
 

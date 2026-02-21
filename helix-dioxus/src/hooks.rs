@@ -3,16 +3,19 @@
 use dioxus::prelude::*;
 
 use crate::state::EditorSnapshot;
-use crate::AppState;
 
-/// Subscribe to editor state changes and return the current snapshot.
+/// Read the current editor snapshot from the signal context.
 ///
-/// Reads the `version` signal (triggering re-renders on change),
-/// then fetches the latest `EditorSnapshot` from `AppState`.
+/// Components that call this automatically re-render when the snapshot changes.
 #[must_use]
-pub fn use_editor_snapshot(version: ReadSignal<usize>) -> (AppState, EditorSnapshot) {
-    let _ = version();
-    let app_state = use_context::<AppState>();
-    let snapshot = app_state.get_snapshot();
-    (app_state, snapshot)
+pub fn use_snapshot() -> EditorSnapshot {
+    use_context::<Signal<EditorSnapshot>>().read().clone()
+}
+
+/// Get the snapshot signal for writing (e.g., after processing commands).
+///
+/// Use this in components that need to update the snapshot after sending commands.
+#[must_use]
+pub fn use_snapshot_signal() -> Signal<EditorSnapshot> {
+    use_context::<Signal<EditorSnapshot>>()
 }

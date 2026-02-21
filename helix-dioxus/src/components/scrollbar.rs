@@ -2,6 +2,7 @@
 
 use dioxus::prelude::*;
 
+use crate::hooks::use_snapshot_signal;
 use crate::lsp::DiagnosticSeverity;
 use crate::state::{EditorCommand, ScrollbarDiagnostic};
 use crate::AppState;
@@ -46,6 +47,7 @@ pub fn Scrollbar(
     search_match_lines: Vec<usize>,
 ) -> Element {
     let app_state = use_context::<AppState>();
+    let mut snapshot_signal = use_snapshot_signal();
 
     // Store scrollbar height for click calculations
     let mut scrollbar_height = use_signal(|| 0.0_f64);
@@ -110,7 +112,7 @@ pub fn Scrollbar(
                     let target_line = (ratio * total_lines as f64) as usize;
 
                     app_state_clone.send_command(EditorCommand::GoToLine(target_line));
-                    app_state_clone.process_commands_sync();
+                    app_state_clone.process_and_notify(&mut snapshot_signal);
                 }
             }
         });
@@ -163,7 +165,7 @@ pub fn Scrollbar(
                     let target_line = (new_ratio * (total_lines.saturating_sub(viewport_lines)) as f64) as usize;
 
                     app_state_clone.send_command(EditorCommand::ScrollToLine(target_line));
-                    app_state_clone.process_commands_sync();
+                    app_state_clone.process_and_notify(&mut snapshot_signal);
                 }
             }
         });
@@ -223,7 +225,7 @@ pub fn Scrollbar(
                         let handle_click = move |evt: MouseEvent| {
                             evt.stop_propagation();
                             marker_app_state.send_command(EditorCommand::GoToLine(line));
-                            marker_app_state.process_commands_sync();
+                            marker_app_state.process_and_notify(&mut snapshot_signal);
                         };
                         let handle_mouseenter = move |_| {
                             hovered_marker.set(Some(MarkerTooltip {
@@ -260,7 +262,7 @@ pub fn Scrollbar(
                         let handle_click = move |evt: MouseEvent| {
                             evt.stop_propagation();
                             diag_app_state.send_command(EditorCommand::GoToLine(marker_line));
-                            diag_app_state.process_commands_sync();
+                            diag_app_state.process_and_notify(&mut snapshot_signal);
                         };
                         let tooltip_message = marker_message.clone();
                         let handle_mouseenter = move |_| {

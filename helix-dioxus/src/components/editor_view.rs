@@ -11,15 +11,14 @@ use crate::components::{
     diagnostics_for_line, first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker, DiagnosticUnderline,
     ErrorLens, Scrollbar,
 };
-use crate::hooks::use_editor_snapshot;
+use crate::hooks::use_snapshot;
 use crate::lsp::{DiagnosticSnapshot, InlayHintKind, InlayHintSnapshot};
 use crate::state::{DiffLineType, LineSnapshot, TokenSpan, WhitespaceSnapshot, WordJumpLabel};
 
 /// Editor view component that renders the document content.
 #[component]
-pub fn EditorView(version: ReadSignal<usize>) -> Element {
-    let (_app_state, snapshot) = use_editor_snapshot(version);
-    // Read the version value for use_effect dependency
+pub fn EditorView() -> Element {
+    let snapshot = use_snapshot();
     let version = snapshot.snapshot_version;
 
     let mode = &snapshot.mode;
@@ -35,7 +34,11 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
     let has_code_actions = snapshot.has_code_actions;
     let cursor_line = snapshot.cursor_line;
 
-    let soft_wrap_class = if snapshot.soft_wrap { "editor-view soft-wrap" } else { "editor-view" };
+    let soft_wrap_class = if snapshot.soft_wrap {
+        "editor-view soft-wrap"
+    } else {
+        "editor-view"
+    };
 
     rsx! {
         // Wrapper: positions the scrollbar alongside the grid
@@ -310,11 +313,7 @@ fn visual_col(logical_col: usize, hints: &[InlayHintSnapshot]) -> usize {
     let offset: usize = hints
         .iter()
         .filter(|h| h.column <= logical_col)
-        .map(|h| {
-            h.label.chars().count()
-                + usize::from(h.padding_left)
-                + usize::from(h.padding_right)
-        })
+        .map(|h| h.label.chars().count() + usize::from(h.padding_left) + usize::from(h.padding_right))
         .sum();
     logical_col + offset
 }
@@ -465,7 +464,7 @@ fn render_styled_content(
         let line_has_selection = !selection_ranges.is_empty();
         if !is_selected && !is_cursor && line_has_selection {
             // Mask the line-level selection background with normal background
-            style.push_str("background-color: #282c34;");
+            style.push_str("background-color: var(--bg-primary);");
         }
         // Selected spans don't need explicit background since line already has it
 
@@ -603,8 +602,8 @@ mod tests {
     fn visual_col_multiple_hints() {
         // Two hints on the same line
         let hints = vec![
-            type_hint(3, ": u8", true, false),   // 4 chars + 1 padding = 5
-            param_hint(8, "key:", false, true),   // 4 chars + 1 padding = 5
+            type_hint(3, ": u8", true, false),  // 4 chars + 1 padding = 5
+            param_hint(8, "key:", false, true), // 4 chars + 1 padding = 5
         ];
         // Before first hint
         assert_eq!(visual_col(2, &hints), 2);

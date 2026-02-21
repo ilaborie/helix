@@ -5,20 +5,21 @@
 use dioxus::prelude::*;
 
 use crate::components::KbdKey;
+use crate::hooks::use_snapshot_signal;
 use crate::state::{ConfirmationDialogSnapshot, EditorCommand};
 use crate::AppState;
 
 /// Confirmation dialog component.
 #[component]
-pub fn ConfirmationDialog(dialog: ConfirmationDialogSnapshot, on_change: EventHandler<()>) -> Element {
+pub fn ConfirmationDialog(dialog: ConfirmationDialogSnapshot) -> Element {
     let app_state = use_context::<AppState>();
+    let mut snapshot_signal = use_snapshot_signal();
 
     let confirm_handler = {
         let app_state = app_state.clone();
         move |_| {
             app_state.send_command(EditorCommand::ConfirmationDialogConfirm);
-            app_state.process_commands_sync();
-            on_change.call(());
+            app_state.process_and_notify(&mut snapshot_signal);
         }
     };
 
@@ -26,8 +27,7 @@ pub fn ConfirmationDialog(dialog: ConfirmationDialogSnapshot, on_change: EventHa
         let app_state = app_state.clone();
         move |_| {
             app_state.send_command(EditorCommand::ConfirmationDialogDeny);
-            app_state.process_commands_sync();
-            on_change.call(());
+            app_state.process_and_notify(&mut snapshot_signal);
         }
     };
 
@@ -35,8 +35,7 @@ pub fn ConfirmationDialog(dialog: ConfirmationDialogSnapshot, on_change: EventHa
         let app_state = app_state.clone();
         move |_| {
             app_state.send_command(EditorCommand::ConfirmationDialogCancel);
-            app_state.process_commands_sync();
-            on_change.call(());
+            app_state.process_and_notify(&mut snapshot_signal);
         }
     };
 
@@ -45,7 +44,7 @@ pub fn ConfirmationDialog(dialog: ConfirmationDialogSnapshot, on_change: EventHa
         div {
             class: "confirmation-dialog-overlay",
             onmousedown: {
-                let cancel = cancel_handler.clone();
+                let mut cancel = cancel_handler.clone();
                 move |evt| cancel(evt)
             },
 
@@ -74,7 +73,7 @@ pub fn ConfirmationDialog(dialog: ConfirmationDialogSnapshot, on_change: EventHa
                     button {
                         class: "confirmation-btn confirmation-btn-secondary",
                         onmousedown: {
-                            let cancel = cancel_handler.clone();
+                            let mut cancel = cancel_handler.clone();
                             move |evt| {
                                 evt.stop_propagation();
                                 cancel(evt);
@@ -89,7 +88,7 @@ pub fn ConfirmationDialog(dialog: ConfirmationDialogSnapshot, on_change: EventHa
                         button {
                             class: "confirmation-btn confirmation-btn-danger",
                             onmousedown: {
-                                let deny = deny_handler.clone();
+                                let mut deny = deny_handler.clone();
                                 move |evt| {
                                     evt.stop_propagation();
                                     deny(evt);
@@ -104,7 +103,7 @@ pub fn ConfirmationDialog(dialog: ConfirmationDialogSnapshot, on_change: EventHa
                     button {
                         class: "confirmation-btn confirmation-btn-primary",
                         onmousedown: {
-                            let confirm = confirm_handler.clone();
+                            let mut confirm = confirm_handler.clone();
                             move |evt| {
                                 evt.stop_propagation();
                                 confirm(evt);
