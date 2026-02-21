@@ -501,6 +501,11 @@ body {
     white-space: nowrap;
 }
 
+.picker-item-shortcut {
+    display: flex;
+    gap: 2px;
+}
+
 .picker-container-with-preview {
     width: 900px;
 }
@@ -1093,6 +1098,19 @@ kbd {
 
 .inlay-hint-param {
     color: var(--orange);
+}
+
+/* ───── Color swatches ───── */
+.color-swatch {
+    position: absolute;
+    display: inline-block;
+    width: 0.7em;
+    height: 0.7em;
+    border: 1px solid var(--text-dim);
+    border-radius: 2px;
+    pointer-events: none;
+    z-index: 2;
+    transform: translateX(-100%);
 }
 
 /* ───── Code actions menu ───── */

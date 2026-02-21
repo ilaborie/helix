@@ -77,6 +77,10 @@ impl LspEventOps for EditorContext {
                             editor: &mut self.editor,
                             server_id,
                         });
+
+                        // Request document colors and inlay hints now that the server is ready
+                        self.request_document_colors();
+                        self.refresh_inlay_hints();
                     }
                     Ok(Notification::Exit) => {
                         log::info!("LSP server {server_id:?} exited");

@@ -284,6 +284,14 @@ fn Line(
                     }
                 }
             }
+            // Color swatches overlay
+            for (idx, swatch) in line.color_swatches.iter().enumerate() {
+                span {
+                    key: "swatch-{idx}",
+                    class: "color-swatch",
+                    style: "left: {swatch.col}ch; background-color: {swatch.color};",
+                }
+            }
         }
     }
 }

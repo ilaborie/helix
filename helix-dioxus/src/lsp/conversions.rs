@@ -317,6 +317,30 @@ fn convert_inlay_hint(hint: lsp::InlayHint) -> InlayHintSnapshot {
     }
 }
 
+/// Convert LSP document colors to `(char_position, css_hex_color)` pairs.
+#[must_use]
+pub fn convert_document_colors(
+    colors: Vec<lsp::ColorInformation>,
+    text: &helix_core::Rope,
+    offset_encoding: OffsetEncoding,
+) -> Vec<(usize, String)> {
+    colors
+        .into_iter()
+        .filter_map(|ci| {
+            let pos = helix_lsp::util::lsp_pos_to_pos(text, ci.range.start, offset_encoding)?;
+            let c = ci.color;
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let hex = format!(
+                "#{:02x}{:02x}{:02x}",
+                (c.red * 255.0) as u8,
+                (c.green * 255.0) as u8,
+                (c.blue * 255.0) as u8,
+            );
+            Some((pos, hex))
+        })
+        .collect()
+}
+
 /// Convert LSP document symbols to symbol snapshots.
 /// Handles both flat (`SymbolInformation`) and nested (`DocumentSymbol`) responses.
 #[must_use]

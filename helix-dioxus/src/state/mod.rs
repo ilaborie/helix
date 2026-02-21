@@ -31,8 +31,9 @@ use helix_lsp::lsp;
 use helix_view::document::Mode;
 
 use crate::lsp::{
-    convert_code_actions, convert_completion_response, convert_document_symbols, convert_goto_response, convert_hover,
-    convert_inlay_hints, convert_references_response, convert_signature_help, convert_workspace_symbols,
+    convert_code_actions, convert_completion_response, convert_document_colors, convert_document_symbols,
+    convert_goto_response, convert_hover, convert_inlay_hints, convert_references_response, convert_signature_help,
+    convert_workspace_symbols,
     CompletionItemSnapshot, DiagnosticPickerEntry, DiagnosticSeverity, DiagnosticSnapshot, HoverSnapshot,
     InlayHintSnapshot, LocationSnapshot, LspResponse, LspServerSnapshot, LspServerStatus, SignatureHelpSnapshot,
     StoredCodeAction, SymbolKind, SymbolSnapshot,
@@ -117,6 +118,8 @@ pub struct EditorContext {
     pub(crate) inlay_hints: Vec<InlayHintSnapshot>,
     /// Whether inlay hints are enabled.
     pub(crate) inlay_hints_enabled: bool,
+    /// Cached document color swatches (`char_position`, `css_hex_color`).
+    pub(crate) color_swatches: Vec<(usize, String)>,
     /// Whether code actions menu is visible.
     pub(crate) code_actions_visible: bool,
     /// Code actions (with full data for execution).
@@ -341,6 +344,7 @@ impl EditorContext {
             signature_help: None,
             inlay_hints: Vec::new(),
             inlay_hints_enabled: true,
+            color_swatches: Vec::new(),
             code_actions_visible: false,
             code_actions: Vec::new(),
             code_action_selected: 0,
@@ -618,6 +622,9 @@ impl EditorContext {
                 self.editor.mode = Mode::Normal;
                 self.signature_help_visible = false;
                 self.signature_help = None;
+                // Refresh LSP data after editing
+                self.request_document_colors();
+                self.refresh_inlay_hints();
             }
             EditorCommand::EnterSelectMode => self.editor.mode = Mode::Select,
             EditorCommand::ExitSelectMode => self.editor.mode = Mode::Normal,
@@ -1008,6 +1015,8 @@ impl EditorContext {
             }
             EditorCommand::SwitchToBuffer(doc_id) => {
                 self.switch_to_buffer(doc_id);
+                self.request_document_colors();
+                self.refresh_inlay_hints();
             }
             EditorCommand::CloseBuffer(doc_id) => {
                 self.close_buffer(doc_id);
@@ -1521,6 +1530,9 @@ impl EditorContext {
                 if self.inlay_hints_enabled {
                     self.inlay_hints = hints;
                 }
+            }
+            LspResponse::DocumentColors(colors) => {
+                self.color_swatches = colors;
             }
             LspResponse::GotoDefinition(locations) => {
                 if locations.len() == 1 {
@@ -2087,6 +2099,20 @@ impl EditorContext {
                     Vec::new()
                 };
 
+                // Filter color swatches for this line
+                let line_start_char = text.line_to_char(line_idx);
+                let line_char_count = text.line(line_idx).len_chars();
+                let line_end_char = line_start_char + line_char_count;
+                let line_color_swatches: Vec<crate::lsp::ColorSwatchSnapshot> = self
+                    .color_swatches
+                    .iter()
+                    .filter(|(pos, _)| *pos >= line_start_char && *pos < line_end_char)
+                    .map(|(pos, color)| crate::lsp::ColorSwatchSnapshot {
+                        col: pos - line_start_char,
+                        color: color.clone(),
+                    })
+                    .collect();
+
                 LineSnapshot {
                     line_number: line_idx + 1,
                     content: line_content,
@@ -2095,6 +2121,7 @@ impl EditorContext {
                     primary_cursor_col,
                     tokens: line_tokens.get(idx).cloned().unwrap_or_default(),
                     selection_ranges,
+                    color_swatches: line_color_swatches,
                 }
             })
             .collect();
@@ -3546,6 +3573,49 @@ impl EditorContext {
                 }
                 Err(err) => {
                     log::error!("Inlay hints request failed: {err}");
+                }
+            }
+        });
+    }
+
+    /// Request document colors from the LSP server.
+    pub(crate) fn request_document_colors(&mut self) {
+        let view_id = self.editor.tree.focus;
+        let view = self.editor.tree.get(view_id);
+        let doc_id = view.doc;
+
+        let Some(doc) = self.editor.document(doc_id) else {
+            log::warn!("No document for document colors");
+            return;
+        };
+
+        let Some(ls) = doc
+            .language_servers_with_feature(LanguageServerFeature::DocumentColors)
+            .next()
+        else {
+            log::debug!("No language server supports document colors");
+            return;
+        };
+
+        let offset_encoding = ls.offset_encoding();
+        let text = doc.text().clone();
+        let doc_ident = doc.identifier();
+
+        let Some(future) = ls.text_document_document_color(doc_ident, None) else {
+            log::warn!("Failed to create document colors request");
+            return;
+        };
+
+        let tx = self.command_tx.clone();
+        tokio::spawn(async move {
+            match future.await {
+                Ok(colors) => {
+                    let swatches = convert_document_colors(colors, &text, offset_encoding);
+                    log::info!("Received {} document colors", swatches.len());
+                    let _ = tx.send(EditorCommand::LspResponse(LspResponse::DocumentColors(swatches)));
+                }
+                Err(err) => {
+                    log::error!("Document colors request failed: {err}");
                 }
             }
         });

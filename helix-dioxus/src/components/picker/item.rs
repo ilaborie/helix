@@ -8,6 +8,77 @@ use crate::state::{PickerIcon, PickerItem};
 
 use super::highlight::HighlightedText;
 
+/// Split a shortcut string into renderable key segments for `<kbd>` display.
+///
+/// Examples: `"Ctrl+f"` → `["Ctrl", "f"]`, `"C-b"` → `["Ctrl", "b"]`,
+/// `"Space f"` → `["Space", "f"]`, `"gg"` → `["g", "g"]`, `":reload"` → `[":reload"]`.
+pub fn parse_shortcut_keys(s: &str) -> Vec<String> {
+    if s.starts_with(':') {
+        return vec![s.to_string()];
+    }
+    if s.contains('+') {
+        return s.split('+').map(String::from).collect();
+    }
+    if let Some(rest) = s.strip_prefix("C-") {
+        return vec!["Ctrl".to_string(), rest.to_string()];
+    }
+    if let Some(rest) = s.strip_prefix("A-") {
+        return vec!["Alt".to_string(), rest.to_string()];
+    }
+    if s.contains(' ') {
+        return s.split_whitespace().map(String::from).collect();
+    }
+    if s.chars().count() > 1 {
+        return s.chars().map(|c| c.to_string()).collect();
+    }
+    vec![s.to_string()]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn typable_command() {
+        assert_eq!(parse_shortcut_keys(":reload"), vec![":reload"]);
+        assert_eq!(parse_shortcut_keys(":write"), vec![":write"]);
+    }
+
+    #[test]
+    fn modifier_plus_key() {
+        assert_eq!(parse_shortcut_keys("Ctrl+f"), vec!["Ctrl", "f"]);
+        assert_eq!(parse_shortcut_keys("Ctrl+Space"), vec!["Ctrl", "Space"]);
+    }
+
+    #[test]
+    fn helix_c_prefix() {
+        assert_eq!(parse_shortcut_keys("C-b"), vec!["Ctrl", "b"]);
+    }
+
+    #[test]
+    fn helix_a_prefix() {
+        assert_eq!(parse_shortcut_keys("A-o"), vec!["Alt", "o"]);
+    }
+
+    #[test]
+    fn space_separated() {
+        assert_eq!(parse_shortcut_keys("Space f"), vec!["Space", "f"]);
+        assert_eq!(parse_shortcut_keys("g s"), vec!["g", "s"]);
+    }
+
+    #[test]
+    fn multi_char_sequence() {
+        assert_eq!(parse_shortcut_keys("gg"), vec!["g", "g"]);
+        assert_eq!(parse_shortcut_keys("mm"), vec!["m", "m"]);
+    }
+
+    #[test]
+    fn single_key() {
+        assert_eq!(parse_shortcut_keys("/"), vec!["/"]);
+        assert_eq!(parse_shortcut_keys("u"), vec!["u"]);
+    }
+}
+
 /// Individual picker item row.
 #[component]
 pub fn PickerItemRow(
@@ -179,12 +250,22 @@ pub fn PickerItemRow(
                         }
                     }
 
-                    // Secondary text for files (path) - NOT for buffers or parent directory
+                    // Secondary text - NOT for buffers or parent directory
                     if !matches!(item.icon, PickerIcon::Buffer | PickerIcon::BufferModified) && item.display != ".." {
                         if let Some(ref secondary) = item.secondary {
-                            div {
-                                class: "picker-item-secondary",
-                                "{secondary}"
+                            if matches!(item.icon, PickerIcon::Command) {
+                                // Render command shortcuts as styled <kbd> elements
+                                div {
+                                    class: "picker-item-shortcut",
+                                    for key in parse_shortcut_keys(secondary) {
+                                        kbd { class: "kbd-key-compact", "{key}" }
+                                    }
+                                }
+                            } else {
+                                div {
+                                    class: "picker-item-secondary",
+                                    "{secondary}"
+                                }
                             }
                         }
                     }

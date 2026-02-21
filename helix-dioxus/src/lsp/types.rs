@@ -515,6 +515,15 @@ pub enum CodeActionPreviewState {
     Unavailable,
 }
 
+/// A color swatch snapshot for rendering inline color previews.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ColorSwatchSnapshot {
+    /// Character position within the line (0-indexed).
+    pub col: usize,
+    /// CSS hex color string (e.g., "#e06c75").
+    pub color: String,
+}
+
 /// Response types from async LSP operations.
 #[derive(Debug, Clone)]
 pub enum LspResponse {
@@ -561,6 +570,8 @@ pub enum LspResponse {
         workspace_edit: Option<helix_lsp::lsp::WorkspaceEdit>,
         offset_encoding: helix_lsp::OffsetEncoding,
     },
+    /// Document colors received.
+    DocumentColors(Vec<(usize, String)>),
     /// Error from LSP operation.
     Error(String),
 }

@@ -9,8 +9,8 @@ use helix_view::DocumentId;
 
 use crate::config::DialogSearchMode;
 use crate::lsp::{
-    CodeActionPreviewState, CodeActionSnapshot, CompletionItemSnapshot, DiagnosticSeverity, DiagnosticSnapshot,
-    InlayHintSnapshot, LocationSnapshot, LspServerSnapshot, SignatureHelpSnapshot,
+    CodeActionPreviewState, CodeActionSnapshot, ColorSwatchSnapshot, CompletionItemSnapshot, DiagnosticSeverity,
+    DiagnosticSnapshot, InlayHintSnapshot, LocationSnapshot, LspServerSnapshot, SignatureHelpSnapshot,
 };
 
 /// Compute a visible window of `window_size` items centered on `selected`,
@@ -451,6 +451,8 @@ pub struct LineSnapshot {
     /// Selection ranges within this line (`start_col`, `end_col`) - for visual mode highlighting.
     /// Each range [start, end) should be highlighted as selected.
     pub selection_ranges: Vec<(usize, usize)>,
+    /// Color swatches for this line (from LSP document colors).
+    pub color_swatches: Vec<ColorSwatchSnapshot>,
 }
 
 /// A span of text with a specific color for syntax highlighting.
