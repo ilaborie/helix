@@ -179,10 +179,12 @@ impl LspEventOps for EditorContext {
             lsp::WorkDoneProgress::End(end) => {
                 log::info!("LSP progress end (server {server_id:?})");
                 self.lsp_progress.end_progress(server_id, &token);
-                // Log the message if present
                 if let Some(msg) = end.message {
                     log::info!("LSP progress completed: {msg}");
                 }
+                // Re-request LSP data now that analysis may be complete
+                self.request_document_colors();
+                self.refresh_inlay_hints();
             }
         }
     }
