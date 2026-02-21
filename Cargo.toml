@@ -1,70 +1,87 @@
 [workspace]
-resolver = "2"
 members = [
-  "helix-core",
-  "helix-view",
-  "helix-term",
-  "helix-tui",
-  "helix-lsp-types",
-  "helix-lsp",
-  "helix-event",
-  "helix-dap-types",
-  "helix-dap",
-  "helix-loader",
-  "helix-vcs",
-  "helix-parsec",
-  "helix-stdx",
-  "helix-dioxus",
-  "xtask",
+    "helix-core",
+    "helix-view",
+    "helix-term",
+    "helix-tui",
+    "helix-lsp-types",
+    "helix-lsp",
+    "helix-event",
+    "helix-dap-types",
+    "helix-dap",
+    "helix-loader",
+    "helix-vcs",
+    "helix-parsec",
+    "helix-stdx",
+    "helix-dioxus",
+    "xtask", "helix-dioxus",
 ]
-
-default-members = [
-  "helix-term"
-]
-
-[profile.release]
-lto = "thin"
-
-[profile.opt]
-inherits = "release"
-lto = "fat"
-codegen-units = 1
-strip = true
-opt-level = 3
-
-[profile.integration]
-inherits = "test"
-package.helix-core.opt-level = 2
-package.helix-tui.opt-level = 2
-package.helix-term.opt-level = 2
-
-[workspace.dependencies]
-tree-house = { version = "0.3.0", default-features = false }
-nucleo = "0.5.0"
-slotmap = "1.1.1"
-thiserror = "2.0"
-tempfile = "3.25.0"
-bitflags = "2.11"
-unicode-segmentation = "1.2"
-ropey = { version = "1.6.1", default-features = false, features = ["simd"] }
-foldhash = "0.2"
-parking_lot = "0.12"
-futures-executor = "0.3"
-futures-util = { version = "0.3", features = ["std", "async-await"], default-features = false }
-tokio-stream = "0.1.18"
-toml = "1.0"
-termina = "0.1"
-sonic-rs = "0.5"
-globset = "0.4"
-etcetera = "0.11"
-arc-swap = "1.8"
+default-members = ["helix-term"]
+resolver = "2"
 
 [workspace.package]
 version = "25.7.1"
-edition = "2021"
 authors = ["Blaž Hrastnik <blaz@mxxn.io>"]
-categories = ["editor"]
-repository = "https://github.com/helix-editor/helix"
 homepage = "https://helix-editor.com"
+categories = ["editor"]
 license = "MPL-2.0"
+repository = "https://github.com/helix-editor/helix"
+edition = "2021"
 rust-version = "1.87"
+
+[workspace.dependencies]
+arc-swap = "1.8"
+bitflags = "2.11"
+etcetera = "0.11"
+foldhash = "0.2"
+futures-executor = "0.3"
+globset = "0.4"
+nucleo = "0.5.0"
+parking_lot = "0.12"
+slotmap = "1.1.1"
+sonic-rs = "0.5"
+tempfile = "3.25.0"
+termina = "0.1"
+thiserror = "2.0"
+tokio-stream = "0.1.18"
+toml = "1.0"
+unicode-segmentation = "1.2"
+
+[workspace.dependencies.futures-util]
+version = "0.3"
+features = [
+    "std",
+    "async-await",
+]
+default-features = false
+
+[workspace.dependencies.ropey]
+version = "1.6.1"
+features = ["simd"]
+default-features = false
+
+[workspace.dependencies.tree-house]
+version = "0.3.0"
+default-features = false
+
+[profile.integration]
+inherits = "test"
+
+[profile.integration.package.helix-core]
+opt-level = 2
+
+[profile.integration.package.helix-term]
+opt-level = 2
+
+[profile.integration.package.helix-tui]
+opt-level = 2
+
+[profile.opt]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+inherits = "release"
+strip = true
+
+[profile.release]
+lto = "thin"

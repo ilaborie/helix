@@ -37,7 +37,6 @@ imara-diff = "0.2.0"
 # Dioxus for GUI
 dioxus = { version = "0.7", features = ["desktop"] }
 
-
 # Async runtime
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "macros"] }
 futures = "0.3"

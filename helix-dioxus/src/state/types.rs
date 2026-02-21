@@ -217,8 +217,7 @@ pub struct PreviewLine {
 
 /// Image file extensions supported for preview.
 const IMAGE_EXTENSIONS: &[&str] = &[
-    "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif", "tiff", "tif", "heic",
-    "heif", "apng", "jfif",
+    "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif", "tiff", "tif", "heic", "heif", "apng", "jfif",
 ];
 
 /// Check if a path refers to an image file based on its extension.

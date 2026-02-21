@@ -96,9 +96,7 @@ fn parse_file(s: &str) -> (PathBuf, Position) {
     if Path::new(s).exists() {
         return def();
     }
-    split_path_row_col(s)
-        .or_else(|| split_path_row(s))
-        .unwrap_or_else(def)
+    split_path_row_col(s).or_else(|| split_path_row(s)).unwrap_or_else(def)
 }
 
 /// Split `file.rs:10:2` into [`PathBuf`], row and col.
@@ -129,37 +127,25 @@ mod tests {
     #[test]
     fn split_path_row_col_valid() {
         let result = split_path_row_col("file.rs:10:5");
-        assert_eq!(
-            result,
-            Some((PathBuf::from("file.rs"), Position::new(9, 4)))
-        );
+        assert_eq!(result, Some((PathBuf::from("file.rs"), Position::new(9, 4))));
     }
 
     #[test]
     fn split_path_row_col_trailing_colon() {
         let result = split_path_row_col("file.rs:10:5:");
-        assert_eq!(
-            result,
-            Some((PathBuf::from("file.rs"), Position::new(9, 4)))
-        );
+        assert_eq!(result, Some((PathBuf::from("file.rs"), Position::new(9, 4))));
     }
 
     #[test]
     fn split_path_row_col_row_one_col_one() {
         let result = split_path_row_col("file.rs:1:1");
-        assert_eq!(
-            result,
-            Some((PathBuf::from("file.rs"), Position::new(0, 0)))
-        );
+        assert_eq!(result, Some((PathBuf::from("file.rs"), Position::new(0, 0))));
     }
 
     #[test]
     fn split_path_row_col_row_zero() {
         let result = split_path_row_col("file.rs:0:0");
-        assert_eq!(
-            result,
-            Some((PathBuf::from("file.rs"), Position::new(0, 0)))
-        );
+        assert_eq!(result, Some((PathBuf::from("file.rs"), Position::new(0, 0))));
     }
 
     #[test]
@@ -182,37 +168,25 @@ mod tests {
     #[test]
     fn split_path_row_valid() {
         let result = split_path_row("file.rs:42");
-        assert_eq!(
-            result,
-            Some((PathBuf::from("file.rs"), Position::new(41, 0)))
-        );
+        assert_eq!(result, Some((PathBuf::from("file.rs"), Position::new(41, 0))));
     }
 
     #[test]
     fn split_path_row_trailing_colon() {
         let result = split_path_row("file.rs:42:");
-        assert_eq!(
-            result,
-            Some((PathBuf::from("file.rs"), Position::new(41, 0)))
-        );
+        assert_eq!(result, Some((PathBuf::from("file.rs"), Position::new(41, 0))));
     }
 
     #[test]
     fn split_path_row_one() {
         let result = split_path_row("file.rs:1");
-        assert_eq!(
-            result,
-            Some((PathBuf::from("file.rs"), Position::new(0, 0)))
-        );
+        assert_eq!(result, Some((PathBuf::from("file.rs"), Position::new(0, 0))));
     }
 
     #[test]
     fn split_path_row_zero() {
         let result = split_path_row("file.rs:0");
-        assert_eq!(
-            result,
-            Some((PathBuf::from("file.rs"), Position::new(0, 0)))
-        );
+        assert_eq!(result, Some((PathBuf::from("file.rs"), Position::new(0, 0))));
     }
 
     #[test]

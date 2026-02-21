@@ -173,13 +173,8 @@ impl EditingOps for EditorContext {
 
         // Insert before the trailing newline, or at end if the line is unterminated
         let line_slice = text.line(line);
-        let has_trailing_newline =
-            line_slice.len_chars() > 0 && line_slice.char(line_slice.len_chars() - 1) == '\n';
-        let insert_pos = if has_trailing_newline {
-            line_end - 1
-        } else {
-            line_end
-        };
+        let has_trailing_newline = line_slice.len_chars() > 0 && line_slice.char(line_slice.len_chars() - 1) == '\n';
+        let insert_pos = if has_trailing_newline { line_end - 1 } else { line_end };
         let insert_selection = helix_core::Selection::point(insert_pos);
 
         // Insert newline + indentation
@@ -1590,12 +1585,7 @@ mod tests {
         let mut ctx = test_context("#[|h]#ello\n");
         let (doc_id, view_id) = doc_view(&ctx);
         // '+' register delegates to system clipboard — skip if unavailable (CI/headless)
-        if ctx
-            .editor
-            .registers
-            .write('+', vec!["clip".to_string()])
-            .is_err()
-        {
+        if ctx.editor.registers.write('+', vec!["clip".to_string()]).is_err() {
             return;
         }
         ctx.insert_register(doc_id, view_id, '+');
