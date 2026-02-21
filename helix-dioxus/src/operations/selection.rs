@@ -266,6 +266,7 @@ impl SelectionOps for EditorContext {
     fn select_inside_pair(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char) {
         let doc = self.editor.document_mut(doc_id).expect("doc exists");
         let text = doc.text().slice(..);
+        let syntax = doc.syntax();
         let selection = doc.selection(view_id).clone();
 
         let new_selection = selection.transform(|range| match ch {
@@ -287,7 +288,7 @@ impl SelectionOps for EditorContext {
                 helix_core::textobject::textobject_paragraph(text, range, helix_core::textobject::TextObject::Inside, 1)
             }
             ch if !ch.is_ascii_alphanumeric() => {
-                if let Ok((open, close)) = helix_core::surround::find_nth_pairs_pos(text, ch, range, 1) {
+                if let Ok((open, close)) = helix_core::surround::find_nth_pairs_pos(syntax, text, ch, range, 1) {
                     let new_anchor = open + 1;
                     let new_head = close;
                     if new_anchor < new_head {
@@ -307,6 +308,7 @@ impl SelectionOps for EditorContext {
     fn select_around_pair(&mut self, doc_id: DocumentId, view_id: ViewId, ch: char) {
         let doc = self.editor.document_mut(doc_id).expect("doc exists");
         let text = doc.text().slice(..);
+        let syntax = doc.syntax();
         let selection = doc.selection(view_id).clone();
 
         let new_selection = selection.transform(|range| match ch {
@@ -328,7 +330,7 @@ impl SelectionOps for EditorContext {
                 helix_core::textobject::textobject_paragraph(text, range, helix_core::textobject::TextObject::Around, 1)
             }
             ch if !ch.is_ascii_alphanumeric() => {
-                if let Ok((open, close)) = helix_core::surround::find_nth_pairs_pos(text, ch, range, 1) {
+                if let Ok((open, close)) = helix_core::surround::find_nth_pairs_pos(syntax, text, ch, range, 1) {
                     return helix_core::Range::new(open, close + 1);
                 }
                 range
