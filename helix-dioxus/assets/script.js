@@ -10,6 +10,29 @@ function focusAppContainer() {
     });
 }
 
+// Position all .inline-dialog elements relative to the editor cursor.
+// Called from use_effect after rendering dialogs with visibility:hidden.
+function positionInlineDialogs() {
+    var cursor = document.getElementById('editor-cursor');
+    if (!cursor) return;
+    var cursorRect = cursor.getBoundingClientRect();
+    var viewportHeight = window.innerHeight;
+    var dialogs = document.querySelectorAll('.inline-dialog');
+    dialogs.forEach(function(dialog) {
+        var preferAbove = dialog.dataset.position === 'above';
+        var goAbove = preferAbove && cursorRect.top > 100;
+        if (goAbove) {
+            dialog.style.top = cursorRect.top + 'px';
+            dialog.style.transform = 'translateY(-100%)';
+        } else {
+            dialog.style.top = cursorRect.bottom + 'px';
+            dialog.style.transform = '';
+        }
+        dialog.style.left = Math.min(cursorRect.left, viewportHeight > 0 ? window.innerWidth - 500 : 600) + 'px';
+        dialog.style.visibility = 'visible';
+    });
+}
+
 // Scroll the cursor element into view
 function scrollCursorIntoView() {
     requestAnimationFrame(() => {

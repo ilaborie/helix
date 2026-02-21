@@ -8,7 +8,7 @@ use crate::components::inline_dialog::{DialogConstraints, DialogPosition, Inline
 
 /// Hover popup that displays documentation and type info.
 #[component]
-pub fn HoverPopup(hover_html: String, cursor_line: usize, cursor_col: usize) -> Element {
+pub fn HoverPopup(hover_html: String) -> Element {
     let constraints = DialogConstraints {
         min_width: None,
         max_width: Some(600),
@@ -17,8 +17,6 @@ pub fn HoverPopup(hover_html: String, cursor_line: usize, cursor_col: usize) -> 
 
     rsx! {
         InlineDialogContainer {
-            cursor_line,
-            cursor_col,
             position: DialogPosition::Above,
             class: "hover-popup",
             constraints,

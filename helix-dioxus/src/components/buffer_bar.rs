@@ -11,6 +11,7 @@ use crate::state::{BufferInfo, EditorCommand};
 use crate::AppState;
 
 use super::file_icons::FileTypeIcon;
+use super::popup_menu::{PopupMenu, PopupMenuEntry};
 
 /// Maximum number of visible tabs before scrolling is needed.
 const MAX_VISIBLE_TABS: usize = 8;
@@ -20,7 +21,6 @@ struct ContextMenuState {
     x: f64,
     y: f64,
     doc_id: DocumentId,
-    name: String,
     path: Option<String>,
     is_modified: bool,
     buffer_count: usize,
@@ -106,20 +106,105 @@ pub fn BufferBar() -> Element {
 
         // Context menu (rendered outside buffer-bar to avoid clipping)
         if let Some(ref state) = *context_menu.read() {
-            BufferContextMenu {
-                x: state.x,
-                y: state.y,
-                doc_id: state.doc_id,
-                name: state.name.clone(),
-                path: state.path.clone(),
-                is_modified: state.is_modified,
-                buffer_count: state.buffer_count,
-                on_close: move |()| {
-                    context_menu.set(None);
-                },
+            {
+                let entries = build_context_menu_entries(state, &app_state, &mut snapshot_signal);
+                rsx! {
+                    PopupMenu {
+                        x: state.x,
+                        y: state.y,
+                        entries,
+                        on_close: move |()| context_menu.set(None),
+                    }
+                }
             }
         }
     }
+}
+
+/// Build the context menu entries for a buffer tab.
+fn build_context_menu_entries(
+    state: &ContextMenuState,
+    app_state: &AppState,
+    snapshot_signal: &mut Signal<crate::state::EditorSnapshot>,
+) -> Vec<PopupMenuEntry> {
+    let doc_id = state.doc_id;
+    let has_others = state.buffer_count > 1;
+    let is_modified = state.is_modified;
+
+    let mut entries = vec![
+        // Close
+        PopupMenuEntry::Item {
+            label: "Close",
+            disabled: false,
+            on_click: {
+                let app_state = app_state.clone();
+                let mut snapshot_signal = *snapshot_signal;
+                EventHandler::new(move |_| {
+                    app_state.send_command(EditorCommand::CloseBuffer(doc_id));
+                    app_state.process_and_notify(&mut snapshot_signal);
+                })
+            },
+        },
+        // Close Others
+        PopupMenuEntry::Item {
+            label: "Close Others",
+            disabled: !has_others,
+            on_click: {
+                let app_state = app_state.clone();
+                let mut snapshot_signal = *snapshot_signal;
+                EventHandler::new(move |_| {
+                    app_state.send_command(EditorCommand::SwitchToBuffer(doc_id));
+                    app_state.send_command(EditorCommand::BufferCloseOthers);
+                    app_state.process_and_notify(&mut snapshot_signal);
+                })
+            },
+        },
+        // Close All
+        PopupMenuEntry::Item {
+            label: "Close All",
+            disabled: false,
+            on_click: {
+                let app_state = app_state.clone();
+                let mut snapshot_signal = *snapshot_signal;
+                EventHandler::new(move |_| {
+                    app_state.send_command(EditorCommand::BufferCloseAll { force: false });
+                    app_state.process_and_notify(&mut snapshot_signal);
+                })
+            },
+        },
+    ];
+
+    // Copy Path (only for buffers with a file path)
+    if let Some(ref file_path) = state.path {
+        entries.push(PopupMenuEntry::Separator);
+        let file_path = file_path.clone();
+        entries.push(PopupMenuEntry::Item {
+            label: "Copy Path",
+            disabled: false,
+            on_click: EventHandler::new(move |_: Event<MouseData>| {
+                let escaped = file_path.replace('\\', "\\\\").replace('\'', "\\'");
+                document::eval(&format!("navigator.clipboard.writeText('{escaped}')"));
+            }),
+        });
+    }
+
+    // Save
+    entries.push(PopupMenuEntry::Separator);
+    entries.push(PopupMenuEntry::Item {
+        label: "Save",
+        disabled: !is_modified,
+        on_click: {
+            let app_state = app_state.clone();
+            let mut snapshot_signal = *snapshot_signal;
+            EventHandler::new(move |_| {
+                app_state.send_command(EditorCommand::SwitchToBuffer(doc_id));
+                app_state.send_command(EditorCommand::CliCommand("w".into()));
+                app_state.process_and_notify(&mut snapshot_signal);
+            })
+        },
+    });
+
+    entries
 }
 
 /// Individual buffer tab component.
@@ -153,7 +238,6 @@ fn BufferTab(buffer: BufferInfo, buffer_count: usize, on_context_menu: EventHand
     let modified_color = "var(--warning)";
 
     // Clone for context menu closure
-    let ctx_name = buffer.name.clone();
     let ctx_path = buffer.path.clone();
     let ctx_is_modified = buffer.is_modified;
 
@@ -178,7 +262,6 @@ fn BufferTab(buffer: BufferInfo, buffer_count: usize, on_context_menu: EventHand
                     x: coords.x,
                     y: coords.y,
                     doc_id,
-                    name: ctx_name.clone(),
                     path: ctx_path.clone(),
                     is_modified: ctx_is_modified,
                     buffer_count,
@@ -219,126 +302,6 @@ fn BufferTab(buffer: BufferInfo, buffer_count: usize, on_context_menu: EventHand
                     class: "icon-wrapper",
                     Icon { data: lucide::X, size: "12", fill: text_color }
                 }
-            }
-        }
-    }
-}
-
-/// Context menu for buffer tab right-click actions.
-#[component]
-fn BufferContextMenu(
-    x: f64,
-    y: f64,
-    doc_id: DocumentId,
-    name: String,
-    path: Option<String>,
-    is_modified: bool,
-    buffer_count: usize,
-    on_close: EventHandler,
-) -> Element {
-    let app_state = use_context::<AppState>();
-    let mut snapshot_signal = use_snapshot_signal();
-
-    let app_state_others = app_state.clone();
-    let app_state_all = app_state.clone();
-    let app_state_save = app_state.clone();
-
-    let has_others = buffer_count > 1;
-    let has_path = path.is_some();
-
-    rsx! {
-        // Backdrop: click anywhere outside to dismiss
-        div {
-            class: "context-menu-backdrop",
-            onmousedown: move |_| on_close.call(()),
-        }
-
-        // Menu positioned at mouse coordinates
-        div {
-            class: "context-menu",
-            style: "left: {x}px; top: {y}px;",
-
-            // Close
-            div {
-                class: "context-menu-item",
-                onmousedown: move |evt| {
-                    evt.stop_propagation();
-                    app_state.send_command(EditorCommand::CloseBuffer(doc_id));
-                    app_state.process_and_notify(&mut snapshot_signal);
-                    on_close.call(());
-                },
-                "Close"
-            }
-
-            // Close Others (disabled when only 1 buffer)
-            div {
-                class: if has_others { "context-menu-item" } else { "context-menu-item context-menu-item-disabled" },
-                onmousedown: move |evt| {
-                    evt.stop_propagation();
-                    if has_others {
-                        app_state_others.send_command(EditorCommand::SwitchToBuffer(doc_id));
-                        app_state_others.send_command(EditorCommand::BufferCloseOthers);
-                        app_state_others.process_and_notify(&mut snapshot_signal);
-                    }
-                    on_close.call(());
-                },
-                "Close Others"
-            }
-
-            // Close All
-            div {
-                class: "context-menu-item",
-                onmousedown: move |evt| {
-                    evt.stop_propagation();
-                    app_state_all.send_command(EditorCommand::BufferCloseAll { force: false });
-                    app_state_all.process_and_notify(&mut snapshot_signal);
-                    on_close.call(());
-                },
-                "Close All"
-            }
-
-            // Separator (only if Copy Path will be shown)
-            if has_path {
-                div { class: "context-menu-separator" }
-            }
-
-            // Copy Path (hidden for scratch buffers)
-            if let Some(ref file_path) = path {
-                {
-                    let file_path = file_path.clone();
-                    rsx! {
-                        div {
-                            class: "context-menu-item",
-                            onmousedown: move |evt: Event<MouseData>| {
-                                evt.stop_propagation();
-                                let escaped = file_path.replace('\\', "\\\\").replace('\'', "\\'");
-                                document::eval(&format!(
-                                    "navigator.clipboard.writeText('{escaped}')"
-                                ));
-                                on_close.call(());
-                            },
-                            "Copy Path"
-                        }
-                    }
-                }
-            }
-
-            // Separator
-            div { class: "context-menu-separator" }
-
-            // Save (disabled when not modified)
-            div {
-                class: if is_modified { "context-menu-item" } else { "context-menu-item context-menu-item-disabled" },
-                onmousedown: move |evt| {
-                    evt.stop_propagation();
-                    if is_modified {
-                        app_state_save.send_command(EditorCommand::SwitchToBuffer(doc_id));
-                        app_state_save.send_command(EditorCommand::CliCommand("w".into()));
-                        app_state_save.process_and_notify(&mut snapshot_signal);
-                    }
-                    on_close.call(());
-                },
-                "Save"
             }
         }
     }

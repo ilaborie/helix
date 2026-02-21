@@ -49,12 +49,7 @@ fn CompletionItem(item: CompletionItemSnapshot, is_selected: bool) -> Element {
 
 /// Completion popup that displays auto-complete suggestions.
 #[component]
-pub fn CompletionPopup(
-    items: Vec<CompletionItemSnapshot>,
-    selected: usize,
-    cursor_line: usize,
-    cursor_col: usize,
-) -> Element {
+pub fn CompletionPopup(items: Vec<CompletionItemSnapshot>, selected: usize) -> Element {
     let constraints = DialogConstraints {
         min_width: Some(250),
         max_width: Some(500),
@@ -63,8 +58,6 @@ pub fn CompletionPopup(
 
     rsx! {
         InlineListDialog {
-            cursor_line,
-            cursor_col,
             selected,
             empty_message: "No completions",
             class: "completion-popup",

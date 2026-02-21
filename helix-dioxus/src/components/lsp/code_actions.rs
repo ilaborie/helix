@@ -149,8 +149,6 @@ fn has_displayable_preview(preview: Option<&CodeActionPreviewState>) -> bool {
 pub fn CodeActionsMenu(
     actions: Vec<CodeActionSnapshot>,
     selected: usize,
-    cursor_line: usize,
-    cursor_col: usize,
     filter: String,
     #[props(default)] preview: Option<CodeActionPreviewState>,
 ) -> Element {
@@ -182,8 +180,6 @@ pub fn CodeActionsMenu(
 
     rsx! {
         InlineDialogContainer {
-            cursor_line,
-            cursor_col,
             class: "code-actions-menu",
             constraints,
 

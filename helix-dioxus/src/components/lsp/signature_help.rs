@@ -40,7 +40,7 @@ fn render_signature_label(
 
 /// Signature help popup that displays function signatures.
 #[component]
-pub fn SignatureHelpPopup(signature_help: SignatureHelpSnapshot, cursor_line: usize, cursor_col: usize) -> Element {
+pub fn SignatureHelpPopup(signature_help: SignatureHelpSnapshot) -> Element {
     let constraints = DialogConstraints {
         min_width: None,
         max_width: Some(600),
@@ -55,8 +55,6 @@ pub fn SignatureHelpPopup(signature_help: SignatureHelpSnapshot, cursor_line: us
 
     rsx! {
         InlineDialogContainer {
-            cursor_line,
-            cursor_col,
             position: DialogPosition::Above,
             class: "signature-help-popup",
             constraints,

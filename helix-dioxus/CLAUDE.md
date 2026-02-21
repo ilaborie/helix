@@ -48,8 +48,10 @@ helix-dioxus/src/
 ├── components/                 # UI Components
 │   ├── mod.rs                  # Re-exports all components
 │   ├── editor_view.rs          # Document rendering with syntax highlighting
-│   ├── buffer_bar.rs           # Tab bar with scroll buttons
+│   ├── buffer_bar.rs           # Tab bar with scroll buttons (uses PopupMenu for context menu)
 │   ├── kbd.rs                  # Reusable KbdKey component (physical key styling)
+│   ├── modal_overlay.rs        # Reusable ModalOverlay (overlay+backdrop+container)
+│   ├── popup_menu.rs           # Reusable PopupMenu (positioned context menu with backdrop)
 │   ├── statusline.rs           # Mode, filename, position display
 │   ├── keybinding_help.rs      # Context-aware keybinding help bar
 │   ├── scrollbar.rs            # Custom scrollbar with diagnostic markers
@@ -193,12 +195,13 @@ Functions defined in `script.js`:
 - Z-index layers: `--z-dropdown` (100), `--z-overlay` (200), `--z-modal` (300), `--z-notification` (300), `--z-confirmation` (400), `--z-tooltip` (9999)
 
 **CSS Classes** (defined in `styles.css`):
+- `.modal-overlay`, `.modal-overlay-top`, `.modal-container` (shared overlay/container for all modal dialogs)
 - `.app-container`, `.editor-view`, `.gutter`, `.content`
 - `.gutter-line`, `.gutter-line-active` (line number row styles)
 - `.buffer-bar`, `.buffer-tab`, `.buffer-tabs`, `.buffer-tab-name`, `.scroll-button` (tab bar)
-- `.context-menu`, `.context-menu-backdrop`, `.context-menu-item`, `.context-menu-item-disabled`, `.context-menu-separator` (buffer tab right-click menu)
+- `.context-menu`, `.context-menu-backdrop`, `.context-menu-item`, `.context-menu-item-disabled`, `.context-menu-separator` (popup context menus)
 - `.statusline`, `.statusline-lsp`, `.statusline-recording` (status bar)
-- `.picker-*` (overlay, container, header, list, list-items, item, body, left, preview)
+- `.picker-*` (container, header, list, list-items, item, body, left, preview)
 - `.picker-scrollbar-track`, `.picker-scrollbar-thumb` (picker list scrollbar)
 - `.prompt`, `.prompt-cursor`
 - `.completion-*`, `.hover-*`, `.code-action-*` (LSP popups)

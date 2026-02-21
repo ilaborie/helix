@@ -16,6 +16,8 @@ mod editor_view;
 pub(crate) mod file_icons;
 mod kbd;
 mod keybinding_help;
+mod modal_overlay;
+mod popup_menu;
 mod scrollbar;
 mod statusline;
 
@@ -34,6 +36,8 @@ pub use editor_view::EditorView;
 pub use file_icons::{FileTypeIcon, FolderTypeIcon};
 pub use kbd::KbdKey;
 pub use keybinding_help::KeybindingHelpBar;
+pub use modal_overlay::ModalOverlay;
+pub use popup_menu::{PopupMenu, PopupMenuEntry};
 pub use scrollbar::Scrollbar;
 pub use statusline::StatusLine;
 

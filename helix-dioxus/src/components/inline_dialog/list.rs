@@ -41,8 +41,6 @@ pub fn InlineListItem(
 ///
 /// ```rust,ignore
 /// InlineListDialog {
-///     cursor_line: 10,
-///     cursor_col: 5,
 ///     selected: current_selection,
 ///     empty_message: "No completions available",
 ///
@@ -57,10 +55,6 @@ pub fn InlineListItem(
 /// ```
 #[component]
 pub fn InlineListDialog(
-    /// Line number where the cursor is (0-indexed).
-    cursor_line: usize,
-    /// Column number where the cursor is (0-indexed).
-    cursor_col: usize,
     /// Index of the currently selected item.
     selected: usize,
     /// Message to display when the list is empty.
@@ -92,8 +86,6 @@ pub fn InlineListDialog(
 
     rsx! {
         InlineDialogContainer {
-            cursor_line,
-            cursor_col,
             position,
             class: combined_class,
             constraints,

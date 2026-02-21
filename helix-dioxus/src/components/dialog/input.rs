@@ -11,14 +11,12 @@ use crate::components::inline_dialog::{DialogConstraints, DialogPosition, Inline
 
 /// An inline input dialog positioned at the cursor.
 #[component]
-pub fn InputDialog(dialog: InputDialogSnapshot, cursor_line: usize, cursor_col: usize) -> Element {
+pub fn InputDialog(dialog: InputDialogSnapshot) -> Element {
     let placeholder = dialog.placeholder.as_deref().unwrap_or("");
     let show_placeholder = dialog.value.is_empty() && !placeholder.is_empty();
 
     rsx! {
         InlineDialogContainer {
-            cursor_line,
-            cursor_col,
             position: DialogPosition::Below,
             class: "input-dialog",
             constraints: DialogConstraints {

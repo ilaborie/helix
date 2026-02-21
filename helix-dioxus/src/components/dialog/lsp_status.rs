@@ -6,7 +6,7 @@
 use crate::icons::{lucide, Icon};
 use dioxus::prelude::*;
 
-use crate::components::KbdKey;
+use crate::components::{KbdKey, ModalOverlay};
 use crate::hooks::use_snapshot_signal;
 use crate::lsp::{LspServerSnapshot, LspServerStatus};
 use crate::state::EditorCommand;
@@ -19,10 +19,8 @@ pub fn LspStatusDialog(servers: Vec<LspServerSnapshot>, selected: usize) -> Elem
     let mut snapshot_signal = use_snapshot_signal();
 
     rsx! {
-        // Overlay
-        div {
-            class: "lsp-dialog-overlay",
-            onmousedown: {
+        ModalOverlay {
+            on_backdrop_click: {
                 let app_state = app_state.clone();
                 move |_| {
                     app_state.send_command(EditorCommand::CloseLspDialog);
@@ -30,63 +28,57 @@ pub fn LspStatusDialog(servers: Vec<LspServerSnapshot>, selected: usize) -> Elem
                 }
             },
 
-            // Dialog container
+            // Header
             div {
-                class: "lsp-dialog-container",
-                onmousedown: move |evt| evt.stop_propagation(),
-
-                // Header
-                div {
-                    class: "lsp-dialog-header",
-                    "Language Servers"
-                    span {
-                        class: "lsp-dialog-count",
-                        " ({servers.len()})"
-                    }
+                class: "lsp-dialog-header",
+                "Language Servers"
+                span {
+                    class: "lsp-dialog-count",
+                    " ({servers.len()})"
                 }
+            }
 
-                // Server list
-                div {
-                    class: "lsp-dialog-list",
-                    if servers.is_empty() {
-                        div {
-                            class: "lsp-dialog-empty",
-                            "No language servers connected"
-                        }
-                    } else {
-                        for (idx, server) in servers.iter().enumerate() {
-                            LspServerRow {
-                                server: server.clone(),
-                                is_selected: idx == selected,
-                                on_restart: {
-                                    let app_state = app_state.clone();
-                                    let name = server.name.clone();
-                                    move |_| {
-                                        app_state.send_command(EditorCommand::RestartLspServer(name.clone()));
-                                        app_state.process_and_notify(&mut snapshot_signal);
-                                    }
-                                },
-                            }
+            // Server list
+            div {
+                class: "lsp-dialog-list",
+                if servers.is_empty() {
+                    div {
+                        class: "lsp-dialog-empty",
+                        "No language servers connected"
+                    }
+                } else {
+                    for (idx, server) in servers.iter().enumerate() {
+                        LspServerRow {
+                            server: server.clone(),
+                            is_selected: idx == selected,
+                            on_restart: {
+                                let app_state = app_state.clone();
+                                let name = server.name.clone();
+                                move |_| {
+                                    app_state.send_command(EditorCommand::RestartLspServer(name.clone()));
+                                    app_state.process_and_notify(&mut snapshot_signal);
+                                }
+                            },
                         }
                     }
                 }
+            }
 
-                // Help row
-                div {
-                    class: "lsp-dialog-help",
-                    span {
-                        KbdKey { label: "j" }
-                        KbdKey { label: "k" }
-                        " navigate"
-                    }
-                    span {
-                        KbdKey { label: "r" }
-                        " restart"
-                    }
-                    span {
-                        KbdKey { label: "Esc" }
-                        " close"
-                    }
+            // Help row
+            div {
+                class: "lsp-dialog-help",
+                span {
+                    KbdKey { label: "j" }
+                    KbdKey { label: "k" }
+                    " navigate"
+                }
+                span {
+                    KbdKey { label: "r" }
+                    " restart"
+                }
+                span {
+                    KbdKey { label: "Esc" }
+                    " close"
                 }
             }
         }

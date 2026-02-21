@@ -15,11 +15,11 @@ mod types;
 
 pub use types::{
     centered_window, is_image_file, scrollbar_thumb_geometry, BufferInfo, CommandCompletionItem, ConfirmationAction,
-    ConfirmationDialogSnapshot, DiffLineType, Direction, EditorCommand, EditorSnapshot, GlobalSearchResult,
-    InputDialogKind, InputDialogSnapshot, LineSnapshot, NotificationSeverity, NotificationSnapshot,
+    ConfirmationDialogSnapshot, DiffLineType, Direction, EditorCommand, EditorSnapshot,
+    GlobalSearchResult, InputDialogKind, InputDialogSnapshot, LineSnapshot, NotificationSeverity, NotificationSnapshot,
     PendingKeySequence, PickerIcon, PickerItem, PickerMode, PickerPreview, PreviewContent, PreviewLine,
-    RegisterSnapshot, ScrollbarDiagnostic, ShellBehavior, StartupAction, TokenSpan, WhitespaceSnapshot,
-    WordJumpLabel, PICKER_WINDOW_SIZE,
+    RegisterSnapshot, ScrollbarDiagnostic, ShellBehavior, StartupAction, TokenSpan, WhitespaceSnapshot, WordJumpLabel,
+    PICKER_WINDOW_SIZE,
 };
 
 use std::path::PathBuf;

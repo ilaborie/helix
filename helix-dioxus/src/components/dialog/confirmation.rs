@@ -4,7 +4,7 @@
 
 use dioxus::prelude::*;
 
-use crate::components::KbdKey;
+use crate::components::{KbdKey, ModalOverlay};
 use crate::hooks::use_snapshot_signal;
 use crate::state::{ConfirmationDialogSnapshot, EditorCommand};
 use crate::AppState;
@@ -40,78 +40,72 @@ pub fn ConfirmationDialog(dialog: ConfirmationDialogSnapshot) -> Element {
     };
 
     rsx! {
-        // Overlay
-        div {
-            class: "confirmation-dialog-overlay",
-            onmousedown: {
+        ModalOverlay {
+            class: "confirmation-dialog",
+            z_index: "--z-confirmation",
+            on_backdrop_click: {
                 let mut cancel = cancel_handler.clone();
                 move |evt| cancel(evt)
             },
 
-            // Dialog container
+            // Title
             div {
-                class: "confirmation-dialog",
-                onmousedown: move |evt| evt.stop_propagation(),
+                class: "confirmation-dialog-title",
+                "{dialog.title}"
+            }
 
-                // Title
-                div {
-                    class: "confirmation-dialog-title",
-                    "{dialog.title}"
-                }
+            // Message
+            div {
+                class: "confirmation-dialog-message",
+                "{dialog.message}"
+            }
 
-                // Message
-                div {
-                    class: "confirmation-dialog-message",
-                    "{dialog.message}"
-                }
+            // Buttons
+            div {
+                class: "confirmation-dialog-buttons",
 
-                // Buttons
-                div {
-                    class: "confirmation-dialog-buttons",
-
-                    // Cancel button (always present)
-                    button {
-                        class: "confirmation-btn confirmation-btn-secondary",
-                        onmousedown: {
-                            let mut cancel = cancel_handler.clone();
-                            move |evt| {
-                                evt.stop_propagation();
-                                cancel(evt);
-                            }
-                        },
-                        KbdKey { label: "Esc" }
-                        "{dialog.cancel_label}"
-                    }
-
-                    // Deny button (optional - only shown if deny_label is set)
-                    if let Some(ref deny_label) = dialog.deny_label {
-                        button {
-                            class: "confirmation-btn confirmation-btn-danger",
-                            onmousedown: {
-                                let mut deny = deny_handler.clone();
-                                move |evt| {
-                                    evt.stop_propagation();
-                                    deny(evt);
-                                }
-                            },
-                            KbdKey { label: "n" }
-                            "{deny_label}"
+                // Cancel button (always present)
+                button {
+                    class: "confirmation-btn confirmation-btn-secondary",
+                    onmousedown: {
+                        let mut cancel = cancel_handler.clone();
+                        move |evt| {
+                            evt.stop_propagation();
+                            cancel(evt);
                         }
-                    }
+                    },
+                    KbdKey { label: "Esc" }
+                    "{dialog.cancel_label}"
+                }
 
-                    // Confirm button (primary action)
+                // Deny button (optional - only shown if deny_label is set)
+                if let Some(ref deny_label) = dialog.deny_label {
                     button {
-                        class: "confirmation-btn confirmation-btn-primary",
+                        class: "confirmation-btn confirmation-btn-danger",
                         onmousedown: {
-                            let mut confirm = confirm_handler.clone();
+                            let mut deny = deny_handler.clone();
                             move |evt| {
                                 evt.stop_propagation();
-                                confirm(evt);
+                                deny(evt);
                             }
                         },
-                        KbdKey { label: "y" }
-                        "{dialog.confirm_label}"
+                        KbdKey { label: "n" }
+                        "{deny_label}"
                     }
+                }
+
+                // Confirm button (primary action)
+                button {
+                    class: "confirmation-btn confirmation-btn-primary",
+                    onmousedown: {
+                        let mut confirm = confirm_handler.clone();
+                        move |evt| {
+                            evt.stop_propagation();
+                            confirm(evt);
+                        }
+                    },
+                    KbdKey { label: "y" }
+                    "{dialog.confirm_label}"
                 }
             }
         }

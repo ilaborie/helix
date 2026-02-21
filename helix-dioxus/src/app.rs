@@ -262,10 +262,6 @@ pub fn App() -> Element {
     // Read snapshot from signal for conditional rendering (auto-subscribes)
     let snapshot = snapshot_signal.read().clone();
 
-    // Convert absolute 1-indexed cursor position to viewport-relative 0-indexed
-    let viewport_cursor_line = (snapshot.cursor_line.saturating_sub(1)).saturating_sub(snapshot.visible_start);
-    let viewport_cursor_col = snapshot.cursor_col;
-
     // Font CSS must be injected AFTER the stylesheet so custom properties override defaults
     let font_css = &app_state.font_css;
 
@@ -364,8 +360,7 @@ pub fn App() -> Element {
                 CompletionPopup {
                     items: snapshot.completion_items.clone(),
                     selected: snapshot.completion_selected,
-                    cursor_line: viewport_cursor_line,
-                    cursor_col: viewport_cursor_col,
+
                 }
             }
 
@@ -374,8 +369,7 @@ pub fn App() -> Element {
                 if let Some(ref hover_html) = snapshot.hover_html {
                     HoverPopup {
                         hover_html: hover_html.clone(),
-                        cursor_line: viewport_cursor_line,
-                        cursor_col: viewport_cursor_col,
+    
                     }
                 }
             }
@@ -385,8 +379,7 @@ pub fn App() -> Element {
                 if let Some(ref sig_help) = snapshot.signature_help {
                     SignatureHelpPopup {
                         signature_help: sig_help.clone(),
-                        cursor_line: viewport_cursor_line,
-                        cursor_col: viewport_cursor_col,
+    
                     }
                 }
             }
@@ -396,8 +389,7 @@ pub fn App() -> Element {
                 CodeActionsMenu {
                     actions: snapshot.code_actions.clone(),
                     selected: snapshot.code_action_selected,
-                    cursor_line: viewport_cursor_line,
-                    cursor_col: viewport_cursor_col,
+
                     filter: snapshot.code_action_filter.clone(),
                     preview: snapshot.code_action_preview.clone(),
                 }
@@ -424,8 +416,7 @@ pub fn App() -> Element {
             if snapshot.input_dialog_visible {
                 InputDialog {
                     dialog: snapshot.input_dialog.clone(),
-                    cursor_line: viewport_cursor_line,
-                    cursor_col: viewport_cursor_col,
+
                 }
             }
 
