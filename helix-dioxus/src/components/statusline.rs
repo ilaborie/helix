@@ -2,8 +2,8 @@
 //!
 //! Displays mode, file name, cursor position, and other editor state.
 
+use crate::icons::{lucide, Icon};
 use dioxus::prelude::*;
-use lucide_dioxus::{CircleCheck, CircleX, LoaderCircle, Plug, TriangleAlert};
 
 use crate::hooks::use_editor_snapshot;
 use crate::lsp::{LspServerSnapshot, LspServerStatus};
@@ -65,7 +65,7 @@ fn LspStatusBlock(servers: Vec<LspServerSnapshot>, on_click: EventHandler<MouseE
             span {
                 class: "icon-wrapper",
                 style: "margin-right: 4px;",
-                Plug { size: 14, color: "currentColor" }
+                Icon { data: lucide::Plug, size: "14", fill: "currentColor" }
             }
             span {
                 class: match status {
@@ -75,9 +75,9 @@ fn LspStatusBlock(servers: Vec<LspServerSnapshot>, on_click: EventHandler<MouseE
                 },
                 style: "margin-right: 4px;",
                 match status {
-                    LspServerStatus::Running => rsx! { CircleCheck { size: 12, color: "currentColor" } },
-                    LspServerStatus::Starting | LspServerStatus::Indexing => rsx! { LoaderCircle { size: 12, color: "currentColor" } },
-                    LspServerStatus::Stopped => rsx! { CircleX { size: 12, color: "currentColor" } },
+                    LspServerStatus::Running => rsx! { Icon { data: lucide::CircleCheck, size: "12", fill: "currentColor" } },
+                    LspServerStatus::Starting | LspServerStatus::Indexing => rsx! { Icon { data: lucide::LoaderCircle, size: "12", fill: "currentColor" } },
+                    LspServerStatus::Stopped => rsx! { Icon { data: lucide::CircleX, size: "12", fill: "currentColor" } },
                 }
             }
             "{server_count}"
@@ -142,7 +142,7 @@ pub fn StatusLine(version: ReadSignal<usize>, on_change: EventHandler<()>) -> El
                             span {
                                 class: "icon-wrapper",
                                 style: "margin-right: 4px;",
-                                CircleX { size: 14, color: "currentColor" }
+                                Icon { data: lucide::CircleX, size: "14", fill: "currentColor" }
                             }
                             "{error_count}"
                         }
@@ -157,7 +157,7 @@ pub fn StatusLine(version: ReadSignal<usize>, on_change: EventHandler<()>) -> El
                             span {
                                 class: "icon-wrapper",
                                 style: "margin-right: 4px;",
-                                TriangleAlert { size: 14, color: "currentColor" }
+                                Icon { data: lucide::TriangleAlert, size: "14", fill: "currentColor" }
                             }
                             "{warning_count}"
                         }

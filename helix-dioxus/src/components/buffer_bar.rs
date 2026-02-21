@@ -2,8 +2,8 @@
 //!
 //! Shows a horizontal tab bar with overflow scroll buttons when needed.
 
+use crate::icons::{lucide, Icon};
 use dioxus::prelude::*;
-use lucide_dioxus::{ChevronLeft, ChevronRight, X};
 
 use crate::hooks::use_editor_snapshot;
 use crate::state::{BufferInfo, EditorCommand};
@@ -166,7 +166,7 @@ fn BufferTab(buffer: BufferInfo, on_action: EventHandler<()>) -> Element {
                 },
                 span {
                     class: "icon-wrapper",
-                    X { size: 12, color: text_color }
+                    Icon { data: lucide::X, size: "12", fill: text_color }
                 }
             }
         }
@@ -189,9 +189,9 @@ fn ScrollButton(direction: &'static str, onclick: EventHandler<MouseEvent>) -> E
             span {
                 class: "icon-wrapper",
                 if is_left {
-                    ChevronLeft { size: 16, color: "currentColor" }
+                    Icon { data: lucide::ChevronLeft, size: "16", fill: "currentColor" }
                 } else {
-                    ChevronRight { size: 16, color: "currentColor" }
+                    Icon { data: lucide::ChevronRight, size: "16", fill: "currentColor" }
                 }
             }
         }

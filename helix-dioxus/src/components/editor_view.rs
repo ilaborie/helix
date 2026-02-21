@@ -4,8 +4,8 @@
 
 use std::fmt::Write as _;
 
+use crate::icons::{lucide, Icon};
 use dioxus::prelude::*;
-use lucide_dioxus::{Bookmark, Lightbulb};
 
 use crate::components::{
     diagnostics_for_line, first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker, DiagnosticUnderline,
@@ -66,7 +66,7 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                                         class: "indicator-diagnostic icon-wrapper",
                                         style: "color: {lightbulb_color};",
                                         title: "Code actions available (Ctrl+Space)",
-                                        Lightbulb { size: 10, color: "currentColor" }
+                                        Icon { data: lucide::Lightbulb, size: "10", fill: "currentColor" }
                                     }
                                 } else if let Some(sev) = severity {
                                     span {
@@ -82,7 +82,7 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                                         class: "indicator-jumplist icon-wrapper",
                                         style: "color: var(--orange);",
                                         title: "Jump list entry (C-o/C-i)",
-                                        Bookmark { size: 10, color: "currentColor" }
+                                        Icon { data: lucide::Bookmark, size: "10", fill: "currentColor" }
                                     }
                                 }
                             }

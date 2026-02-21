@@ -1,13 +1,9 @@
 //! Picker item row component.
 
 use dioxus::prelude::*;
-use lucide_dioxus::{
-    Blocks, Bookmark, Braces, ChevronRight, CircleX, Code, Component, FileCode, FileDiff, FileMinus, FilePen, FilePlus,
-    FileX, Hash, Info, Layers, Lightbulb, Link2, Package, Palette, Smile, SquareFunction, Terminal, TextSearch,
-    TriangleAlert, Variable,
-};
 
 use crate::components::file_icons::{FileTypeIcon, FolderTypeIcon};
+use crate::icons::{lucide, Icon};
 use crate::state::{PickerIcon, PickerItem};
 
 use super::highlight::HighlightedText;
@@ -86,7 +82,7 @@ pub fn PickerItemRow(
             span {
                 class: "icon-wrapper",
                 style: "width: 16px; height: 16px; opacity: {indicator_opacity}; flex-shrink: 0; color: var(--success);",
-                ChevronRight { size: 16, color: "currentColor" }
+                Icon { data: lucide::ChevronRight, size: "16", fill: "currentColor" }
             }
 
             // Icon based on type
@@ -119,36 +115,36 @@ pub fn PickerItemRow(
                         style: "width: 16px; height: 16px; margin-right: 8px; flex-shrink: 0; color: {icon_color};",
                         {match item.icon {
                             // Symbol icons
-                            PickerIcon::SymbolFunction => rsx! { SquareFunction { size: 16, color: "currentColor" } },
-                            PickerIcon::SymbolMethod => rsx! { Code { size: 16, color: "currentColor" } },
-                            PickerIcon::SymbolClass => rsx! { Blocks { size: 16, color: "currentColor" } },
-                            PickerIcon::SymbolStruct => rsx! { Braces { size: 16, color: "currentColor" } },
-                            PickerIcon::SymbolEnum => rsx! { Layers { size: 16, color: "currentColor" } },
-                            PickerIcon::SymbolInterface => rsx! { Component { size: 16, color: "currentColor" } },
-                            PickerIcon::SymbolVariable => rsx! { Variable { size: 16, color: "currentColor" } },
-                            PickerIcon::SymbolConstant => rsx! { Hash { size: 16, color: "currentColor" } },
-                            PickerIcon::SymbolField => rsx! { Code { size: 16, color: "currentColor" } },
-                            PickerIcon::SymbolModule => rsx! { Package { size: 16, color: "currentColor" } },
-                            PickerIcon::SymbolOther => rsx! { Code { size: 16, color: "currentColor" } },
+                            PickerIcon::SymbolFunction => rsx! { Icon { data: lucide::SquareFunction, size: "16", fill: "currentColor" } },
+                            PickerIcon::SymbolMethod => rsx! { Icon { data: lucide::Code, size: "16", fill: "currentColor" } },
+                            PickerIcon::SymbolClass => rsx! { Icon { data: lucide::Blocks, size: "16", fill: "currentColor" } },
+                            PickerIcon::SymbolStruct => rsx! { Icon { data: lucide::Braces, size: "16", fill: "currentColor" } },
+                            PickerIcon::SymbolEnum => rsx! { Icon { data: lucide::Layers, size: "16", fill: "currentColor" } },
+                            PickerIcon::SymbolInterface => rsx! { Icon { data: lucide::Component, size: "16", fill: "currentColor" } },
+                            PickerIcon::SymbolVariable => rsx! { Icon { data: lucide::Variable, size: "16", fill: "currentColor" } },
+                            PickerIcon::SymbolConstant => rsx! { Icon { data: lucide::Hash, size: "16", fill: "currentColor" } },
+                            PickerIcon::SymbolField => rsx! { Icon { data: lucide::Code, size: "16", fill: "currentColor" } },
+                            PickerIcon::SymbolModule => rsx! { Icon { data: lucide::Package, size: "16", fill: "currentColor" } },
+                            PickerIcon::SymbolOther => rsx! { Icon { data: lucide::Code, size: "16", fill: "currentColor" } },
                             // Diagnostic icons
-                            PickerIcon::DiagnosticError => rsx! { CircleX { size: 16, color: "currentColor" } },
-                            PickerIcon::DiagnosticWarning => rsx! { TriangleAlert { size: 16, color: "currentColor" } },
-                            PickerIcon::DiagnosticInfo => rsx! { Info { size: 16, color: "currentColor" } },
-                            PickerIcon::DiagnosticHint => rsx! { Lightbulb { size: 16, color: "currentColor" } },
-                            PickerIcon::SearchResult => rsx! { TextSearch { size: 16, color: "currentColor" } },
-                            PickerIcon::Reference => rsx! { Link2 { size: 16, color: "currentColor" } },
-                            PickerIcon::Definition => rsx! { FileCode { size: 16, color: "currentColor" } },
-                            PickerIcon::Register => rsx! { Code { size: 16, color: "currentColor" } },
-                            PickerIcon::Command => rsx! { Terminal { size: 16, color: "currentColor" } },
-                            PickerIcon::JumpEntry => rsx! { Bookmark { size: 16, color: "currentColor" } },
-                            PickerIcon::Theme => rsx! { Palette { size: 16, color: "currentColor" } },
+                            PickerIcon::DiagnosticError => rsx! { Icon { data: lucide::CircleX, size: "16", fill: "currentColor" } },
+                            PickerIcon::DiagnosticWarning => rsx! { Icon { data: lucide::TriangleAlert, size: "16", fill: "currentColor" } },
+                            PickerIcon::DiagnosticInfo => rsx! { Icon { data: lucide::Info, size: "16", fill: "currentColor" } },
+                            PickerIcon::DiagnosticHint => rsx! { Icon { data: lucide::Lightbulb, size: "16", fill: "currentColor" } },
+                            PickerIcon::SearchResult => rsx! { Icon { data: lucide::TextSearch, size: "16", fill: "currentColor" } },
+                            PickerIcon::Reference => rsx! { Icon { data: lucide::Link2, size: "16", fill: "currentColor" } },
+                            PickerIcon::Definition => rsx! { Icon { data: lucide::FileCode, size: "16", fill: "currentColor" } },
+                            PickerIcon::Register => rsx! { Icon { data: lucide::Code, size: "16", fill: "currentColor" } },
+                            PickerIcon::Command => rsx! { Icon { data: lucide::Terminal, size: "16", fill: "currentColor" } },
+                            PickerIcon::JumpEntry => rsx! { Icon { data: lucide::Bookmark, size: "16", fill: "currentColor" } },
+                            PickerIcon::Theme => rsx! { Icon { data: lucide::Palette, size: "16", fill: "currentColor" } },
                             // VCS icons
-                            PickerIcon::VcsAdded => rsx! { FilePlus { size: 16, color: "currentColor" } },
-                            PickerIcon::VcsModified => rsx! { FilePen { size: 16, color: "currentColor" } },
-                            PickerIcon::VcsConflict => rsx! { FileX { size: 16, color: "currentColor" } },
-                            PickerIcon::VcsDeleted => rsx! { FileMinus { size: 16, color: "currentColor" } },
-                            PickerIcon::VcsRenamed => rsx! { FileDiff { size: 16, color: "currentColor" } },
-                            PickerIcon::Emoji => rsx! { Smile { size: 16, color: "currentColor" } },
+                            PickerIcon::VcsAdded => rsx! { Icon { data: lucide::FilePlus, size: "16", fill: "currentColor" } },
+                            PickerIcon::VcsModified => rsx! { Icon { data: lucide::FilePen, size: "16", fill: "currentColor" } },
+                            PickerIcon::VcsConflict => rsx! { Icon { data: lucide::FileX, size: "16", fill: "currentColor" } },
+                            PickerIcon::VcsDeleted => rsx! { Icon { data: lucide::FileMinus, size: "16", fill: "currentColor" } },
+                            PickerIcon::VcsRenamed => rsx! { Icon { data: lucide::FileDiff, size: "16", fill: "currentColor" } },
+                            PickerIcon::Emoji => rsx! { Icon { data: lucide::Smile, size: "16", fill: "currentColor" } },
                             // Already handled above
                             PickerIcon::Folder | PickerIcon::FolderOpen | PickerIcon::File
                             | PickerIcon::Buffer | PickerIcon::BufferModified => unreachable!(),

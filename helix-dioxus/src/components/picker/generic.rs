@@ -4,8 +4,8 @@
 //! When a preview is available, displays a two-column layout with the item
 //! list on the left and a syntax-highlighted file preview on the right.
 
+use crate::icons::{lucide, Icon};
 use dioxus::prelude::*;
-use lucide_dioxus::Search;
 
 use crate::components::KbdKey;
 use crate::config::DialogSearchMode;
@@ -91,7 +91,7 @@ pub fn GenericPicker(
                                 span {
                                     class: "icon-wrapper",
                                     style: "width: 16px; height: 16px; margin-right: 8px; color: var(--text-dim);",
-                                    Search { size: 16, color: "currentColor" }
+                                    Icon { data: lucide::Search, size: "16", fill: "currentColor" }
                                 }
                                 span {
                                     class: "picker-search-input",

@@ -4,8 +4,8 @@
 //! - Gutter icons showing severity (E/W/I/H)
 //! - Error Lens style inline messages at end of lines
 
+use crate::icons::{lucide, Icon};
 use dioxus::prelude::*;
-use lucide_dioxus::{Circle, CircleX, Info, Lightbulb, TriangleAlert};
 
 use crate::lsp::{DiagnosticSeverity, DiagnosticSnapshot};
 
@@ -20,10 +20,10 @@ pub fn DiagnosticMarker(severity: DiagnosticSeverity) -> Element {
             class: "diagnostic-marker icon-wrapper",
             style: "color: {color};",
             match severity {
-                DiagnosticSeverity::Error => rsx! { CircleX { size: 10, color: "currentColor" } },
-                DiagnosticSeverity::Warning => rsx! { TriangleAlert { size: 10, color: "currentColor" } },
-                DiagnosticSeverity::Info => rsx! { Info { size: 10, color: "currentColor" } },
-                DiagnosticSeverity::Hint => rsx! { Lightbulb { size: 10, color: "currentColor" } },
+                DiagnosticSeverity::Error => rsx! { Icon { data: lucide::CircleX, size: "10", fill: "currentColor" } },
+                DiagnosticSeverity::Warning => rsx! { Icon { data: lucide::TriangleAlert, size: "10", fill: "currentColor" } },
+                DiagnosticSeverity::Info => rsx! { Icon { data: lucide::Info, size: "10", fill: "currentColor" } },
+                DiagnosticSeverity::Hint => rsx! { Icon { data: lucide::Lightbulb, size: "10", fill: "currentColor" } },
             }
         }
     }
@@ -57,7 +57,7 @@ pub fn ErrorLens(diagnostic: DiagnosticSnapshot) -> Element {
             span {
                 class: "icon-wrapper",
                 style: "margin-right: 4px;",
-                Circle { size: 8, color: "currentColor" }
+                Icon { data: lucide::Circle, size: "8", fill: "currentColor" }
             }
             "{message}"
         }

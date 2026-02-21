@@ -40,6 +40,7 @@ pub mod components;
 pub mod config;
 pub mod events;
 pub mod hooks;
+pub mod icons;
 pub mod keybindings;
 pub mod keymap;
 pub mod lsp;

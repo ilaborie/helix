@@ -3,8 +3,8 @@
 //! Displays a modal dialog with a list of active language servers,
 //! their status, and actions to restart them.
 
+use crate::icons::{lucide, Icon};
 use dioxus::prelude::*;
-use lucide_dioxus::{Circle, CircleCheck, CircleX, LoaderCircle, RefreshCw};
 
 use crate::components::KbdKey;
 use crate::lsp::{LspServerSnapshot, LspServerStatus};
@@ -115,10 +115,10 @@ fn LspServerRow(server: LspServerSnapshot, is_selected: bool, on_restart: EventH
                     _ => "lsp-server-status icon-wrapper",
                 },
                 match server.status {
-                    LspServerStatus::Running => rsx! { CircleCheck { size: 14, color: status_color } },
-                    LspServerStatus::Starting => rsx! { LoaderCircle { size: 14, color: status_color } },
-                    LspServerStatus::Indexing => rsx! { LoaderCircle { size: 14, color: status_color } },
-                    LspServerStatus::Stopped => rsx! { CircleX { size: 14, color: status_color } },
+                    LspServerStatus::Running => rsx! { Icon { data: lucide::CircleCheck, size: "14", fill: status_color } },
+                    LspServerStatus::Starting => rsx! { Icon { data: lucide::LoaderCircle, size: "14", fill: status_color } },
+                    LspServerStatus::Indexing => rsx! { Icon { data: lucide::LoaderCircle, size: "14", fill: status_color } },
+                    LspServerStatus::Stopped => rsx! { Icon { data: lucide::CircleX, size: "14", fill: status_color } },
                 }
             }
 
@@ -155,7 +155,7 @@ fn LspServerRow(server: LspServerSnapshot, is_selected: bool, on_restart: EventH
                 span {
                     class: "lsp-server-active icon-wrapper",
                     title: "Active for current document",
-                    Circle { size: 10, color: "currentColor" }
+                    Icon { data: lucide::Circle, size: "10", fill: "currentColor" }
                 }
             }
 
@@ -169,7 +169,7 @@ fn LspServerRow(server: LspServerSnapshot, is_selected: bool, on_restart: EventH
                 },
                 span {
                     class: "icon-wrapper",
-                    RefreshCw { size: 14, color: "currentColor" }
+                    Icon { data: lucide::RefreshCw, size: "14", fill: "currentColor" }
                 }
             }
         }

@@ -3,8 +3,8 @@
 //! Displays available code actions (quick fixes, refactors) at cursor position,
 //! with an optional preview panel showing the diff for the selected action.
 
+use crate::icons::{lucide, Icon};
 use dioxus::prelude::*;
-use lucide_dioxus::{FileCode, Lightbulb, PackagePlus, Search, Star, Wrench};
 
 use super::code_action_preview::CodeActionPreviewPanel;
 use crate::components::inline_dialog::{DialogConstraints, InlineDialogContainer, InlineListItem};
@@ -13,20 +13,33 @@ use crate::lsp::{CodeActionPreviewState, CodeActionSnapshot};
 /// Get the icon and color for a code action kind.
 fn action_kind_style(kind: Option<&str>, is_preferred: bool) -> (&'static str, Element) {
     if is_preferred {
-        return ("var(--warning)", rsx! { Star { size: 12, color: "currentColor" } });
+        return (
+            "var(--warning)",
+            rsx! { Icon { data: lucide::Star, size: "12", fill: "currentColor" } },
+        );
     }
 
     match kind {
-        Some(k) if k.starts_with("quickfix") => ("var(--success)", rsx! { Wrench { size: 12, color: "currentColor" } }),
+        Some(k) if k.starts_with("quickfix") => (
+            "var(--success)",
+            rsx! { Icon { data: lucide::Wrench, size: "12", fill: "currentColor" } },
+        ),
         Some(k) if k.starts_with("refactor.extract") => (
             "var(--accent)",
-            rsx! { PackagePlus { size: 12, color: "currentColor" } },
+            rsx! { Icon { data: lucide::PackagePlus, size: "12", fill: "currentColor" } },
         ),
-        Some(k) if k.starts_with("refactor") => {
-            ("var(--purple)", rsx! { FileCode { size: 12, color: "currentColor" } })
-        }
-        Some(k) if k.starts_with("source") => ("var(--hint)", rsx! { FileCode { size: 12, color: "currentColor" } }),
-        _ => ("var(--text)", rsx! { Lightbulb { size: 12, color: "currentColor" } }),
+        Some(k) if k.starts_with("refactor") => (
+            "var(--purple)",
+            rsx! { Icon { data: lucide::FileCode, size: "12", fill: "currentColor" } },
+        ),
+        Some(k) if k.starts_with("source") => (
+            "var(--hint)",
+            rsx! { Icon { data: lucide::FileCode, size: "12", fill: "currentColor" } },
+        ),
+        _ => (
+            "var(--text)",
+            rsx! { Icon { data: lucide::Lightbulb, size: "12", fill: "currentColor" } },
+        ),
     }
 }
 
@@ -105,7 +118,7 @@ fn SearchBar(filter: String, filtered_count: usize, total_count: usize) -> Eleme
             span {
                 class: "icon-wrapper",
                 style: "color: var(--text-dim);",
-                Search { size: 14, color: "currentColor" }
+                Icon { data: lucide::Search, size: "14", fill: "currentColor" }
             }
             span {
                 class: "code-actions-search-input",

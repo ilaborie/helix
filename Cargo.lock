@@ -3089,7 +3089,6 @@ dependencies = [
  "image",
  "imara-diff 0.2.0",
  "log",
- "lucide-dioxus",
  "once_cell",
  "parking_lot",
  "pulldown-cmark",
@@ -3863,15 +3862,6 @@ name = "longest-increasing-subsequence"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3bd0dd2cd90571056fdb71f6275fada10131182f84899f4b2a916e565d81d86"
-
-[[package]]
-name = "lucide-dioxus"
-version = "2.568.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62db16e9c364daf69497e0197202ac42a951f1ffcc07e0d1fb5fc6b55d1bec64"
-dependencies = [
- "dioxus",
-]
 
 [[package]]
 name = "mac"
