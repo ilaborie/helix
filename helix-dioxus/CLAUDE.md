@@ -124,17 +124,18 @@ helix-dioxus/src/
     └── shell.rs                # handle_shell_mode
 
 helix-dioxus/assets/
-├── styles.css                  # Main stylesheet (loaded via document::Stylesheet)
+├── styles.css                  # Main stylesheet (embedded via include_str!)
 └── script.js                   # JavaScript functions (loaded via custom head)
 ```
 
 ### Dioxus 0.7 Patterns
 
-- Components receive `version: ReadSignal<usize>` for reactivity
+- `Signal<EditorSnapshot>` is provided as context; components use `use_snapshot()` hook to read it
+- After sending commands, call `app_state.process_and_notify(&mut snapshot_signal)` to update the signal
 - Use `use_context::<AppState>()` to access shared state
 - Use `use_effect` for side effects (scrollIntoView, focus)
 - Conditional rendering with `if condition { rsx! { ... } }`
-- Read signals in component body to subscribe to changes
+- Reading a signal in a component body subscribes it to changes automatically
 
 ### Extension Traits Pattern
 
@@ -160,15 +161,17 @@ use crate::operations::{MovementOps, EditingOps, ...};
 
 ### Assets Pattern
 
-**External Stylesheet**: CSS is loaded via Dioxus `document::Stylesheet` with `asset!()` macro:
+**External Stylesheet**: CSS is embedded via `include_str!` and rendered with `document::Style`:
 
 ```rust
 // In app.rs
 rsx! {
-    document::Stylesheet { href: asset!("/assets/styles.css") }
+    document::Style { {include_str!("../assets/styles.css")} }
     // ...
 }
 ```
+
+Note: `asset!()` macro requires the `dx` CLI to resolve paths. `include_str!()` works with standard `cargo build`.
 
 **JavaScript Functions**: Custom script is loaded via `include_str!` and wrapped in a script tag:
 
@@ -418,8 +421,9 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - Solution: Show selection highlighting only when `sel_end > sel_start + 1` (multi-char selections in any mode)
 
 ### Component not re-rendering after state change
-- Cause: Dioxus 0.7 requires reading signal to subscribe
-- Solution: Add `let _ = version();` in component body
+- Cause: Dioxus 0.7 requires reading a signal to subscribe to its changes
+- Solution: Use `use_snapshot()` in the component body to subscribe to `Signal<EditorSnapshot>`
+- After sending commands, call `app_state.process_and_notify(&mut signal)` to trigger re-renders
 
 ### SelectionDidChange errors in logs
 - Cause: WebView events not handled by Dioxus

@@ -1441,6 +1441,87 @@ Massive sprint bringing helix-dioxus to 100% keybinding coverage and full LSP in
 
 ---
 
+## 2026-02-15: dioxus-iconify Migration
+
+### Progress
+- Replaced `lucide-dioxus` crate with CLI-generated icon data via `dioxus-iconify`
+- Created `src/icons/` module with `mod.rs` (Icon component + IconData struct), `lucide.rs` (37 Lucide icons), `logos.rs` (1 logo), `vscode_icons.rs` (37 VSCode file type icons)
+- Icons are now stroke-based SVG constants generated at build time, no runtime dependency on external icon crate
+
+---
+
+## 2026-02-15: Image Preview in File Picker
+
+### Progress
+- Added real image preview in the file picker for image files (PNG, JPG, GIF, SVG, etc.)
+- Preview panel shows the image with metadata (dimensions, file size)
+- Reuses the existing `PickerPreviewPanel` infrastructure
+
+---
+
+## 2026-02-15: Command Picker Kbd Styling
+
+### Progress
+- Shortcut keys in the command picker are now rendered as `<kbd>` elements
+- Added `.kbd-key-compact` CSS class for 20px height help bar integration
+- Consistent keyboard key styling across the UI using the reusable KbdKey component
+
+---
+
+## 2026-02-15: Visible Whitespace and Rulers
+
+### Progress
+- Implemented visible whitespace rendering (spaces, tabs, newlines) controlled by editor config
+- Added column ruler rendering (vertical guide lines at configured columns)
+- Removed cursor glow pulse effect for cleaner appearance
+
+---
+
+## 2026-02-15: Bug Fixes
+
+### open_line_below fix
+- Fixed `open_line_below` (`o`) on unterminated last lines (lines without trailing newline)
+
+### Inlay hints fix
+- Re-request inlay hints from LSP after progress notifications complete
+- Fixes stale hints after LSP server finishes background work
+
+### Soft-wrap clipping fix
+- Fixed last character being clipped on soft-wrapped lines
+
+---
+
+## 2026-02-16: Binary Entry Point Refactor
+
+### Progress
+- Moved binary entry point from `src/bin/dhx.rs` to standard `src/main.rs`
+- Simplified build configuration — `cargo run -p helix-dioxus` works without extra flags
+
+---
+
+## 2026-02-16: Signal<EditorSnapshot> Refactor
+
+### Progress
+- Replaced manual version counter (`ReadSignal<usize>`) with `Signal<EditorSnapshot>` provided as Dioxus context
+- Components now use `use_snapshot()` hook instead of receiving `version` prop
+- After sending commands, callers invoke `app_state.process_and_notify(&mut signal)` to update the signal and trigger re-renders
+- Eliminated prop drilling — components subscribe to the snapshot signal directly via context
+
+### Decisions Made
+- `use_snapshot()` returns a cloned `EditorSnapshot`, keeping the signal borrow short-lived
+- `use_snapshot_signal()` returns the raw `Signal` for components that need to write back
+
+---
+
+## 2026-02-16: CSS include_str! Fix
+
+### Progress
+- Switched CSS loading from `document::Stylesheet { href: asset!() }` to `document::Style { {include_str!()} }`
+- The `asset!()` macro requires the `dx` CLI to resolve paths; `include_str!()` works with standard `cargo build`
+- Ensures the app builds and runs correctly without the Dioxus CLI toolchain
+
+---
+
 ## Planned Enhancements
 
 ### Helix Commands & Modes
