@@ -16,8 +16,8 @@ mod types;
 pub use types::{
     centered_window, is_image_file, scrollbar_thumb_geometry, BufferInfo, CommandCompletionItem, ConfirmationAction,
     ConfirmationDialogSnapshot, DiffLineType, Direction, EditorCommand, EditorSnapshot, GitDiffHunkSnapshot,
-    GlobalSearchResult, InputDialogKind, InputDialogSnapshot, LineSnapshot, NotificationSeverity, NotificationSnapshot,
-    PendingKeySequence, PickerIcon, PickerItem, PickerMode, PickerPreview, PreviewContent, PreviewLine,
+    GlobalSearchResult, InputDialogKind, InputDialogSnapshot, LineSnapshot, NotificationSeverity, PendingKeySequence,
+    PendingNotification, PickerIcon, PickerItem, PickerMode, PickerPreview, PreviewContent, PreviewLine,
     RegisterSnapshot, ScrollbarDiagnostic, ShellBehavior, StartupAction, TokenSpan, WhitespaceSnapshot, WordJumpLabel,
     PICKER_WINDOW_SIZE,
 };
@@ -166,10 +166,8 @@ pub struct EditorContext {
     pub(crate) lsp_progress: helix_lsp::LspProgressMap,
 
     // Notification state - pub(crate) for operations access
-    /// Active notifications.
-    pub(crate) notifications: Vec<NotificationSnapshot>,
-    /// Counter for generating unique notification IDs.
-    pub(crate) notification_id_counter: u64,
+    /// Channel sender for forwarding notifications to the toast system.
+    pub(crate) notification_tx: tokio::sync::mpsc::UnboundedSender<PendingNotification>,
 
     // Input dialog state - pub(crate) for operations access
     /// Whether the input dialog is visible.
@@ -432,6 +430,7 @@ impl EditorContext {
         file: Option<(PathBuf, helix_core::Position)>,
         command_rx: mpsc::Receiver<EditorCommand>,
         command_tx: mpsc::Sender<EditorCommand>,
+        notification_tx: tokio::sync::mpsc::UnboundedSender<PendingNotification>,
     ) -> Result<Self> {
         // Load syntax configuration (user languages.toml merged with defaults)
         let syn_loader = helix_core::config::user_lang_loader().unwrap_or_else(|err| {
@@ -582,8 +581,7 @@ impl EditorContext {
             lsp_server_selected: 0,
             lsp_progress: helix_lsp::LspProgressMap::new(),
             // Notification state
-            notifications: Vec::new(),
-            notification_id_counter: 0,
+            notification_tx,
             // Input dialog state
             input_dialog_visible: false,
             input_dialog_value: String::new(),
@@ -1588,12 +1586,6 @@ impl EditorContext {
             // Notifications
             EditorCommand::ShowNotification { message, severity } => {
                 self.show_notification(message, severity);
-            }
-            EditorCommand::DismissNotification(id) => {
-                self.notifications.retain(|n| n.id != id);
-            }
-            EditorCommand::DismissAllNotifications => {
-                self.notifications.clear();
             }
 
             // Input Dialog
@@ -2680,7 +2672,6 @@ impl EditorContext {
             lsp_servers: self.collect_lsp_servers(),
             lsp_server_selected: self.lsp_server_selected,
             // Notification state
-            notifications: self.notifications.clone(),
             // Input dialog state
             input_dialog_visible: self.input_dialog_visible,
             input_dialog: InputDialogSnapshot {
@@ -4131,27 +4122,9 @@ impl EditorContext {
         });
     }
 
-    /// Show a notification toast.
+    /// Show a notification toast via the channel bridge to `ToastProvider`.
     pub(crate) fn show_notification(&mut self, message: String, severity: NotificationSeverity) {
-        self.notification_id_counter += 1;
-        let notification = NotificationSnapshot {
-            id: self.notification_id_counter,
-            message,
-            severity,
-            created_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0),
-        };
-        self.notifications.push(notification);
-
-        // Auto-dismiss after 5 seconds - schedule via command
-        let id = self.notification_id_counter;
-        let tx = self.command_tx.clone();
-        tokio::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-            let _ = tx.send(EditorCommand::DismissNotification(id));
-        });
+        let _ = self.notification_tx.send(PendingNotification { message, severity });
     }
 
     /// Show the rename dialog with the word under cursor prefilled.

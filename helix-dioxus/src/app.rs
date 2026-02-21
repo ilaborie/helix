@@ -2,13 +2,16 @@
 //!
 //! This is the root Dioxus component that composes the editor UI.
 
+use std::time::Duration;
+
 use dioxus::prelude::*;
+use dioxus_primitives::toast::{ToastOptions, ToastProvider, ToastType};
 use helix_view::input::KeyCode;
 
 use crate::components::{
     BufferBar, CodeActionsMenu, CommandCompletionPopup, CommandPrompt, CompletionPopup, ConfirmationDialog, EditorView,
     GenericPicker, GitDiffPopup, HoverPopup, InputDialog, KeybindingHelpBar, LocationPicker, LspStatusDialog,
-    NotificationContainer, RegexPrompt, SearchPrompt, ShellPrompt, SignatureHelpPopup, StatusLine,
+    RegexPrompt, SearchPrompt, ShellPrompt, SignatureHelpPopup, StatusLine,
 };
 use crate::keybindings::{
     handle_code_actions_mode, handle_command_mode, handle_completion_mode, handle_confirmation_mode,
@@ -17,7 +20,7 @@ use crate::keybindings::{
 };
 use crate::keymap::command::AwaitCharKind;
 use crate::keymap::DhxKeymapResult;
-use crate::state::{EditorCommand, PendingKeySequence};
+use crate::state::{EditorCommand, NotificationSeverity, PendingKeySequence};
 use crate::AppState;
 
 /// Convert a snapshot mode string to `helix_view::document::Mode`.
@@ -275,174 +278,213 @@ pub fn App() -> Element {
         // Dynamic window title based on current buffer
         document::Title { "helix-dioxus - {snapshot.file_name}" }
 
-        div {
-            class: "app-container",
-            tabindex: 0,
-            onkeydown: onkeydown,
-            // CSS custom properties from theme applied as inline style (cascades to all children)
-            style: "position: relative; {snapshot.theme_css_vars}",
+        // ToastProvider manages toast lifecycle, auto-dismiss, and max-toast eviction
+        ToastProvider {
+            max_toasts: Signal::new(5_usize),
 
-            // Buffer bar at the top (controlled by `bufferline` config)
-            if snapshot.show_buffer_bar {
-                BufferBar {}
-            }
+            // Bridge component forwards channel notifications to the toast API
+            NotificationBridge {}
 
-            // Editor view takes up most of the space
             div {
-                style: "flex: 1; overflow: hidden;",
-                EditorView {}
-            }
+                class: "app-container",
+                tabindex: 0,
+                onkeydown: onkeydown,
+                // CSS custom properties from theme applied as inline style (cascades to all children)
+                style: "position: relative; {snapshot.theme_css_vars}",
 
-            // Command completion popup (shown above command prompt)
-            if snapshot.command_mode && !snapshot.command_completions.is_empty() {
-                CommandCompletionPopup {
-                    items: snapshot.command_completions.clone(),
-                    selected: snapshot.command_completion_selected,
+                // Buffer bar at the top (controlled by `bufferline` config)
+                if snapshot.show_buffer_bar {
+                    BufferBar {}
                 }
-            }
 
-            // Command prompt (shown when in command mode)
-            if snapshot.command_mode {
-                CommandPrompt { input: snapshot.command_input.clone() }
-            }
-
-            // Search prompt (shown when in search mode)
-            if snapshot.search_mode {
-                SearchPrompt {
-                    input: snapshot.search_input.clone(),
-                    backwards: snapshot.search_backwards,
+                // Editor view takes up most of the space
+                div {
+                    style: "flex: 1; overflow: hidden;",
+                    EditorView {}
                 }
-            }
 
-            // Regex prompt (shown when in regex select/split mode)
-            if snapshot.regex_mode {
-                RegexPrompt {
-                    input: snapshot.regex_input.clone(),
-                    split: snapshot.regex_split,
+                // Command completion popup (shown above command prompt)
+                if snapshot.command_mode && !snapshot.command_completions.is_empty() {
+                    CommandCompletionPopup {
+                        items: snapshot.command_completions.clone(),
+                        selected: snapshot.command_completion_selected,
+                    }
                 }
-            }
 
-            // Shell prompt (shown when in shell mode)
-            if snapshot.shell_mode {
-                ShellPrompt {
-                    input: snapshot.shell_input.clone(),
-                    prompt: snapshot.shell_prompt.clone(),
+                // Command prompt (shown when in command mode)
+                if snapshot.command_mode {
+                    CommandPrompt { input: snapshot.command_input.clone() }
                 }
-            }
 
-            // Keybinding help bar (above statusline)
-            KeybindingHelpBar {
-                mode: snapshot.mode.clone(),
-                pending: *pending_key.read(),
-                register_snapshots: snapshot.registers.clone(),
-            }
-
-            // Status line at the bottom
-            StatusLine {}
-
-            // Generic picker overlay (shown when picker is visible)
-            if snapshot.picker_visible {
-                GenericPicker {
-                    items: snapshot.picker_items.clone(),
-                    selected: snapshot.picker_selected,
-                    filter: snapshot.picker_filter.clone(),
-                    total: snapshot.picker_total,
-                    filtered_count: snapshot.picker_filtered_count,
-                    window_offset: snapshot.picker_window_offset,
-                    mode: snapshot.picker_mode,
-                    current_path: snapshot.picker_current_path.clone(),
-                    preview: snapshot.picker_preview.clone(),
-                    search_mode: snapshot.dialog_search_mode,
-                    search_focused: snapshot.picker_search_focused,
+                // Search prompt (shown when in search mode)
+                if snapshot.search_mode {
+                    SearchPrompt {
+                        input: snapshot.search_input.clone(),
+                        backwards: snapshot.search_backwards,
+                    }
                 }
-            }
 
-            // LSP - Completion popup
-            if snapshot.completion_visible {
-                CompletionPopup {
-                    items: snapshot.completion_items.clone(),
-                    selected: snapshot.completion_selected,
-
+                // Regex prompt (shown when in regex select/split mode)
+                if snapshot.regex_mode {
+                    RegexPrompt {
+                        input: snapshot.regex_input.clone(),
+                        split: snapshot.regex_split,
+                    }
                 }
-            }
 
-            // LSP - Hover popup
-            if snapshot.hover_visible {
-                if let Some(ref hover_html) = snapshot.hover_html {
-                    HoverPopup {
-                        hover_html: hover_html.clone(),
+                // Shell prompt (shown when in shell mode)
+                if snapshot.shell_mode {
+                    ShellPrompt {
+                        input: snapshot.shell_input.clone(),
+                        prompt: snapshot.shell_prompt.clone(),
+                    }
+                }
+
+                // Keybinding help bar (above statusline)
+                KeybindingHelpBar {
+                    mode: snapshot.mode.clone(),
+                    pending: *pending_key.read(),
+                    register_snapshots: snapshot.registers.clone(),
+                }
+
+                // Status line at the bottom
+                StatusLine {}
+
+                // Generic picker overlay (shown when picker is visible)
+                if snapshot.picker_visible {
+                    GenericPicker {
+                        items: snapshot.picker_items.clone(),
+                        selected: snapshot.picker_selected,
+                        filter: snapshot.picker_filter.clone(),
+                        total: snapshot.picker_total,
+                        filtered_count: snapshot.picker_filtered_count,
+                        window_offset: snapshot.picker_window_offset,
+                        mode: snapshot.picker_mode,
+                        current_path: snapshot.picker_current_path.clone(),
+                        preview: snapshot.picker_preview.clone(),
+                        search_mode: snapshot.dialog_search_mode,
+                        search_focused: snapshot.picker_search_focused,
+                    }
+                }
+
+                // LSP - Completion popup
+                if snapshot.completion_visible {
+                    CompletionPopup {
+                        items: snapshot.completion_items.clone(),
+                        selected: snapshot.completion_selected,
 
                     }
                 }
-            }
 
-            // LSP - Signature help popup
-            if snapshot.signature_help_visible {
-                if let Some(ref sig_help) = snapshot.signature_help {
-                    SignatureHelpPopup {
-                        signature_help: sig_help.clone(),
+                // LSP - Hover popup
+                if snapshot.hover_visible {
+                    if let Some(ref hover_html) = snapshot.hover_html {
+                        HoverPopup {
+                            hover_html: hover_html.clone(),
+
+                        }
+                    }
+                }
+
+                // LSP - Signature help popup
+                if snapshot.signature_help_visible {
+                    if let Some(ref sig_help) = snapshot.signature_help {
+                        SignatureHelpPopup {
+                            signature_help: sig_help.clone(),
+
+                        }
+                    }
+                }
+
+                // LSP - Code actions menu
+                if snapshot.code_actions_visible {
+                    CodeActionsMenu {
+                        actions: snapshot.code_actions.clone(),
+                        selected: snapshot.code_action_selected,
+
+                        filter: snapshot.code_action_filter.clone(),
+                        preview: snapshot.code_action_preview.clone(),
+                    }
+                }
+
+                // VCS - Git diff hover popup
+                if snapshot.git_diff_hover_visible {
+                    if let Some(ref hunk) = snapshot.git_diff_hover {
+                        GitDiffPopup {
+                            hunk: hunk.clone(),
+                            line: snapshot.git_diff_hover_line.unwrap_or(0),
+                        }
+                    }
+                }
+
+                // LSP - Location picker
+                if snapshot.location_picker_visible {
+                    LocationPicker {
+                        title: snapshot.location_picker_title.clone(),
+                        locations: snapshot.locations.clone(),
+                        selected: snapshot.location_selected,
+                    }
+                }
+
+                // LSP - Status dialog
+                if snapshot.lsp_dialog_visible {
+                    LspStatusDialog {
+                        servers: snapshot.lsp_servers.clone(),
+                        selected: snapshot.lsp_server_selected,
+                    }
+                }
+
+                // Input dialog (for rename, goto line, etc.)
+                if snapshot.input_dialog_visible {
+                    InputDialog {
+                        dialog: snapshot.input_dialog.clone(),
 
                     }
                 }
-            }
 
-            // LSP - Code actions menu
-            if snapshot.code_actions_visible {
-                CodeActionsMenu {
-                    actions: snapshot.code_actions.clone(),
-                    selected: snapshot.code_action_selected,
-
-                    filter: snapshot.code_action_filter.clone(),
-                    preview: snapshot.code_action_preview.clone(),
-                }
-            }
-
-            // VCS - Git diff hover popup
-            if snapshot.git_diff_hover_visible {
-                if let Some(ref hunk) = snapshot.git_diff_hover {
-                    GitDiffPopup {
-                        hunk: hunk.clone(),
-                        line: snapshot.git_diff_hover_line.unwrap_or(0),
+                // Confirmation dialog (for quit with unsaved changes, etc.)
+                if snapshot.confirmation_dialog_visible {
+                    ConfirmationDialog {
+                        dialog: snapshot.confirmation_dialog.clone(),
                     }
                 }
-            }
-
-            // LSP - Location picker
-            if snapshot.location_picker_visible {
-                LocationPicker {
-                    title: snapshot.location_picker_title.clone(),
-                    locations: snapshot.locations.clone(),
-                    selected: snapshot.location_selected,
-                }
-            }
-
-            // LSP - Status dialog
-            if snapshot.lsp_dialog_visible {
-                LspStatusDialog {
-                    servers: snapshot.lsp_servers.clone(),
-                    selected: snapshot.lsp_server_selected,
-                }
-            }
-
-            // Input dialog (for rename, goto line, etc.)
-            if snapshot.input_dialog_visible {
-                InputDialog {
-                    dialog: snapshot.input_dialog.clone(),
-
-                }
-            }
-
-            // Confirmation dialog (for quit with unsaved changes, etc.)
-            if snapshot.confirmation_dialog_visible {
-                ConfirmationDialog {
-                    dialog: snapshot.confirmation_dialog.clone(),
-                }
-            }
-
-            // Notification toasts (bottom-right corner)
-            NotificationContainer {
-                notifications: snapshot.notifications.clone(),
             }
         }
     }
+}
+
+/// Invisible bridge component that drains the notification channel and forwards to `ToastProvider`.
+#[component]
+fn NotificationBridge() -> Element {
+    let app_state = use_context::<AppState>();
+    let toasts = dioxus_primitives::toast::use_toast();
+
+    use_future(move || {
+        let rx = app_state.notification_receiver.clone();
+        async move {
+            loop {
+                let notif = rx.0.lock().await.recv().await;
+                match notif {
+                    Some(notif) => {
+                        let toast_type = match notif.severity {
+                            NotificationSeverity::Error => ToastType::Error,
+                            NotificationSeverity::Warning => ToastType::Warning,
+                            NotificationSeverity::Info => ToastType::Info,
+                            NotificationSeverity::Success => ToastType::Success,
+                        };
+                        let options = match notif.severity {
+                            NotificationSeverity::Error => {
+                                ToastOptions::new().duration(Duration::from_secs(10))
+                            }
+                            _ => ToastOptions::new(),
+                        };
+                        toasts.show(notif.message, toast_type, options);
+                    }
+                    None => break,
+                }
+            }
+        }
+    });
+
+    rsx! {}
 }

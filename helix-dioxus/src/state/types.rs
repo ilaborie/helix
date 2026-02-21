@@ -435,10 +435,6 @@ pub struct EditorSnapshot {
     /// Selected server index in dialog.
     pub lsp_server_selected: usize,
 
-    // Notification state
-    /// Active notifications to display.
-    pub notifications: Vec<NotificationSnapshot>,
-
     // Input dialog state
     /// Whether the input dialog is visible.
     pub input_dialog_visible: bool,
@@ -1020,10 +1016,6 @@ pub enum EditorCommand {
         message: String,
         severity: NotificationSeverity,
     },
-    /// Dismiss a specific notification by ID.
-    DismissNotification(u64),
-    /// Dismiss all notifications.
-    DismissAllNotifications,
 
     // Input Dialog
     /// Show an input dialog.
@@ -1240,17 +1232,13 @@ pub enum NotificationSeverity {
     Success,
 }
 
-/// Snapshot of a notification for rendering.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NotificationSnapshot {
-    /// Unique identifier for this notification.
-    pub id: u64,
+/// A pending notification to be forwarded to the toast system via channel.
+#[derive(Debug, Clone)]
+pub struct PendingNotification {
     /// The notification message.
     pub message: String,
-    /// Severity level determines color styling.
+    /// Severity level determines toast type.
     pub severity: NotificationSeverity,
-    /// Timestamp when the notification was created (for auto-dismiss).
-    pub created_at: u64,
 }
 
 /// Snapshot of an input dialog for rendering.

@@ -31,9 +31,12 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::mpsc;
+use std::sync::Arc;
 
 use anyhow::Result;
 use dioxus::desktop::tao::window::Icon;
+
+use state::PendingNotification;
 
 // Public library modules
 pub mod components;
@@ -64,6 +67,13 @@ thread_local! {
     pub(crate) static EDITOR_CTX: RefCell<Option<Rc<RefCell<EditorContext>>>> = const { RefCell::new(None) };
 }
 
+/// Wrapper for the notification receiver so it can be provided as Dioxus context.
+/// The `NotificationBridge` component drains this to forward notifications to `ToastProvider`.
+#[derive(Clone)]
+pub struct NotificationReceiver(
+    pub(crate) Arc<tokio::sync::Mutex<tokio::sync::mpsc::UnboundedReceiver<PendingNotification>>>,
+);
+
 /// Custom JavaScript for the webview.
 const CUSTOM_SCRIPT: &str = include_str!("../assets/script.js");
 
@@ -93,14 +103,20 @@ pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
     // Create command channel
     let (command_tx, command_rx) = mpsc::channel::<EditorCommand>();
 
+    // Create notification channel (bridge between EditorContext and ToastProvider)
+    let (notification_tx, notification_rx) =
+        tokio::sync::mpsc::unbounded_channel::<PendingNotification>();
+    let notification_receiver =
+        NotificationReceiver(Arc::new(tokio::sync::Mutex::new(notification_rx)));
+
     // Initialize editor context based on startup action
     let (mut editor_ctx, pending_commands) = match &startup_action {
         StartupAction::None | StartupAction::OpenFilePicker => (
-            EditorContext::new(&config, None, command_rx, command_tx.clone())?,
+            EditorContext::new(&config, None, command_rx, command_tx.clone(), notification_tx.clone())?,
             Vec::new(),
         ),
         StartupAction::OpenFile(path, pos) => (
-            EditorContext::new(&config, Some((path.clone(), *pos)), command_rx, command_tx.clone())?,
+            EditorContext::new(&config, Some((path.clone(), *pos)), command_rx, command_tx.clone(), notification_tx.clone())?,
             Vec::new(),
         ),
         StartupAction::OpenFiles(files) => {
@@ -113,7 +129,7 @@ pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
                 .map(|(path, pos)| EditorCommand::OpenFileAtPosition(path, pos))
                 .collect();
             (
-                EditorContext::new(&config, first, command_rx, command_tx.clone())?,
+                EditorContext::new(&config, first, command_rx, command_tx.clone(), notification_tx.clone())?,
                 rest,
             )
         }
@@ -146,6 +162,7 @@ pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
         command_tx,
         snapshot: std::sync::Arc::new(parking_lot::Mutex::new(initial_snapshot)),
         font_css,
+        notification_receiver,
     };
 
     // Clone for the closure
@@ -218,6 +235,8 @@ pub struct AppState {
     pub snapshot: std::sync::Arc<parking_lot::Mutex<EditorSnapshot>>,
     /// CSS custom properties for font configuration (injected after stylesheet).
     pub font_css: String,
+    /// Notification receiver for the toast bridge.
+    pub notification_receiver: NotificationReceiver,
 }
 
 impl AppState {

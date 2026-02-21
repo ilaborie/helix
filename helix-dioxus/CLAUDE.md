@@ -74,7 +74,7 @@ helix-dioxus/src/
 │   │   ├── confirmation.rs     # Confirmation dialog (quit with unsaved changes)
 │   │   ├── input.rs            # Input dialog (rename symbol, etc.)
 │   │   ├── lsp_status.rs       # LSP server status dialog
-│   │   ├── notification.rs     # Notification toast container
+│   │   # (notification.rs removed — replaced by dioxus-primitives ToastProvider)
 │   │   └── prompt.rs           # Command/search prompts
 │   ├── picker/                 # Picker components (overlay dialogs)
 │   │   ├── mod.rs              # Re-exports GenericPicker
@@ -211,7 +211,7 @@ Functions defined in `script.js`:
 - `.prompt`, `.prompt-cursor`
 - `.completion-*`, `.hover-*`, `.code-action-*` (LSP popups)
 - `.inline-dialog`, `.inline-dialog-list`, `.inline-dialog-item` (cursor-positioned popups)
-- `.notification-*` (toast notifications)
+- `.toast`, `.toast-container`, `.toast-list`, `.toast-content`, `.toast-title`, `.toast-close` (dioxus-primitives toast notifications)
 - `.confirmation-*` (modal confirmation dialogs)
 - `.command-completion-*` (command mode autocompletion popup)
 - `.input-dialog`, `.input-dialog-*` (rename symbol, etc.)

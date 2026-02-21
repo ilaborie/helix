@@ -43,8 +43,8 @@ pub use scrollbar::Scrollbar;
 pub use statusline::StatusLine;
 
 pub use dialog::{
-    CommandCompletionPopup, CommandPrompt, ConfirmationDialog, InputDialog, LspStatusDialog, NotificationContainer,
-    RegexPrompt, SearchPrompt, ShellPrompt,
+    CommandCompletionPopup, CommandPrompt, ConfirmationDialog, InputDialog, LspStatusDialog, RegexPrompt, SearchPrompt,
+    ShellPrompt,
 };
 pub use git_diff_popup::GitDiffPopup;
 pub use lsp::{CodeActionsMenu, CompletionPopup, HoverPopup, LocationPicker, SignatureHelpPopup};

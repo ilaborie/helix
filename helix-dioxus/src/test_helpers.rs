@@ -10,7 +10,7 @@ use helix_core::Transaction;
 use helix_view::input::{KeyCode, KeyEvent, KeyModifiers};
 use helix_view::{current_ref, DocumentId, ViewId};
 
-use crate::state::EditorContext;
+use crate::state::{EditorContext, PendingNotification};
 
 /// Global Tokio runtime shared across all tests.
 ///
@@ -53,14 +53,34 @@ pub(crate) fn init() -> tokio::runtime::EnterGuard<'static> {
 /// ```ignore
 /// let mut ctx = test_context("#[|h]#ello\nworld\n");
 /// ```
+/// Create an `EditorContext` with notification channel.
+///
+/// Returns `(EditorContext, UnboundedReceiver<PendingNotification>)` so tests can
+/// assert on notifications sent through the channel.
+pub fn test_context_with_notifications(
+    annotated: &str,
+) -> (EditorContext, tokio::sync::mpsc::UnboundedReceiver<PendingNotification>) {
+    let (ctx, notif_rx) = test_context_inner(annotated);
+    (ctx, notif_rx)
+}
+
 pub fn test_context(annotated: &str) -> EditorContext {
+    let (ctx, _notif_rx) = test_context_inner(annotated);
+    ctx
+}
+
+fn test_context_inner(
+    annotated: &str,
+) -> (EditorContext, tokio::sync::mpsc::UnboundedReceiver<PendingNotification>) {
     let _guard = init();
 
     let (text, selection) = print(annotated);
     let (tx, rx) = mpsc::channel();
+    let (notif_tx, notif_rx) = tokio::sync::mpsc::unbounded_channel::<PendingNotification>();
 
     let config = crate::config::DhxConfig::default();
-    let mut ctx = EditorContext::new(&config, None, rx, tx).expect("EditorContext creation should succeed");
+    let mut ctx =
+        EditorContext::new(&config, None, rx, tx, notif_tx).expect("EditorContext creation should succeed");
 
     // Replace the scratch buffer content with our test text
     {
@@ -77,7 +97,7 @@ pub fn test_context(annotated: &str) -> EditorContext {
         doc.set_selection(view_id, selection);
     }
 
-    ctx
+    (ctx, notif_rx)
 }
 
 /// Get the current `(DocumentId, ViewId)` from the context.

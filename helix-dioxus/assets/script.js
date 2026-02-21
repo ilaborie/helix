@@ -103,6 +103,7 @@ function positionGitDiffPopup(line) {
 
         popup.style.left = left + 'px';
         popup.style.top = top + 'px';
+        popup.style.visibility = 'visible';
     });
 }
 

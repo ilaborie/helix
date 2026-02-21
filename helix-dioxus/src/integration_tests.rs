@@ -11,7 +11,9 @@ use crate::keybindings::{handle_picker_mode, handle_search_mode};
 use crate::keymap::DhxKeymapResult;
 use crate::operations::{CliOps, EditingOps, MovementOps, SearchOps};
 use crate::state::{EditorCommand, EditorContext, PickerMode};
-use crate::test_helpers::{assert_state, assert_text, doc_view, key, special_key, test_context};
+use crate::test_helpers::{
+    assert_state, assert_text, doc_view, key, special_key, test_context, test_context_with_notifications,
+};
 
 /// Dispatch a key through the keymap and return matched commands.
 /// Returns empty vec for Pending/AwaitChar/NotFound/Cancelled results.
@@ -283,24 +285,24 @@ fn picker_vim_mode_esc_cancels_when_unfocused() {
 #[test]
 fn config_reload_shows_notification() {
     let _guard = crate::test_helpers::init();
-    let mut ctx = test_context("#[|h]#ello\n");
-    assert!(ctx.notifications.is_empty());
+    let (mut ctx, mut notif_rx) = test_context_with_notifications("#[|h]#ello\n");
+    assert!(notif_rx.try_recv().is_err(), "no notifications yet");
 
     ctx.reload_config();
 
-    assert_eq!(ctx.notifications.len(), 1);
-    assert_eq!(ctx.notifications[0].message, "Config reloaded");
+    let notif = notif_rx.try_recv().expect("should have notification");
+    assert_eq!(notif.message, "Config reloaded");
 }
 
 #[test]
 fn config_reload_via_command_mode() {
     let _guard = crate::test_helpers::init();
-    let mut ctx = test_context("#[|h]#ello\n");
+    let (mut ctx, mut notif_rx) = test_context_with_notifications("#[|h]#ello\n");
     ctx.command_input = "config-reload".to_string();
     ctx.execute_command();
 
-    assert!(!ctx.notifications.is_empty());
-    assert_eq!(ctx.notifications[0].message, "Config reloaded");
+    let notif = notif_rx.try_recv().expect("should have notification");
+    assert_eq!(notif.message, "Config reloaded");
     // Command mode should be cleared
     assert!(!ctx.command_mode);
     assert!(ctx.command_input.is_empty());
@@ -311,17 +313,15 @@ fn config_reload_via_command_mode() {
 #[test]
 fn set_option_boolean() {
     let _guard = crate::test_helpers::init();
-    let mut ctx = test_context("#[|h]#ello\n");
+    let (mut ctx, mut notif_rx) = test_context_with_notifications("#[|h]#ello\n");
     // cursorline defaults to false
     assert!(!ctx.editor.config().cursorline);
 
     ctx.set_option("cursorline", "true");
 
     assert!(ctx.editor.config().cursorline);
-    assert_eq!(
-        ctx.notifications.last().expect("notification").message,
-        "Set cursorline = true"
-    );
+    let notif = notif_rx.try_recv().expect("should have notification");
+    assert_eq!(notif.message, "Set cursorline = true");
 }
 
 #[test]
@@ -338,12 +338,12 @@ fn set_option_number() {
 #[test]
 fn set_option_unknown_key() {
     let _guard = crate::test_helpers::init();
-    let mut ctx = test_context("#[|h]#ello\n");
+    let (mut ctx, mut notif_rx) = test_context_with_notifications("#[|h]#ello\n");
 
     ctx.set_option("nonexistent-key", "true");
 
-    let msg = &ctx.notifications.last().expect("notification").message;
-    assert!(msg.contains("Unknown config key"), "got: {msg}");
+    let notif = notif_rx.try_recv().expect("should have notification");
+    assert!(notif.message.contains("Unknown config key"), "got: {}", notif.message);
 }
 
 #[test]
