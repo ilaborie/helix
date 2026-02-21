@@ -66,6 +66,7 @@ pub enum StartupAction {
 pub struct BufferInfo {
     pub id: DocumentId,
     pub name: String,
+    pub path: Option<String>,
     pub is_modified: bool,
     pub is_current: bool,
 }

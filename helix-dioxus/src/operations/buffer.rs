@@ -118,6 +118,7 @@ impl BufferOps for EditorContext {
             .map(|(&id, doc)| BufferInfo {
                 id,
                 name: doc.display_name().into_owned(),
+                path: doc.path().map(|p| p.to_string_lossy().into_owned()),
                 is_modified: doc.is_modified(),
                 is_current: id == current_doc_id,
             })

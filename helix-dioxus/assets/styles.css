@@ -337,6 +337,54 @@ body {
     justify-content: center;
 }
 
+/* ───── Context menu (buffer tab right-click) ───── */
+.context-menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-dropdown);
+}
+
+.context-menu {
+    position: fixed;
+    background: var(--bg-secondary);
+    border: 1px solid var(--bg-selection);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    z-index: var(--z-dropdown);
+    min-width: 180px;
+    padding: 4px 0;
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+    color: var(--text);
+    font-size: 13px;
+}
+
+.context-menu-item:hover {
+    background: var(--bg-highlight);
+}
+
+.context-menu-item-disabled {
+    color: var(--text-dim);
+    opacity: 0.5;
+    cursor: default;
+}
+
+.context-menu-item-disabled:hover {
+    background: transparent;
+}
+
+.context-menu-separator {
+    height: 1px;
+    background: var(--bg-selection);
+    margin: 4px 8px;
+}
+
 /* ───── File type icons (Material Icon Theme) ───── */
 .file-type-icon {
     display: inline-flex;

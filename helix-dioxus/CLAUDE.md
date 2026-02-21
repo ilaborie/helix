@@ -196,6 +196,7 @@ Functions defined in `script.js`:
 - `.app-container`, `.editor-view`, `.gutter`, `.content`
 - `.gutter-line`, `.gutter-line-active` (line number row styles)
 - `.buffer-bar`, `.buffer-tab`, `.buffer-tabs`, `.buffer-tab-name`, `.scroll-button` (tab bar)
+- `.context-menu`, `.context-menu-backdrop`, `.context-menu-item`, `.context-menu-item-disabled`, `.context-menu-separator` (buffer tab right-click menu)
 - `.statusline`, `.statusline-lsp`, `.statusline-recording` (status bar)
 - `.picker-*` (overlay, container, header, list, list-items, item, body, left, preview)
 - `.picker-scrollbar-track`, `.picker-scrollbar-thumb` (picker list scrollbar)
