@@ -354,6 +354,7 @@ pub struct EditorSnapshot {
     pub picker_preview: Option<PickerPreview>,
 
     // Buffer bar state
+    pub show_buffer_bar: bool,
     pub open_buffers: Vec<BufferInfo>,
     pub buffer_scroll_offset: usize,
 

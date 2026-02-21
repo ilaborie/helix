@@ -1606,7 +1606,7 @@ Massive sprint bringing helix-dioxus to 100% keybinding coverage and full LSP in
 
 ### Remaining TODOs
 - [ ] Scrollbar interactions (track click, thumb drag) — **BLOCKED** by Dioxus element height issue (see [SCROLLBAR_FIX_INVESTIGATION.md](SCROLLBAR_FIX_INVESTIGATION.md))
-- [ ] Buffer bar: hide option
+- [x] Buffer bar: hide option (`bufferline` config: `never`/`always`/`multiple`)
 - [ ] macOS dock icon (needs .app bundle)
 
 ### Architecture Note
@@ -1824,6 +1824,25 @@ DAP/Debug is **not supported** — `Space G` sub-menu will not be implemented.
 ### Progress
 - Active parameter in signature help popup is now visually highlighted
 - Uses bold + accent color to distinguish the current parameter from the rest of the signature
+
+---
+
+## 2026-02-21: Buffer Bar Hide Option (bufferline config)
+
+### Progress
+- Wired helix-view's `bufferline` config (`never`/`always`/`multiple`) to control buffer bar visibility
+- helix-dioxus overrides the default from `Never` to `Always` (tabs are a natural GUI element)
+- Added `show_buffer_bar` to `EditorSnapshot`, computed from `editor.config().bufferline`
+- Conditional rendering in `app.rs` — buffer bar is only rendered when `show_buffer_bar` is true
+- Dynamic chrome height: viewport line computation accounts for buffer bar presence/absence (+1 line when hidden)
+- Runtime support: `:set bufferline never|always|multiple` toggles the buffer bar live
+- 4 integration tests covering all three modes
+
+### Files Changed
+- `src/state/mod.rs` — `load_editor_config()` override, `snapshot()` computation, dynamic `compute_viewport_lines()`
+- `src/state/types.rs` — `show_buffer_bar: bool` field on `EditorSnapshot`
+- `src/app.rs` — conditional `BufferBar {}` rendering
+- `src/integration_tests.rs` — 4 new tests
 
 ---
 

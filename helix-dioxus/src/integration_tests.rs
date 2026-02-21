@@ -593,3 +593,55 @@ fn join_lines_single_line() {
 
     assert_state(&ctx, "foo\n  bar#[ |]#baz\n");
 }
+
+// --- bufferline config ---
+
+/// Default config (Always) shows the buffer bar.
+#[test]
+fn bufferline_always_shows_bar() {
+    let mut ctx = test_context("#[h|]#ello\n");
+    let snap = ctx.snapshot();
+    assert!(snap.show_buffer_bar);
+    assert!(!snap.open_buffers.is_empty());
+}
+
+/// Helper: set `bufferline` on the editor config without triggering Tokio-dependent notifications.
+fn set_bufferline(ctx: &mut EditorContext, bufferline: helix_view::editor::BufferLine) {
+    let mut config = ctx.editor.config().clone();
+    config.bufferline = bufferline;
+    ctx.editor.config = std::sync::Arc::new(arc_swap::ArcSwap::from_pointee(config));
+}
+
+/// `bufferline = never` hides the buffer bar.
+#[test]
+fn bufferline_never_hides_bar() {
+    let mut ctx = test_context("#[h|]#ello\n");
+    set_bufferline(&mut ctx, helix_view::editor::BufferLine::Never);
+    let snap = ctx.snapshot();
+    assert!(!snap.show_buffer_bar);
+    assert!(snap.open_buffers.is_empty());
+}
+
+/// `bufferline = multiple` with a single buffer hides the bar.
+#[test]
+fn bufferline_multiple_single_buffer() {
+    let mut ctx = test_context("#[h|]#ello\n");
+    set_bufferline(&mut ctx, helix_view::editor::BufferLine::Multiple);
+    let snap = ctx.snapshot();
+    assert!(!snap.show_buffer_bar);
+}
+
+/// `bufferline = multiple` with two buffers shows the bar.
+#[test]
+fn bufferline_multiple_two_buffers() {
+    let mut ctx = test_context("#[h|]#ello\n");
+    set_bufferline(&mut ctx, helix_view::editor::BufferLine::Multiple);
+
+    // Open a second buffer
+    ctx.editor
+        .new_file(helix_view::editor::Action::VerticalSplit);
+
+    let snap = ctx.snapshot();
+    assert!(snap.show_buffer_bar);
+    assert!(snap.open_buffers.len() >= 2);
+}

@@ -254,8 +254,11 @@ pub struct EditorContext {
 /// Line-height multiplier matching CSS `--editor-line-height: 1.5`.
 const LINE_HEIGHT_RATIO: f64 = 1.5;
 
-/// Total height in pixels of non-editor chrome: `buffer_bar`(32) + `help_bar`(20) + `statusline`(24).
-const CHROME_HEIGHT_PX: f64 = 76.0;
+/// Height in pixels of the buffer bar.
+const BUFFER_BAR_HEIGHT_PX: f64 = 32.0;
+
+/// Height in pixels of non-editor chrome *excluding* the buffer bar: `help_bar`(20) + `statusline`(24).
+const BASE_CHROME_HEIGHT_PX: f64 = 44.0;
 
 /// Approximate character-width ratio for monospace fonts (width / font-size).
 const CHAR_WIDTH_RATIO: f64 = 0.6;
@@ -265,10 +268,17 @@ const CHAR_WIDTH_RATIO: f64 = 0.6;
 const HORIZONTAL_CHROME_PX: f64 = 30.0;
 
 /// Compute the number of visible editor lines from window dimensions and font size.
+///
+/// When `show_buffer_bar` is true, 32px are reserved for the buffer bar.
 #[must_use]
-pub fn compute_viewport_lines(window_height: f64, font_size: f64) -> usize {
+pub fn compute_viewport_lines(window_height: f64, font_size: f64, show_buffer_bar: bool) -> usize {
     let line_height_px = font_size * LINE_HEIGHT_RATIO;
-    let editor_height = (window_height - CHROME_HEIGHT_PX).max(line_height_px);
+    let chrome = if show_buffer_bar {
+        BASE_CHROME_HEIGHT_PX + BUFFER_BAR_HEIGHT_PX
+    } else {
+        BASE_CHROME_HEIGHT_PX
+    };
+    let editor_height = (window_height - chrome).max(line_height_px);
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     {
         (editor_height / line_height_px).floor() as usize
@@ -441,7 +451,9 @@ impl EditorContext {
 
         // Compute initial viewport from config
         let font_size = dhx_config.font.size;
-        let viewport_lines = compute_viewport_lines(dhx_config.window.height, font_size);
+        // Default bufferline is Always (overridden in load_editor_config), so buffer bar is shown at init
+        let show_buffer_bar = true;
+        let viewport_lines = compute_viewport_lines(dhx_config.window.height, font_size, show_buffer_bar);
         let char_width = font_size * CHAR_WIDTH_RATIO;
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let cols = ((dhx_config.window.width - HORIZONTAL_CHROME_PX).max(0.0) / char_width).floor() as u16;
@@ -611,7 +623,12 @@ impl EditorContext {
     /// Recomputes the number of visible editor lines and updates the
     /// underlying `Editor` rect so `ensure_cursor_in_view` works correctly.
     pub(crate) fn update_viewport_size(&mut self, window_width: f64, window_height: f64) {
-        self.viewport_lines = compute_viewport_lines(window_height, self.font_size);
+        let show_buffer_bar = match self.editor.config().bufferline {
+            helix_view::editor::BufferLine::Always => true,
+            helix_view::editor::BufferLine::Never => false,
+            helix_view::editor::BufferLine::Multiple => self.editor.documents().count() > 1,
+        };
+        self.viewport_lines = compute_viewport_lines(window_height, self.font_size, show_buffer_bar);
         let char_width = self.font_size * CHAR_WIDTH_RATIO;
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let cols = ((window_width - HORIZONTAL_CHROME_PX).max(0.0) / char_width).floor() as u16;
@@ -2489,7 +2506,17 @@ impl EditorContext {
             .unwrap_or(&self.editor.config().rulers)
             .clone();
 
-        let (open_buffers, buffer_scroll_offset) = self.buffer_bar_snapshot();
+        let show_buffer_bar = match self.editor.config().bufferline {
+            helix_view::editor::BufferLine::Always => true,
+            helix_view::editor::BufferLine::Never => false,
+            helix_view::editor::BufferLine::Multiple => self.editor.documents().count() > 1,
+        };
+
+        let (open_buffers, buffer_scroll_offset) = if show_buffer_bar {
+            self.buffer_bar_snapshot()
+        } else {
+            (Vec::new(), 0)
+        };
 
         // Increment snapshot version for change detection
         self.snapshot_version += 1;
@@ -2544,6 +2571,7 @@ impl EditorContext {
                 .as_ref()
                 .map(|p| p.to_string_lossy().to_string()),
             picker_preview: self.compute_picker_preview(),
+            show_buffer_bar,
             open_buffers,
             buffer_scroll_offset,
             // LSP state
@@ -4898,18 +4926,34 @@ fn load_merged_config_toml() -> Option<toml::Value> {
 /// Load editor configuration from global + workspace `config.toml` `[editor]` sections.
 ///
 /// Workspace values override global. Falls back to defaults if neither file exists.
+/// helix-view defaults `bufferline` to `Never`, but helix-dioxus overrides to `Always`
+/// (tabs are a natural GUI element) unless the user explicitly set it in their config.
 pub(crate) fn load_editor_config() -> helix_view::editor::Config {
     let Some(merged) = load_merged_config_toml() else {
-        return helix_view::editor::Config::default();
+        return helix_view::editor::Config {
+            bufferline: helix_view::editor::BufferLine::Always,
+            ..Default::default()
+        };
     };
 
-    match merged.get("editor") {
+    let user_set_bufferline = merged
+        .get("editor")
+        .and_then(|e| e.get("bufferline"))
+        .is_some();
+
+    let mut config = match merged.get("editor") {
         Some(editor_val) => editor_val.clone().try_into().unwrap_or_else(|err| {
             log::warn!("Failed to deserialize [editor] config: {err}");
             helix_view::editor::Config::default()
         }),
         None => helix_view::editor::Config::default(),
+    };
+
+    if !user_set_bufferline {
+        config.bufferline = helix_view::editor::BufferLine::Always;
     }
+
+    config
 }
 
 ///// Load configurable keymaps: start with defaults, merge user `[keys]` from config.toml.
@@ -5041,27 +5085,33 @@ mod tests {
 
     #[test]
     fn compute_viewport_lines_default_config() {
-        // Default: 900px window, 14px font → (900 - 76) / (14 * 1.5) = 824 / 21 = 39
-        assert_eq!(compute_viewport_lines(900.0, 14.0), 39);
+        // With buffer bar: 900px window, 14px font → (900 - 76) / (14 * 1.5) = 824 / 21 = 39
+        assert_eq!(compute_viewport_lines(900.0, 14.0, true), 39);
     }
 
     #[test]
     fn compute_viewport_lines_large_font() {
-        // 900px window, 20px font → (900 - 76) / (20 * 1.5) = 824 / 30 = 27
-        assert_eq!(compute_viewport_lines(900.0, 20.0), 27);
+        // With buffer bar: 900px window, 20px font → (900 - 76) / (20 * 1.5) = 824 / 30 = 27
+        assert_eq!(compute_viewport_lines(900.0, 20.0, true), 27);
     }
 
     #[test]
     fn compute_viewport_lines_small_window() {
         // Very small window, clamped to at least 1 line height
         // 80px window, 14px font → max(80 - 76, 21) / 21 = 21 / 21 = 1
-        assert_eq!(compute_viewport_lines(80.0, 14.0), 1);
+        assert_eq!(compute_viewport_lines(80.0, 14.0, true), 1);
     }
 
     #[test]
     fn compute_viewport_lines_tiny_window() {
         // Window smaller than chrome → (50 - 76).max(21) = 21 / 21 = 1
-        assert_eq!(compute_viewport_lines(50.0, 14.0), 1);
+        assert_eq!(compute_viewport_lines(50.0, 14.0, true), 1);
+    }
+
+    #[test]
+    fn compute_viewport_lines_without_buffer_bar() {
+        // Without buffer bar: 900px window, 14px font → (900 - 44) / (14 * 1.5) = 856 / 21 = 40
+        assert_eq!(compute_viewport_lines(900.0, 14.0, false), 40);
     }
 
     // --- soft wrap helpers ---

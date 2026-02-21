@@ -282,8 +282,10 @@ pub fn App() -> Element {
             // CSS custom properties from theme applied as inline style (cascades to all children)
             style: "position: relative; {snapshot.theme_css_vars}",
 
-            // Buffer bar at the top
-            BufferBar {}
+            // Buffer bar at the top (controlled by `bufferline` config)
+            if snapshot.show_buffer_bar {
+                BufferBar {}
+            }
 
             // Editor view takes up most of the space
             div {
