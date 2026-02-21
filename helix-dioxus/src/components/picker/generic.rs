@@ -45,6 +45,12 @@ pub fn GenericPicker(
         .map(|(i, item)| (window_offset + i, item))
         .collect();
 
+    // Scroll selected item into view when selection changes
+    use_effect(move || {
+        let _ = selected;
+        document::eval("scrollSelectedPickerItem();");
+    });
+
     let title = mode.title();
 
     // Use wide layout whenever the mode supports preview (even if current item has none),

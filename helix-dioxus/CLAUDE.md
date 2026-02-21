@@ -56,6 +56,7 @@ helix-dioxus/src/
 │   ├── keybinding_help.rs      # Context-aware keybinding help bar
 │   ├── scrollbar.rs            # Custom scrollbar with diagnostic markers
 │   ├── diagnostics.rs          # Diagnostic rendering helpers
+│   ├── git_diff_popup.rs       # Git diff hover popup (revert/copy actions)
 │   ├── file_icons/             # File/folder type icons (via dioxus-iconify)
 │   │   └── mod.rs              # FileTypeIcon, FolderTypeIcon components + filename→IconData mapping
 │   ├── lsp/                    # LSP-related popups
@@ -221,7 +222,8 @@ Functions defined in `script.js`:
 - `.file-type-icon` (Material Icon Theme SVG icons for files/folders)
 - `.cursor-secondary-normal`, `.cursor-secondary-select`, `.cursor-secondary-insert` (multi-cursor)
 - `.indicator-gutter`, `.indicator-diagnostic`, `.indicator-jumplist` (gutter indicators)
-- `.gutter-diff-bar`, `.gutter-diff-deleted` (VCS diff markers)
+- `.gutter-diff-zone`, `.gutter-diff-bar`, `.gutter-diff-deleted` (VCS diff markers with hover zone)
+- `.git-diff-popup`, `.git-diff-popup-header`, `.git-diff-popup-actions`, `.git-diff-popup-btn`, `.git-diff-popup-content` (git diff hover popup)
 - `.error-lens` (inline diagnostic messages)
 - `.inlay-hint`, `.inlay-hint-type`, `.inlay-hint-param` (LSP inlay hints)
 - `.lsp-icon-blinking`, `.lsp-icon-spinning` (LSP status animations)

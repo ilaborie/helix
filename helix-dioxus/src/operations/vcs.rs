@@ -13,7 +13,10 @@ use helix_view::DocumentId;
 use imara_diff::Hunk;
 
 use super::JumpOps;
-use crate::state::{EditorContext, NotificationSeverity, PickerIcon, PickerItem, PickerMode};
+use crate::lsp::{DiffChangeKind, DiffLine};
+use crate::state::{
+    DiffLineType, EditorContext, GitDiffHunkSnapshot, NotificationSeverity, PickerIcon, PickerItem, PickerMode,
+};
 
 /// VCS operations as an extension trait on `EditorContext`.
 pub trait VcsOps {
@@ -27,6 +30,21 @@ pub trait VcsOps {
     fn goto_last_change(&mut self, doc_id: DocumentId, view_id: helix_view::ViewId);
     /// Show a picker listing all changed files in the working directory.
     fn show_changed_files_picker(&mut self);
+    /// Compute git diff hunk data for a given line (1-indexed).
+    fn compute_hunk_for_line(&self, doc_id: DocumentId, line: usize) -> Option<GitDiffHunkSnapshot>;
+    /// Revert the hunk at the given line (1-indexed) to the base version.
+    fn revert_hunk_at_line(&mut self, doc_id: DocumentId, view_id: helix_view::ViewId, line: usize);
+    /// Get the original (base) text for the hunk at the given line (1-indexed).
+    fn copy_original_hunk(&self, doc_id: DocumentId, line: usize) -> Option<String>;
+}
+
+/// Extract lines `[start, end)` from a `Rope` as a `String`.
+fn rope_lines_to_string(rope: &helix_core::Rope, start: usize, end: usize) -> String {
+    let mut result = String::new();
+    for i in start..end.min(rope.len_lines()) {
+        result.push_str(&rope.line(i).to_string());
+    }
+    result
 }
 
 /// Compute the selection `Range` for a hunk in the given text.
@@ -244,6 +262,144 @@ impl VcsOps for EditorContext {
         self.push_jump();
         let doc = self.editor.document_mut(doc_id).expect("doc exists");
         doc.set_selection(view_id, Selection::single(range.anchor, range.head));
+    }
+
+    fn compute_hunk_for_line(&self, doc_id: DocumentId, line: usize) -> Option<GitDiffHunkSnapshot> {
+        let doc = self.editor.document(doc_id)?;
+        let handle = doc.diff_handle()?.clone();
+        let diff = handle.load();
+
+        // Convert 1-indexed line to 0-indexed for hunk_at
+        #[allow(clippy::cast_possible_truncation)]
+        let line_0 = (line.saturating_sub(1)) as u32;
+        let hunk_idx = diff.hunk_at(line_0, true)?;
+        let hunk = diff.nth_hunk(hunk_idx);
+        if hunk == Hunk::NONE {
+            return None;
+        }
+
+        let diff_type = if hunk.after.is_empty() {
+            DiffLineType::Deleted
+        } else if hunk.before.is_empty() {
+            DiffLineType::Added
+        } else {
+            DiffLineType::Modified
+        };
+
+        // Extract base and current text for the hunk region with context
+        let base = diff.diff_base();
+        let current = diff.doc();
+        let context: u32 = 3;
+
+        let old_start = hunk.before.start.saturating_sub(context) as usize;
+        #[allow(clippy::cast_possible_truncation)] // line count fits in u32
+        let old_end = (hunk.before.end + context).min(base.len_lines() as u32) as usize;
+        let new_start = hunk.after.start.saturating_sub(context) as usize;
+        #[allow(clippy::cast_possible_truncation)] // line count fits in u32
+        let new_end = (hunk.after.end + context).min(current.len_lines() as u32) as usize;
+
+        let old_text = rope_lines_to_string(base, old_start, old_end);
+        let new_text = rope_lines_to_string(current, new_start, new_end);
+
+        let hunks = crate::lsp::diff::compute_file_diff(&old_text, &new_text, 3);
+        if hunks.is_empty() && diff_type != DiffLineType::Deleted {
+            return None;
+        }
+
+        let all_lines: Vec<DiffLine> = hunks.into_iter().flat_map(|h| h.lines).collect();
+
+        // For pure deletions with no diff lines, build them manually from base
+        let lines = if all_lines.is_empty() && diff_type == DiffLineType::Deleted {
+            let del_start = hunk.before.start as usize;
+            let del_end = hunk.before.end as usize;
+            let mut manual_lines = Vec::new();
+            for i in del_start..del_end {
+                let line_content = base.line(i).to_string();
+                manual_lines.push(DiffLine {
+                    kind: DiffChangeKind::Removed,
+                    content: line_content.trim_end_matches('\n').to_string(),
+                    old_line_number: Some(i + 1),
+                    new_line_number: None,
+                });
+            }
+            manual_lines
+        } else {
+            all_lines
+        };
+
+        let lines_added = lines.iter().filter(|l| l.kind == DiffChangeKind::Added).count();
+        let lines_removed = lines.iter().filter(|l| l.kind == DiffChangeKind::Removed).count();
+
+        Some(GitDiffHunkSnapshot {
+            diff_type,
+            lines,
+            lines_added,
+            lines_removed,
+        })
+    }
+
+    fn revert_hunk_at_line(&mut self, doc_id: DocumentId, view_id: helix_view::ViewId, line: usize) {
+        let (hunk, base_text) = {
+            let Some(doc) = self.editor.document(doc_id) else {
+                return;
+            };
+            let Some(handle) = doc.diff_handle().cloned() else {
+                return;
+            };
+            let diff = handle.load();
+
+            #[allow(clippy::cast_possible_truncation)]
+            let line_0 = (line.saturating_sub(1)) as u32;
+            let Some(hunk_idx) = diff.hunk_at(line_0, true) else {
+                return;
+            };
+            let hunk = diff.nth_hunk(hunk_idx);
+            if hunk == Hunk::NONE {
+                return;
+            }
+
+            // Extract base text for this hunk
+            let base = diff.diff_base();
+            let base_text = rope_lines_to_string(base, hunk.before.start as usize, hunk.before.end as usize);
+            (hunk, base_text)
+        };
+
+        // Build and apply the transaction
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().clone();
+        let text_slice = text.slice(..);
+
+        let anchor = text_slice.line_to_char(hunk.after.start as usize);
+        let head = if hunk.after.is_empty() {
+            anchor
+        } else {
+            text_slice.line_to_char(hunk.after.end as usize)
+        };
+
+        let replacement: helix_core::Tendril = base_text.into();
+        let transaction = helix_core::Transaction::change(&text, [(anchor, head, Some(replacement))].into_iter());
+        doc.apply(&transaction, view_id);
+    }
+
+    fn copy_original_hunk(&self, doc_id: DocumentId, line: usize) -> Option<String> {
+        let doc = self.editor.document(doc_id)?;
+        let handle = doc.diff_handle()?.clone();
+        let diff = handle.load();
+
+        #[allow(clippy::cast_possible_truncation)]
+        let line_0 = (line.saturating_sub(1)) as u32;
+        let hunk_idx = diff.hunk_at(line_0, true)?;
+        let hunk = diff.nth_hunk(hunk_idx);
+        if hunk == Hunk::NONE || hunk.before.is_empty() {
+            return None;
+        }
+
+        let base = diff.diff_base();
+        Some(rope_lines_to_string(
+            base,
+            hunk.before.start as usize,
+            hunk.before.end as usize,
+        ))
     }
 
     fn show_changed_files_picker(&mut self) {

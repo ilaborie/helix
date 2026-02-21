@@ -7,8 +7,8 @@ use helix_view::input::KeyCode;
 
 use crate::components::{
     BufferBar, CodeActionsMenu, CommandCompletionPopup, CommandPrompt, CompletionPopup, ConfirmationDialog, EditorView,
-    GenericPicker, HoverPopup, InputDialog, KeybindingHelpBar, LocationPicker, LspStatusDialog, NotificationContainer,
-    RegexPrompt, SearchPrompt, ShellPrompt, SignatureHelpPopup, StatusLine,
+    GenericPicker, GitDiffPopup, HoverPopup, InputDialog, KeybindingHelpBar, LocationPicker, LspStatusDialog,
+    NotificationContainer, RegexPrompt, SearchPrompt, ShellPrompt, SignatureHelpPopup, StatusLine,
 };
 use crate::keybindings::{
     handle_code_actions_mode, handle_command_mode, handle_completion_mode, handle_confirmation_mode,
@@ -371,7 +371,7 @@ pub fn App() -> Element {
                 if let Some(ref hover_html) = snapshot.hover_html {
                     HoverPopup {
                         hover_html: hover_html.clone(),
-    
+
                     }
                 }
             }
@@ -381,7 +381,7 @@ pub fn App() -> Element {
                 if let Some(ref sig_help) = snapshot.signature_help {
                     SignatureHelpPopup {
                         signature_help: sig_help.clone(),
-    
+
                     }
                 }
             }
@@ -394,6 +394,16 @@ pub fn App() -> Element {
 
                     filter: snapshot.code_action_filter.clone(),
                     preview: snapshot.code_action_preview.clone(),
+                }
+            }
+
+            // VCS - Git diff hover popup
+            if snapshot.git_diff_hover_visible {
+                if let Some(ref hunk) = snapshot.git_diff_hover {
+                    GitDiffPopup {
+                        hunk: hunk.clone(),
+                        line: snapshot.git_diff_hover_line.unwrap_or(0),
+                    }
                 }
             }
 

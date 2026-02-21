@@ -14,6 +14,7 @@ mod buffer_bar;
 mod diagnostics;
 mod editor_view;
 pub(crate) mod file_icons;
+mod git_diff_popup;
 mod kbd;
 mod keybinding_help;
 mod modal_overlay;
@@ -45,5 +46,6 @@ pub use dialog::{
     CommandCompletionPopup, CommandPrompt, ConfirmationDialog, InputDialog, LspStatusDialog, NotificationContainer,
     RegexPrompt, SearchPrompt, ShellPrompt,
 };
+pub use git_diff_popup::GitDiffPopup;
 pub use lsp::{CodeActionsMenu, CompletionPopup, HoverPopup, LocationPicker, SignatureHelpPopup};
 pub use picker::GenericPicker;

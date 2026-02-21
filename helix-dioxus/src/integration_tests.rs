@@ -638,8 +638,7 @@ fn bufferline_multiple_two_buffers() {
     set_bufferline(&mut ctx, helix_view::editor::BufferLine::Multiple);
 
     // Open a second buffer
-    ctx.editor
-        .new_file(helix_view::editor::Action::VerticalSplit);
+    ctx.editor.new_file(helix_view::editor::Action::VerticalSplit);
 
     let snap = ctx.snapshot();
     assert!(snap.show_buffer_bar);

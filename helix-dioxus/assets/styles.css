@@ -551,6 +551,8 @@ body {
 .picker-list-items {
     flex: 1;
     min-width: 0;
+    max-height: 340px;
+    overflow-y: auto;
 }
 
 .picker-scrollbar-track {
@@ -891,11 +893,22 @@ kbd {
     z-index: 1;
 }
 
+/* VCS diff hover zone — wider interactive hit target around diff markers */
+.gutter-diff-zone {
+    position: absolute;
+    top: 0;
+    right: -10px;
+    width: 14px;
+    height: 100%;
+    cursor: pointer;
+    z-index: 3;
+}
+
 /* VCS diff bar on right edge of line number gutter */
 .gutter-diff-bar {
     position: absolute;
     top: 0;
-    right: -6px;
+    right: 2px;
     width: 3px;
     height: 100%;
     pointer-events: none;
@@ -905,7 +918,7 @@ kbd {
 .gutter-diff-deleted {
     position: absolute;
     bottom: -4px;
-    right: -6px;
+    right: 0;
     width: 0;
     height: 0;
     border-top: 4px solid transparent;
@@ -913,6 +926,103 @@ kbd {
     border-right: 6px solid var(--error);
     z-index: 2;
     pointer-events: none;
+}
+
+/* ───── Git Diff Hover Popup ───── */
+.git-diff-popup {
+    position: fixed;
+    z-index: var(--z-dropdown);
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--bg-highlight);
+    border-radius: 6px;
+    max-width: 550px;
+    max-height: 350px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    font-size: 12px;
+}
+
+.git-diff-popup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--bg-highlight);
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.git-diff-popup-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.git-diff-popup-stat-label {
+    font-weight: 600;
+}
+
+.git-diff-popup-stat-count {
+    color: var(--text-dim);
+}
+
+.git-diff-popup-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.git-diff-popup-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border: 1px solid var(--bg-highlight);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.git-diff-popup-btn:hover {
+    background: var(--bg-highlight);
+}
+
+.git-diff-popup-btn-revert {
+    color: var(--error);
+    border-color: var(--error);
+}
+
+.git-diff-popup-btn-revert:hover {
+    background: rgba(255, 85, 85, 0.15);
+}
+
+.git-diff-popup-btn-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+}
+
+.git-diff-popup-btn-close:hover {
+    color: var(--text);
+    background: var(--bg-highlight);
+}
+
+.git-diff-popup-content {
+    overflow-y: auto;
+    overflow-x: auto;
+    flex: 1;
+    font-family: var(--font-mono);
 }
 
 .diagnostic-marker {

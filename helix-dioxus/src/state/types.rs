@@ -71,6 +71,19 @@ pub struct BufferInfo {
     pub is_current: bool,
 }
 
+/// Snapshot of a git diff hunk for hover popup display.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GitDiffHunkSnapshot {
+    /// Type of change (added, modified, deleted).
+    pub diff_type: DiffLineType,
+    /// Diff lines with context.
+    pub lines: Vec<crate::lsp::DiffLine>,
+    /// Number of lines added in this hunk.
+    pub lines_added: usize,
+    /// Number of lines removed in this hunk.
+    pub lines_removed: usize,
+}
+
 /// Type of diff change for a line in the gutter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiffLineType {
@@ -335,6 +348,14 @@ pub struct EditorSnapshot {
     pub jump_lines: Vec<usize>,
     /// Lines with VCS diff changes (1-indexed line number, diff type).
     pub diff_lines: Vec<(usize, DiffLineType)>,
+
+    // Git diff hover popup state
+    /// Whether the git diff hover popup is visible.
+    pub git_diff_hover_visible: bool,
+    /// The line number (1-indexed) being hovered for git diff.
+    pub git_diff_hover_line: Option<usize>,
+    /// The hunk data for the git diff hover popup.
+    pub git_diff_hover: Option<GitDiffHunkSnapshot>,
 
     // Picker state
     pub picker_visible: bool,
@@ -926,6 +947,16 @@ pub enum EditorCommand {
     GotoLastChange,
     /// Show changed files picker (Space g).
     ShowChangedFilesPicker,
+
+    // VCS - Git diff hover popup
+    /// Show git diff hover popup for a line (1-indexed).
+    ShowGitDiffHover(usize),
+    /// Close git diff hover popup.
+    CloseGitDiffHover,
+    /// Revert the hunk at the given line (1-indexed).
+    RevertGitHunk(usize),
+    /// Copy the original (base) text for the hunk at the given line (1-indexed).
+    CopyOriginalHunk(usize),
 
     // LSP - Diagnostics
     /// Jump to next diagnostic.

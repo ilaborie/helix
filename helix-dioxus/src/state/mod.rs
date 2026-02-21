@@ -15,7 +15,7 @@ mod types;
 
 pub use types::{
     centered_window, is_image_file, scrollbar_thumb_geometry, BufferInfo, CommandCompletionItem, ConfirmationAction,
-    ConfirmationDialogSnapshot, DiffLineType, Direction, EditorCommand, EditorSnapshot,
+    ConfirmationDialogSnapshot, DiffLineType, Direction, EditorCommand, EditorSnapshot, GitDiffHunkSnapshot,
     GlobalSearchResult, InputDialogKind, InputDialogSnapshot, LineSnapshot, NotificationSeverity, NotificationSnapshot,
     PendingKeySequence, PickerIcon, PickerItem, PickerMode, PickerPreview, PreviewContent, PreviewLine,
     RegisterSnapshot, ScrollbarDiagnostic, ShellBehavior, StartupAction, TokenSpan, WhitespaceSnapshot, WordJumpLabel,
@@ -226,6 +226,14 @@ pub struct EditorContext {
     pub(crate) word_jump_ranges: Vec<usize>,
     pub(crate) word_jump_extend: bool,
     pub(crate) word_jump_first_idx: Option<char>,
+
+    // Git diff hover popup state
+    /// Whether the git diff hover popup is visible.
+    pub(crate) git_diff_hover_visible: bool,
+    /// The line number (1-indexed) being hovered for git diff.
+    pub(crate) git_diff_hover_line: Option<usize>,
+    /// The hunk data for the git diff hover popup.
+    pub(crate) git_diff_hover: Option<GitDiffHunkSnapshot>,
 
     // Dialog configuration
     pub(crate) dialog_search_mode: crate::config::DialogSearchMode,
@@ -607,6 +615,9 @@ impl EditorContext {
             word_jump_ranges: Vec::new(),
             word_jump_extend: false,
             word_jump_first_idx: None,
+            git_diff_hover_visible: false,
+            git_diff_hover_line: None,
+            git_diff_hover: None,
             dialog_search_mode: dhx_config.dialog.search_mode,
             picker_search_focused: false,
             should_quit: false,
@@ -735,6 +746,21 @@ impl EditorContext {
         if self.hover_visible && !matches!(cmd, EditorCommand::TriggerHover | EditorCommand::LspResponse(_)) {
             self.hover_visible = false;
             self.hover_content = None;
+        }
+
+        // Auto-close git diff hover on any command except show/close itself
+        if self.git_diff_hover_visible
+            && !matches!(
+                cmd,
+                EditorCommand::ShowGitDiffHover(_)
+                    | EditorCommand::CloseGitDiffHover
+                    | EditorCommand::RevertGitHunk(_)
+                    | EditorCommand::CopyOriginalHunk(_)
+            )
+        {
+            self.git_diff_hover_visible = false;
+            self.git_diff_hover_line = None;
+            self.git_diff_hover = None;
         }
 
         let view_id = self.editor.tree.focus;
@@ -1428,6 +1454,40 @@ impl EditorContext {
             EditorCommand::GotoFirstChange => self.goto_first_change(doc_id, view_id),
             EditorCommand::GotoLastChange => self.goto_last_change(doc_id, view_id),
             EditorCommand::ShowChangedFilesPicker => self.show_changed_files_picker(),
+
+            // VCS - Git diff hover
+            EditorCommand::ShowGitDiffHover(line) => {
+                self.git_diff_hover = self.compute_hunk_for_line(doc_id, line);
+                self.git_diff_hover_visible = self.git_diff_hover.is_some();
+                self.git_diff_hover_line = self.git_diff_hover_visible.then_some(line);
+            }
+            EditorCommand::CloseGitDiffHover => {
+                self.git_diff_hover_visible = false;
+                self.git_diff_hover_line = None;
+                self.git_diff_hover = None;
+            }
+            EditorCommand::RevertGitHunk(line) => {
+                self.revert_hunk_at_line(doc_id, view_id, line);
+                self.git_diff_hover_visible = false;
+                self.git_diff_hover_line = None;
+                self.git_diff_hover = None;
+            }
+            EditorCommand::CopyOriginalHunk(line) => {
+                if let Some(text) = self.copy_original_hunk(doc_id, line) {
+                    // Write to '+' register (system clipboard) and sync internal clipboard
+                    if let Err(e) = self.editor.registers.write('+', vec![text.clone()]) {
+                        log::warn!("Failed to write to system clipboard register: {e}");
+                    }
+                    self.clipboard = text;
+                    self.show_notification(
+                        "Original hunk copied to clipboard".to_string(),
+                        NotificationSeverity::Info,
+                    );
+                }
+                self.git_diff_hover_visible = false;
+                self.git_diff_hover_line = None;
+                self.git_diff_hover = None;
+            }
 
             // LSP - Diagnostics
             EditorCommand::NextDiagnostic => {
@@ -2546,6 +2606,9 @@ impl EditorContext {
             search_match_lines,
             jump_lines,
             diff_lines,
+            git_diff_hover_visible: self.git_diff_hover_visible,
+            git_diff_hover_line: self.git_diff_hover_line,
+            git_diff_hover: self.git_diff_hover.clone(),
             regex_mode: self.regex_mode,
             regex_split: self.regex_split,
             regex_input: self.regex_input.clone(),
@@ -4936,10 +4999,7 @@ pub(crate) fn load_editor_config() -> helix_view::editor::Config {
         };
     };
 
-    let user_set_bufferline = merged
-        .get("editor")
-        .and_then(|e| e.get("bufferline"))
-        .is_some();
+    let user_set_bufferline = merged.get("editor").and_then(|e| e.get("bufferline")).is_some();
 
     let mut config = match merged.get("editor") {
         Some(editor_val) => editor_val.clone().try_into().unwrap_or_else(|err| {
@@ -5269,18 +5329,12 @@ mod tests {
 
     #[test]
     fn snippet_tabstop_with_default() {
-        assert_eq!(
-            strip_snippet_placeholders("fn ${1:name}($2)$0"),
-            "fn name()"
-        );
+        assert_eq!(strip_snippet_placeholders("fn ${1:name}($2)$0"), "fn name()");
     }
 
     #[test]
     fn snippet_nested_placeholders() {
-        assert_eq!(
-            strip_snippet_placeholders("${1:Option<${2:T}>}$0"),
-            "Option<T>"
-        );
+        assert_eq!(strip_snippet_placeholders("${1:Option<${2:T}>}$0"), "Option<T>");
     }
 
     #[test]
@@ -5300,9 +5354,6 @@ mod tests {
 
     #[test]
     fn snippet_multiple_tabstops() {
-        assert_eq!(
-            strip_snippet_placeholders("map(|${1:x}| ${2:x})$0"),
-            "map(|x| x)"
-        );
+        assert_eq!(strip_snippet_placeholders("map(|${1:x}| ${2:x})$0"), "map(|x| x)");
     }
 }

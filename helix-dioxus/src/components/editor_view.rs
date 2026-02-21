@@ -11,15 +11,18 @@ use crate::components::{
     diagnostics_for_line, first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker, DiagnosticUnderline,
     ErrorLens, Scrollbar,
 };
-use crate::hooks::use_snapshot;
+use crate::hooks::{use_snapshot, use_snapshot_signal};
 use crate::lsp::{DiagnosticSnapshot, InlayHintKind, InlayHintSnapshot};
-use crate::state::{DiffLineType, LineSnapshot, TokenSpan, WhitespaceSnapshot, WordJumpLabel};
+use crate::state::{DiffLineType, EditorCommand, LineSnapshot, TokenSpan, WhitespaceSnapshot, WordJumpLabel};
+use crate::AppState;
 
 /// Editor view component that renders the document content.
 #[component]
 pub fn EditorView() -> Element {
     let snapshot = use_snapshot();
     let version = snapshot.snapshot_version;
+    let app_state = use_context::<AppState>();
+    let mut snapshot_signal = use_snapshot_signal();
 
     let mode = &snapshot.mode;
     let diagnostics = &snapshot.diagnostics;
@@ -138,12 +141,31 @@ pub fn EditorView() -> Element {
                                 } else {
                                     "{line_num}"
                                     if let Some(dt) = diff_type {
-                                        if dt == DiffLineType::Deleted {
-                                            span { class: "gutter-diff-deleted" }
-                                        } else {
-                                            span {
-                                                class: "gutter-diff-bar",
-                                                style: "background-color: {dt.css_color()};",
+                                        {
+                                            let app_state_hover = app_state.clone();
+                                            let app_state_leave = app_state.clone();
+                                            let hover_line = line_num;
+                                            rsx! {
+                                                span {
+                                                    class: "gutter-diff-zone",
+                                                    "data-diff-line": "{hover_line}",
+                                                    onmouseenter: move |_| {
+                                                        app_state_hover.send_command(EditorCommand::ShowGitDiffHover(hover_line));
+                                                        app_state_hover.process_and_notify(&mut snapshot_signal);
+                                                    },
+                                                    onmouseleave: move |_| {
+                                                        app_state_leave.send_command(EditorCommand::CloseGitDiffHover);
+                                                        app_state_leave.process_and_notify(&mut snapshot_signal);
+                                                    },
+                                                    if dt == DiffLineType::Deleted {
+                                                        span { class: "gutter-diff-deleted" }
+                                                    } else {
+                                                        span {
+                                                            class: "gutter-diff-bar",
+                                                            style: "background-color: {dt.css_color()};",
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
                                     }
