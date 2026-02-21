@@ -453,6 +453,12 @@ pub struct EditorSnapshot {
     /// Whether the picker search input is focused (vim-style mode only).
     pub picker_search_focused: bool,
 
+    // Viewport
+    /// Number of visible editor lines (computed from window height and font size).
+    pub viewport_lines: usize,
+    /// Whether soft wrap is enabled (from `editor.soft-wrap.enable` in config.toml).
+    pub soft_wrap: bool,
+
     // Application state
     pub should_quit: bool,
 }
@@ -473,6 +479,12 @@ pub struct LineSnapshot {
     pub selection_ranges: Vec<(usize, usize)>,
     /// Color swatches for this line (from LSP document colors).
     pub color_swatches: Vec<ColorSwatchSnapshot>,
+    /// Inlay hints for this line (from LSP).
+    pub inlay_hints: Vec<InlayHintSnapshot>,
+    /// Whether this line is a soft-wrap continuation (not the first segment of a document line).
+    pub is_wrap_continuation: bool,
+    /// The wrap indicator string (e.g., "↪ ") for continuation lines.
+    pub wrap_indicator: Option<String>,
 }
 
 /// A span of text with a specific color for syntax highlighting.

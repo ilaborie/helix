@@ -232,11 +232,169 @@ pub struct EditorContext {
     // Application state - pub(crate) for operations access
     pub(crate) should_quit: bool,
 
+    // Viewport tracking
+    /// Number of visible editor lines (computed from window height and font size).
+    pub(crate) viewport_lines: usize,
+    /// Font size in pixels (from `DhxConfig`).
+    pub(crate) font_size: f64,
+    /// Display scale factor (e.g. 2.0 on macOS Retina).
+    /// Updated via `ScaleFactorChanged` events, used to convert physical → logical pixels.
+    pub(crate) scale_factor: f64,
+
     /// Snapshot version counter, incremented on each snapshot creation.
     snapshot_version: u64,
 
     /// Configurable keymaps (trie-based dispatch replacing hardcoded handlers).
     pub(crate) keymaps: crate::keymap::DhxKeymaps,
+}
+
+/// Line-height multiplier matching CSS `--editor-line-height: 1.5`.
+const LINE_HEIGHT_RATIO: f64 = 1.5;
+
+/// Total height in pixels of non-editor chrome: `buffer_bar`(32) + `help_bar`(20) + `statusline`(24).
+const CHROME_HEIGHT_PX: f64 = 76.0;
+
+/// Approximate character-width ratio for monospace fonts (width / font-size).
+const CHAR_WIDTH_RATIO: f64 = 0.6;
+
+/// Horizontal pixels consumed by non-text UI elements (scrollbar + content padding).
+/// 14px scrollbar + 2×8px content-cell padding = 30px.
+const HORIZONTAL_CHROME_PX: f64 = 30.0;
+
+/// Compute the number of visible editor lines from window dimensions and font size.
+#[must_use]
+pub fn compute_viewport_lines(window_height: f64, font_size: f64) -> usize {
+    let line_height_px = font_size * LINE_HEIGHT_RATIO;
+    let editor_height = (window_height - CHROME_HEIGHT_PX).max(line_height_px);
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    { (editor_height / line_height_px).floor() as usize }
+}
+
+// --- Soft wrap helpers ---
+
+/// Split lines that exceed `content_cols` into multiple segments for soft wrapping.
+///
+/// The first segment keeps the original line number; continuation segments get
+/// `is_wrap_continuation: true` with the wrap indicator in the gutter.
+fn soft_wrap_lines(lines: Vec<LineSnapshot>, content_cols: usize, wrap_indicator: &str) -> Vec<LineSnapshot> {
+    if content_cols == 0 {
+        return lines;
+    }
+    let indicator_width = wrap_indicator.chars().count();
+    // Continuation lines have fewer columns due to the wrap indicator
+    let cont_cols = content_cols.saturating_sub(indicator_width).max(1);
+
+    let mut result = Vec::with_capacity(lines.len());
+    for line in lines {
+        let display_len = line.content.trim_end_matches('\n').chars().count();
+        if display_len <= content_cols {
+            result.push(line);
+            continue;
+        }
+
+        // Split the line into segments
+        let chars: Vec<char> = line.content.trim_end_matches('\n').chars().collect();
+        let mut col_offset = 0;
+        let mut first = true;
+
+        while col_offset < chars.len() {
+            let seg_cols = if first { content_cols } else { cont_cols };
+            let seg_end = (col_offset + seg_cols).min(chars.len());
+            let seg_content: String = chars.get(col_offset..seg_end).unwrap_or(&[]).iter().collect();
+
+            result.push(LineSnapshot {
+                line_number: line.line_number,
+                content: seg_content,
+                is_cursor_line: line.is_cursor_line,
+                cursor_cols: clip_cursors(&line.cursor_cols, col_offset, seg_end),
+                primary_cursor_col: line
+                    .primary_cursor_col
+                    .and_then(|c| clip_cursor(c, col_offset, seg_end)),
+                tokens: clip_tokens(&line.tokens, col_offset, seg_end),
+                selection_ranges: clip_selections(&line.selection_ranges, col_offset, seg_end),
+                color_swatches: clip_swatches(&line.color_swatches, col_offset, seg_end),
+                inlay_hints: clip_inlay_hints(&line.inlay_hints, col_offset, seg_end),
+                is_wrap_continuation: !first,
+                wrap_indicator: if first { None } else { Some(wrap_indicator.to_string()) },
+            });
+
+            col_offset = seg_end;
+            first = false;
+        }
+    }
+    result
+}
+
+/// Clip and offset token spans to a column range `[start_col, end_col)`.
+fn clip_tokens(tokens: &[TokenSpan], start_col: usize, end_col: usize) -> Vec<TokenSpan> {
+    tokens
+        .iter()
+        .filter_map(|t| {
+            let clipped_start = t.start.max(start_col);
+            let clipped_end = t.end.min(end_col);
+            (clipped_start < clipped_end).then(|| TokenSpan {
+                start: clipped_start - start_col,
+                end: clipped_end - start_col,
+                color: t.color.clone(),
+            })
+        })
+        .collect()
+}
+
+/// Clip and offset selection ranges to a column range `[start_col, end_col)`.
+fn clip_selections(ranges: &[(usize, usize)], start_col: usize, end_col: usize) -> Vec<(usize, usize)> {
+    ranges
+        .iter()
+        .filter_map(|&(sel_start, sel_end)| {
+            let clipped_start = sel_start.max(start_col);
+            let clipped_end = sel_end.min(end_col);
+            (clipped_start < clipped_end).then(|| (clipped_start - start_col, clipped_end - start_col))
+        })
+        .collect()
+}
+
+/// Clip cursor columns to a column range, returning offset columns.
+fn clip_cursors(cols: &[usize], start_col: usize, end_col: usize) -> Vec<usize> {
+    cols.iter()
+        .filter_map(|&c| clip_cursor(c, start_col, end_col))
+        .collect()
+}
+
+/// Clip a single cursor column to a range, returning the offset column.
+fn clip_cursor(col: usize, start_col: usize, end_col: usize) -> Option<usize> {
+    (col >= start_col && col < end_col).then(|| col - start_col)
+}
+
+/// Clip color swatches to a column range.
+fn clip_swatches(
+    swatches: &[crate::lsp::ColorSwatchSnapshot],
+    start_col: usize,
+    end_col: usize,
+) -> Vec<crate::lsp::ColorSwatchSnapshot> {
+    swatches
+        .iter()
+        .filter(|s| s.col >= start_col && s.col < end_col)
+        .map(|s| crate::lsp::ColorSwatchSnapshot {
+            col: s.col - start_col,
+            color: s.color.clone(),
+        })
+        .collect()
+}
+
+/// Clip inlay hints to a column range.
+fn clip_inlay_hints(
+    hints: &[crate::lsp::InlayHintSnapshot],
+    start_col: usize,
+    end_col: usize,
+) -> Vec<crate::lsp::InlayHintSnapshot> {
+    hints
+        .iter()
+        .filter(|h| h.column >= start_col && h.column < end_col)
+        .map(|h| crate::lsp::InlayHintSnapshot {
+            column: h.column - start_col,
+            ..h.clone()
+        })
+        .collect()
 }
 
 impl EditorContext {
@@ -271,9 +429,18 @@ impl EditorContext {
         // Create handlers and register essential hooks
         let handlers = create_handlers();
 
+        // Compute initial viewport from config
+        let font_size = dhx_config.font.size;
+        let viewport_lines = compute_viewport_lines(dhx_config.window.height, font_size);
+        let char_width = font_size * CHAR_WIDTH_RATIO;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let cols = ((dhx_config.window.width - HORIZONTAL_CHROME_PX).max(0.0) / char_width).floor() as u16;
+        #[allow(clippy::cast_possible_truncation)]
+        let rows = viewport_lines as u16;
+
         // Create the editor
         let mut editor = helix_view::Editor::new(
-            helix_view::graphics::Rect::new(0, 0, 120, 40),
+            helix_view::graphics::Rect::new(0, 0, cols, rows),
             theme_loader,
             syn_loader,
             editor_config,
@@ -419,9 +586,31 @@ impl EditorContext {
             dialog_search_mode: dhx_config.dialog.search_mode,
             picker_search_focused: false,
             should_quit: false,
+            viewport_lines,
+            font_size,
+            scale_factor: 1.0,
             snapshot_version: 0,
             keymaps: load_keymaps(),
         })
+    }
+
+    /// Update viewport size after a window resize.
+    ///
+    /// Recomputes the number of visible editor lines and updates the
+    /// underlying `Editor` rect so `ensure_cursor_in_view` works correctly.
+    pub(crate) fn update_viewport_size(&mut self, window_width: f64, window_height: f64) {
+        self.viewport_lines = compute_viewport_lines(window_height, self.font_size);
+        let char_width = self.font_size * CHAR_WIDTH_RATIO;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let cols = ((window_width - HORIZONTAL_CHROME_PX).max(0.0) / char_width).floor() as u16;
+        #[allow(clippy::cast_possible_truncation)]
+        let rows = self.viewport_lines as u16;
+        self.editor
+            .resize(helix_view::graphics::Rect::new(0, 0, cols, rows));
+        log::info!(
+            "viewport resized: {window_width}x{window_height} → {cols}x{rows} ({} lines)",
+            self.viewport_lines
+        );
     }
 
     /// Apply the currently selected theme in the picker as a live preview.
@@ -2022,7 +2211,8 @@ impl EditorContext {
     }
 
     /// Create a snapshot of the current editor state.
-    pub fn snapshot(&mut self, viewport_lines: usize) -> EditorSnapshot {
+    pub fn snapshot(&mut self) -> EditorSnapshot {
+        let viewport_lines = self.viewport_lines;
         let view_id = self.editor.tree.focus;
         let view = self.editor.tree.get(view_id);
         let Some(doc) = self.editor.document(view.doc) else {
@@ -2137,6 +2327,17 @@ impl EditorContext {
                     })
                     .collect();
 
+                // Filter inlay hints for this line (line is 1-indexed in InlayHintSnapshot)
+                let line_inlay_hints: Vec<InlayHintSnapshot> = if self.inlay_hints_enabled {
+                    self.inlay_hints
+                        .iter()
+                        .filter(|h| h.line == line_idx + 1)
+                        .cloned()
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+
                 LineSnapshot {
                     line_number: line_idx + 1,
                     content: line_content,
@@ -2146,9 +2347,31 @@ impl EditorContext {
                     tokens: line_tokens.get(idx).cloned().unwrap_or_default(),
                     selection_ranges,
                     color_swatches: line_color_swatches,
+                    inlay_hints: line_inlay_hints,
+                    is_wrap_continuation: false,
+                    wrap_indicator: None,
                 }
             })
             .collect();
+
+        // Post-process: split long lines into segments when soft wrap is enabled
+        let lines = if self.editor.config().soft_wrap.enable.unwrap_or(false) {
+            // Subtract 1 column as safety margin: helix's column-based gutter
+            // doesn't exactly match the CSS grid layout (indicator + gutter-cell
+            // padding), and CHAR_WIDTH_RATIO is approximate — a tiny per-character
+            // error accumulates over ~130+ columns to clip the last character.
+            let content_cols = view.inner_width(doc).saturating_sub(1) as usize;
+            let wrap_indicator = self
+                .editor
+                .config()
+                .soft_wrap
+                .wrap_indicator
+                .clone()
+                .unwrap_or_else(|| "↪ ".to_string());
+            soft_wrap_lines(lines, content_cols, &wrap_indicator)
+        } else {
+            lines
+        };
 
         // Collect diagnostics from doc before releasing the borrow
         let diagnostics = self.collect_diagnostics(doc, visible_start, visible_end);
@@ -2370,6 +2593,8 @@ impl EditorContext {
             theme_css_vars: self.theme_to_css_vars(),
             dialog_search_mode: self.dialog_search_mode,
             picker_search_focused: self.picker_search_focused,
+            viewport_lines: self.viewport_lines,
+            soft_wrap: self.editor.config().soft_wrap.enable.unwrap_or(false),
             should_quit: self.should_quit,
         }
     }
@@ -3584,15 +3809,16 @@ impl EditorContext {
 
         let offset_encoding = ls.offset_encoding();
         let text = doc.text();
-        let total_lines = text.len_lines();
+        let last_line = text.len_lines().saturating_sub(1);
+        let last_line_len = text.line(last_line).len_chars();
 
         // Request hints for whole document (could optimize for viewport later)
         #[allow(clippy::cast_possible_truncation)]
         let range = lsp::Range {
             start: lsp::Position { line: 0, character: 0 },
             end: lsp::Position {
-                line: total_lines as u32,
-                character: 0,
+                line: last_line as u32,
+                character: last_line_len as u32,
             },
         };
 
@@ -4659,5 +4885,160 @@ mod tests {
     fn trigger_char_empty_triggers_returns_false() {
         let triggers: Vec<String> = vec![];
         assert!(!is_signature_help_trigger_char('(', &triggers));
+    }
+
+    // --- compute_viewport_lines ---
+
+    #[test]
+    fn compute_viewport_lines_default_config() {
+        // Default: 900px window, 14px font → (900 - 76) / (14 * 1.5) = 824 / 21 = 39
+        assert_eq!(compute_viewport_lines(900.0, 14.0), 39);
+    }
+
+    #[test]
+    fn compute_viewport_lines_large_font() {
+        // 900px window, 20px font → (900 - 76) / (20 * 1.5) = 824 / 30 = 27
+        assert_eq!(compute_viewport_lines(900.0, 20.0), 27);
+    }
+
+    #[test]
+    fn compute_viewport_lines_small_window() {
+        // Very small window, clamped to at least 1 line height
+        // 80px window, 14px font → max(80 - 76, 21) / 21 = 21 / 21 = 1
+        assert_eq!(compute_viewport_lines(80.0, 14.0), 1);
+    }
+
+    #[test]
+    fn compute_viewport_lines_tiny_window() {
+        // Window smaller than chrome → (50 - 76).max(21) = 21 / 21 = 1
+        assert_eq!(compute_viewport_lines(50.0, 14.0), 1);
+    }
+
+    // --- soft wrap helpers ---
+
+    fn make_line(content: &str, line_number: usize) -> LineSnapshot {
+        LineSnapshot {
+            line_number,
+            content: content.to_string(),
+            is_cursor_line: false,
+            cursor_cols: Vec::new(),
+            primary_cursor_col: None,
+            tokens: Vec::new(),
+            selection_ranges: Vec::new(),
+            color_swatches: Vec::new(),
+            inlay_hints: Vec::new(),
+            is_wrap_continuation: false,
+            wrap_indicator: None,
+        }
+    }
+
+    #[test]
+    fn soft_wrap_short_line_unchanged() {
+        let lines = vec![make_line("hello", 1)];
+        let result = soft_wrap_lines(lines, 80, "↪ ");
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].content, "hello");
+        assert!(!result[0].is_wrap_continuation);
+        assert!(result[0].wrap_indicator.is_none());
+    }
+
+    #[test]
+    fn soft_wrap_splits_long_line() {
+        // 10 chars, content_cols=4, indicator="↪ " (2 chars) → cont_cols=2
+        // First segment: 4 chars "abcd", then "ef", "gh", "ij"
+        let lines = vec![make_line("abcdefghij", 1)];
+        let result = soft_wrap_lines(lines, 4, "↪ ");
+        assert_eq!(result.len(), 4);
+        assert_eq!(result[0].content, "abcd");
+        assert!(!result[0].is_wrap_continuation);
+        assert_eq!(result[1].content, "ef");
+        assert!(result[1].is_wrap_continuation);
+        assert_eq!(result[1].wrap_indicator.as_deref(), Some("↪ "));
+        assert_eq!(result[2].content, "gh");
+        assert!(result[2].is_wrap_continuation);
+        assert_eq!(result[3].content, "ij");
+        assert!(result[3].is_wrap_continuation);
+    }
+
+    #[test]
+    fn soft_wrap_preserves_line_number() {
+        let lines = vec![make_line("abcdefghij", 42)];
+        let result = soft_wrap_lines(lines, 5, "↪ ");
+        for seg in &result {
+            assert_eq!(seg.line_number, 42);
+        }
+    }
+
+    #[test]
+    fn soft_wrap_zero_cols_returns_unchanged() {
+        let lines = vec![make_line("hello", 1)];
+        let result = soft_wrap_lines(lines, 0, "↪ ");
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn soft_wrap_clips_tokens() {
+        let tokens = vec![
+            TokenSpan { start: 0, end: 3, color: "red".to_string() },
+            TokenSpan { start: 5, end: 8, color: "blue".to_string() },
+        ];
+        let clipped = clip_tokens(&tokens, 2, 6);
+        assert_eq!(clipped.len(), 2);
+        assert_eq!(clipped[0].start, 0); // 2-2
+        assert_eq!(clipped[0].end, 1);   // 3-2
+        assert_eq!(clipped[0].color, "red");
+        assert_eq!(clipped[1].start, 3); // 5-2
+        assert_eq!(clipped[1].end, 4);   // min(8,6)-2
+        assert_eq!(clipped[1].color, "blue");
+    }
+
+    #[test]
+    fn soft_wrap_clips_selections() {
+        let ranges = vec![(1, 5), (7, 10)];
+        let clipped = clip_selections(&ranges, 3, 8);
+        assert_eq!(clipped.len(), 2);
+        assert_eq!(clipped[0], (0, 2)); // (3-3, 5-3)
+        assert_eq!(clipped[1], (4, 5)); // (7-3, min(10,8)-3)
+    }
+
+    #[test]
+    fn soft_wrap_clips_cursors() {
+        let cols = vec![0, 3, 5, 9];
+        let clipped = clip_cursors(&cols, 3, 7);
+        assert_eq!(clipped, vec![0, 2]); // 3-3=0, 5-3=2; 0 and 9 excluded
+    }
+
+    #[test]
+    fn soft_wrap_clips_cursor_at_boundary() {
+        // Cursor at start_col is included, at end_col is excluded
+        assert_eq!(clip_cursor(5, 5, 10), Some(0));
+        assert_eq!(clip_cursor(10, 5, 10), None);
+        assert_eq!(clip_cursor(4, 5, 10), None);
+    }
+
+    #[test]
+    fn soft_wrap_with_cursor_on_continuation() {
+        let mut line = make_line("abcdefghij", 1);
+        line.cursor_cols = vec![6];
+        line.primary_cursor_col = Some(6);
+        line.is_cursor_line = true;
+        let result = soft_wrap_lines(vec![line], 4, "↪ ");
+        // cols=4, indicator="↪ " (2 chars), cont_cols=2
+        // Seg 0: [0,4) "abcd", Seg 1: [4,6) "ef", Seg 2: [6,8) "gh", Seg 3: [8,10) "ij"
+        // Cursor at col 6 lands in seg 2 at offset 0
+        assert!(result[0].cursor_cols.is_empty());
+        assert!(result[1].cursor_cols.is_empty());
+        assert_eq!(result[2].cursor_cols, vec![0]); // 6-6
+        assert_eq!(result[2].primary_cursor_col, Some(0));
+    }
+
+    #[test]
+    fn soft_wrap_trims_trailing_newline() {
+        // Content "abcdef\n" → display_len 6, with cols=4 should split
+        let lines = vec![make_line("abcdef\n", 1)];
+        let result = soft_wrap_lines(lines, 4, "↪ ");
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].content, "abcd");
+        assert_eq!(result[1].content, "ef");
     }
 }

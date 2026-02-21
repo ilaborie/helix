@@ -525,13 +525,13 @@ mod tests {
         let (doc_id, view_id) = doc_view(&ctx);
         ctx.compute_word_jump_labels(doc_id, view_id);
 
-        let snap1 = ctx.snapshot(40);
+        let snap1 = ctx.snapshot();
         assert!(snap1.word_jump_active);
         assert!(snap1.word_jump_first_char.is_none());
 
         ctx.filter_word_jump_first_char('a');
 
-        let snap2 = ctx.snapshot(40);
+        let snap2 = ctx.snapshot();
         assert!(snap2.word_jump_active);
         assert_eq!(snap2.word_jump_first_char, Some('a'));
     }

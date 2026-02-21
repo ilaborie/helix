@@ -130,44 +130,70 @@ body {
     outline: none;
 }
 
-/* ───── Editor view ───── */
-.editor-view {
+/* ───── Editor view wrapper (flex: grid + scrollbar) ───── */
+.editor-view-wrapper {
     display: flex;
+    flex-direction: row;
     height: 100%;
+    overflow: hidden;
+}
+
+/* ───── Editor view (CSS Grid: 3 columns per row) ───── */
+.editor-view {
+    display: grid;
+    grid-template-columns: 18px auto 1fr;
+    align-content: start;
+    padding-top: 8px;
+    flex: 1;
+    min-width: 0; /* prevent grid from overflowing flex container */
     overflow: hidden;
     font-size: var(--font-size);
     font-feature-settings: var(--font-ligatures);
     line-height: var(--editor-line-height);
+    position: relative; /* for absolutely positioned rulers */
 }
 
-/* Gutter (line numbers) */
-.gutter {
-    padding: 8px 12px 8px 8px;
+/* Indicator cell (col 1): diagnostics/code-actions/jump markers */
+.indicator-cell {
+    background-color: var(--bg-secondary);
+    user-select: none;
+    min-height: calc(var(--editor-line-height) * 1em);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+/* Gutter cell (col 2): line numbers */
+.gutter-cell {
+    padding: 0 12px 0 8px;
     text-align: right;
     color: var(--text-dim);
     background-color: var(--bg-secondary);
     user-select: none;
     min-width: 40px;
-    overflow: hidden;
-}
-.gutter-line, .gutter-line-active {
-    position: relative;
-    background-color: var(--bg-secondary);
     min-height: calc(var(--editor-line-height) * 1em);
+    position: relative;
 }
-.gutter-line-active {
+.gutter-cell.gutter-line-active {
     color: var(--text);
 }
 
-/* Editor content */
-.content {
-    flex: 1;
-    padding: 8px;
-    overflow-x: auto;
-    overflow-y: hidden;
+/* Content cell (col 3): document text */
+.content-cell {
+    padding: 0 8px;
+    overflow: hidden;
     white-space: pre;
     user-select: none;
     position: relative;
+    min-height: calc(var(--editor-line-height) * 1em);
+}
+
+/* Wrap indicator for soft-wrap continuation lines */
+.wrap-indicator {
+    color: var(--text-dimmer);
+    text-align: right;
+    padding-right: 4px;
 }
 
 /* Whitespace characters */
@@ -752,20 +778,7 @@ kbd {
     font-size: 14px;
 }
 
-/* ───── Indicator gutter ───── */
-.indicator-gutter {
-    padding: 8px 0;
-    background-color: var(--bg-secondary);
-    user-select: none;
-    width: 18px;
-    min-width: 18px;
-    overflow: hidden;
-}
-
-.indicator-gutter-line {
-    height: calc(var(--editor-line-height) * 1em);
-    position: relative;
-}
+/* ───── Indicator gutter (now .indicator-cell in grid) ───── */
 
 .indicator-diagnostic {
     position: absolute;
@@ -1082,8 +1095,10 @@ kbd {
 .inlay-hint {
     color: var(--text-dim);
     font-style: italic;
-    font-size: 12px;
     opacity: 0.7;
+    pointer-events: none;
+    user-select: none;
+    /* No font-size override — must match code font for ch alignment */
 }
 
 .inlay-hint-type {
@@ -1738,11 +1753,11 @@ kbd {
 /* ───── Custom editor scrollbar ───── */
 .editor-scrollbar {
     width: 14px;
-    height: 100%;
-    background-color: var(--bg-secondary);
     flex-shrink: 0;
-    cursor: pointer;
+    align-self: stretch;
     position: relative;
+    background-color: var(--bg-secondary);
+    cursor: pointer;
 }
 
 .scrollbar-track {

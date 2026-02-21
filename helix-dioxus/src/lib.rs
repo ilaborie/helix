@@ -99,14 +99,24 @@ pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
             EditorContext::new(&config, None, command_rx, command_tx.clone())?,
             Vec::new(),
         ),
-        StartupAction::OpenFile(path) => (
-            EditorContext::new(&config, Some(path.clone()), command_rx, command_tx.clone())?,
+        StartupAction::OpenFile(path, pos) => (
+            EditorContext::new(
+                &config,
+                Some((path.clone(), *pos)),
+                command_rx,
+                command_tx.clone(),
+            )?,
             Vec::new(),
         ),
         StartupAction::OpenFiles(files) => {
             // Open first file, then queue commands to open the rest
             let first = files.first().cloned();
-            let rest: Vec<EditorCommand> = files.iter().skip(1).cloned().map(EditorCommand::OpenFile).collect();
+            let rest: Vec<EditorCommand> = files
+                .iter()
+                .skip(1)
+                .cloned()
+                .map(|(path, pos)| EditorCommand::OpenFileAtPosition(path, pos))
+                .collect();
             (
                 EditorContext::new(&config, first, command_rx, command_tx.clone())?,
                 rest,
@@ -125,7 +135,7 @@ pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
     }
 
     // Create initial snapshot
-    let initial_snapshot = editor_ctx.snapshot(40);
+    let initial_snapshot = editor_ctx.snapshot();
 
     // Wrap editor context in Rc<RefCell> for single-threaded access
     let editor_ctx = Rc::new(RefCell::new(editor_ctx));
@@ -164,11 +174,33 @@ pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
                         .with_window_icon(load_icon()),
                 )
                 .with_custom_head(custom_head)
-                .with_custom_event_handler(move |_event, _target| {
+                .with_custom_event_handler(move |event, _target| {
+                    // Handle window events for resize and scale factor changes
+                    if let dioxus::desktop::tao::event::Event::WindowEvent { event: win_event, .. } = event {
+                        match win_event {
+                            dioxus::desktop::tao::event::WindowEvent::ScaleFactorChanged {
+                                scale_factor, ..
+                            } => {
+                                if let Ok(mut ctx) = editor_ctx_clone.try_borrow_mut() {
+                                    ctx.scale_factor = *scale_factor;
+                                    log::info!("scale factor changed: {scale_factor}");
+                                }
+                            }
+                            dioxus::desktop::tao::event::WindowEvent::Resized(size) => {
+                                if let Ok(mut ctx) = editor_ctx_clone.try_borrow_mut() {
+                                    let logical: dioxus::desktop::tao::dpi::LogicalSize<f64> =
+                                        size.to_logical(ctx.scale_factor);
+                                    ctx.update_viewport_size(logical.width, logical.height);
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+
                     // Process commands on each event loop iteration
                     if let Ok(mut ctx) = editor_ctx_clone.try_borrow_mut() {
                         ctx.process_commands();
-                        let new_snapshot = ctx.snapshot(40);
+                        let new_snapshot = ctx.snapshot();
 
                         // Check if we should quit
                         if new_snapshot.should_quit {
@@ -208,7 +240,7 @@ impl AppState {
             if let Some(ref editor_ctx) = *ctx.borrow() {
                 if let Ok(mut editor) = editor_ctx.try_borrow_mut() {
                     editor.process_commands();
-                    let new_snapshot = editor.snapshot(40);
+                    let new_snapshot = editor.snapshot();
 
                     // Check if we should quit
                     if new_snapshot.should_quit {

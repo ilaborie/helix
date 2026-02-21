@@ -12,7 +12,7 @@ use crate::components::{
     ErrorLens, Scrollbar,
 };
 use crate::hooks::use_editor_snapshot;
-use crate::lsp::DiagnosticSnapshot;
+use crate::lsp::{DiagnosticSnapshot, InlayHintKind, InlayHintSnapshot};
 use crate::state::{DiffLineType, LineSnapshot, TokenSpan, WhitespaceSnapshot, WordJumpLabel};
 
 /// Editor view component that renders the document content.
@@ -35,32 +35,74 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
     let has_code_actions = snapshot.has_code_actions;
     let cursor_line = snapshot.cursor_line;
 
-    rsx! {
-        div {
-            class: "editor-view",
+    let soft_wrap_class = if snapshot.soft_wrap { "editor-view soft-wrap" } else { "editor-view" };
 
-            // Unified indicator gutter (breakpoints, diagnostics, code actions)
-            // Uses absolute positioning to allow multiple overlapping indicators
+    rsx! {
+        // Wrapper: positions the scrollbar alongside the grid
+        div {
+            class: "editor-view-wrapper",
+
             div {
-                class: "indicator-gutter",
-                for line in &snapshot.lines {
+                class: "{soft_wrap_class}",
+
+                // CSS Grid: each line produces 3 cells (indicator, gutter, content)
+                // Grid rows auto-size so wrapped content keeps gutter aligned
+                for (idx, line) in snapshot.lines.iter().enumerate() {
                     {
                         let line_num = line.line_number;
+
+                        // --- Cell 1: Indicator gutter ---
                         let show_lightbulb = has_code_actions && line_num == cursor_line;
                         let severity = highest_severity_for_line(diagnostics, line_num);
                         let has_jump = snapshot.jump_lines.contains(&line_num);
-                        let key = format!("ind-{line_num}-{version}-{show_lightbulb}-{}-{has_jump}", severity.is_some());
-                        // Use diagnostic severity color if available, otherwise warning
-                        let lightbulb_color = severity
-                            .map_or("var(--warning)", |s| s.css_color());
-                        rsx! {
-                            div {
-                                key: "{key}",
-                                class: "indicator-gutter-line",
+                        let lightbulb_color = severity.map_or("var(--warning)", |s| s.css_color());
 
-                                // Single indicator at bottom-right:
-                                // - Lightbulb (severity-colored) when code actions available
-                                // - Diagnostic marker when no code actions but has diagnostic
+                        // --- Cell 2: Line number gutter ---
+                        let is_cursor = line.is_cursor_line;
+                        let diff_type = snapshot.diff_lines.iter().find(|(l, _)| *l == line_num).map(|(_, dt)| *dt);
+                        let gutter_class = if is_cursor { "gutter-cell gutter-line-active" } else { "gutter-cell gutter-line" };
+
+                        // --- Cell 3: Content ---
+                        let has_sel = !line.selection_ranges.is_empty();
+                        let mut line_diags: Vec<_> = diagnostics_for_line(diagnostics, line_num)
+                            .into_iter()
+                            .cloned()
+                            .collect();
+                        line_diags.sort_by_key(|d| d.severity);
+                        let primary_diag = first_diagnostic_for_line(diagnostics, line_num).cloned();
+
+                        #[allow(clippy::indexing_slicing)]
+                        let next_line_diag = if idx + 1 < snapshot.lines.len() {
+                            let next_line = &snapshot.lines[idx + 1];
+                            let next_content = next_line.content.trim();
+                            if next_content.is_empty() {
+                                first_diagnostic_for_line(diagnostics, next_line.line_number).cloned()
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
+                        let error_lens_diag = primary_diag.or(next_line_diag);
+
+                        let line_jump_labels: Vec<WordJumpLabel> = snapshot.word_jump_labels
+                            .iter()
+                            .filter(|l| l.line == line_num)
+                            .cloned()
+                            .collect();
+
+                        let has_jump_labels = !line_jump_labels.is_empty();
+                        let has_hints = !line.inlay_hints.is_empty();
+
+                        // Single key on first cell — Dioxus uses it to diff the entire block
+                        let row_key = format!("row-{line_num}-{version}-{show_lightbulb}-{is_cursor}-{has_sel}-{has_jump_labels}-{has_hints}-{diff_type:?}");
+
+                        rsx! {
+                            // Cell 1: Indicator
+                            div {
+                                key: "{row_key}",
+                                class: "indicator-cell",
+
                                 if show_lightbulb {
                                     span {
                                         class: "indicator-diagnostic icon-wrapper",
@@ -75,8 +117,6 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                                     }
                                 }
 
-                                // Future: Breakpoint indicator (center)
-
                                 if has_jump {
                                     span {
                                         class: "indicator-jumplist icon-wrapper",
@@ -86,121 +126,60 @@ pub fn EditorView(version: ReadSignal<usize>) -> Element {
                                     }
                                 }
                             }
-                        }
-                    }
-                }
-            }
 
-            // Line numbers gutter
-            div {
-                class: "gutter",
-                for line in &snapshot.lines {
-                    // Include version, cursor state, and diff type in key to force re-render
-                    {
-                        let is_cursor = line.is_cursor_line;
-                        let diff_type = snapshot.diff_lines.iter().find(|(l, _)| *l == line.line_number).map(|(_, dt)| *dt);
-                        let gutter_key = format!("{}-{version}-{is_cursor}-{diff_type:?}", line.line_number);
-                        let gutter_class = if is_cursor { "gutter-line-active" } else { "gutter-line" };
-                        rsx! {
+                            // Cell 2: Line number or wrap indicator
                             div {
-                                key: "{gutter_key}",
                                 class: "{gutter_class}",
-                                "{line.line_number}"
-                                // VCS diff marker on right edge of line number
-                                if let Some(dt) = diff_type {
-                                    if dt == DiffLineType::Deleted {
-                                        span {
-                                            class: "gutter-diff-deleted",
-                                        }
-                                    } else {
-                                        span {
-                                            class: "gutter-diff-bar",
-                                            style: "background-color: {dt.css_color()};",
+                                if let Some(ref indicator) = line.wrap_indicator {
+                                    span { class: "wrap-indicator", "{indicator}" }
+                                } else {
+                                    "{line_num}"
+                                    if let Some(dt) = diff_type {
+                                        if dt == DiffLineType::Deleted {
+                                            span { class: "gutter-diff-deleted" }
+                                        } else {
+                                            span {
+                                                class: "gutter-diff-bar",
+                                                style: "background-color: {dt.css_color()};",
+                                            }
                                         }
                                     }
+                                }
+                            }
+
+                            // Cell 3: Content
+                            div {
+                                class: "content-cell",
+
+                                Line {
+                                    line: line.clone(),
+                                    mode: mode.clone(),
+                                    whitespace: snapshot.whitespace.clone(),
+                                    diagnostics: line_diags,
+                                    error_lens_diagnostic: error_lens_diag,
+                                    jump_labels: line_jump_labels,
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            // Document content
-            div {
-                class: "content",
-
-                // Rulers (vertical column guides)
+                // Rulers (vertical column guides) — absolutely positioned over content area
+                // Offset accounts for indicator(18px) + gutter(~60px) + content padding(8px)
                 for &col in &snapshot.rulers {
                     div {
                         key: "ruler-{col}",
                         class: "ruler",
-                        style: "left: {col}ch;",
-                    }
-                }
-
-                for (idx, line) in snapshot.lines.iter().enumerate() {
-                    // Include version and selection state in key to force re-render
-                    {
-                        let has_sel = !line.selection_ranges.is_empty();
-                        let line_num = line.line_number;
-                        // Get all diagnostics for this line (for underlines)
-                        // Sort by severity ascending so higher severity renders last (on top)
-                        let mut line_diags: Vec<_> = diagnostics_for_line(diagnostics, line_num)
-                            .into_iter()
-                            .cloned()
-                            .collect();
-                        line_diags.sort_by_key(|d| d.severity);
-                        // Get highest severity diagnostic for ErrorLens
-                        let primary_diag = first_diagnostic_for_line(diagnostics, line_num).cloned();
-
-                        // Check if the next line is empty and has a diagnostic we should show here
-                        #[allow(clippy::indexing_slicing)] // idx + 1 is bounds-checked on the line above
-                        let next_line_diag = if idx + 1 < snapshot.lines.len() {
-                            let next_line = &snapshot.lines[idx + 1];
-                            let next_content = next_line.content.trim();
-                            // If next line is empty/whitespace and has a diagnostic, show it on this line
-                            if next_content.is_empty() {
-                                first_diagnostic_for_line(diagnostics, next_line.line_number).cloned()
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        };
-
-                        // Use next line's diagnostic for ErrorLens if this line has content but no diagnostic
-                        // and the next line is empty with a diagnostic
-                        let error_lens_diag = primary_diag.or(next_line_diag);
-
-                        // Collect word jump labels for this line
-                        let line_jump_labels: Vec<WordJumpLabel> = snapshot.word_jump_labels
-                            .iter()
-                            .filter(|l| l.line == line_num)
-                            .cloned()
-                            .collect();
-
-                        let has_jump_labels = !line_jump_labels.is_empty();
-                        let key = format!("{line_num}-{version}-{has_sel}-{has_jump_labels}");
-                        rsx! {
-                            Line {
-                                key: "{key}",
-                                line: line.clone(),
-                                mode: mode.clone(),
-                                whitespace: snapshot.whitespace.clone(),
-                                diagnostics: line_diags,
-                                error_lens_diagnostic: error_lens_diag,
-                                jump_labels: line_jump_labels,
-                            }
-                        }
+                        style: "left: calc(86px + {col}ch);",
                     }
                 }
             }
 
-            // Scrollbar on the right edge
+            // Scrollbar: sibling of the grid, positioned by the flex wrapper
             Scrollbar {
                 total_lines: snapshot.total_lines,
                 visible_start: snapshot.visible_start,
-                viewport_lines: 40,
+                viewport_lines: snapshot.viewport_lines,
                 all_diagnostics: snapshot.all_diagnostics_summary.clone(),
                 search_match_lines: snapshot.search_match_lines.clone(),
             }
@@ -259,11 +238,13 @@ fn Line(
     // This prevents showing ErrorLens on empty lines - it will be shown on the previous line instead
     let show_error_lens = !display_content.trim().is_empty();
 
+    let inlay_hints = &line.inlay_hints;
+
     // Render the line content with tokens, cursor, and selection highlighting
     rsx! {
         div {
             class: "{line_class}",
-            {render_styled_content(&chars, &line.tokens, cursor_cols, primary_cursor_col, cursor_class, secondary_cursor_class, selection_ranges, &whitespace)}
+            {render_styled_content(&chars, &line.tokens, cursor_cols, primary_cursor_col, cursor_class, secondary_cursor_class, selection_ranges, &whitespace, inlay_hints)}
             // Visible newline character
             if let Some(nl_char) = whitespace.newline {
                 if line.content.ends_with('\n') {
@@ -271,11 +252,12 @@ fn Line(
                 }
             }
             // Diagnostic underlines (wavy lines under errors/warnings)
+            // Use visual_col to offset for inline inlay hints
             for (idx, diag) in diagnostics.iter().enumerate() {
                 DiagnosticUnderline {
                     key: "{idx}",
-                    start_col: diag.start_col,
-                    end_col: diag.end_col,
+                    start_col: visual_col(diag.start_col, inlay_hints),
+                    end_col: visual_col(diag.end_col, inlay_hints),
                     severity: diag.severity,
                 }
             }
@@ -288,7 +270,7 @@ fn Line(
             // Word jump labels overlay
             for label in jump_labels.iter() {
                 {
-                    let left_ch = label.col;
+                    let left_ch = visual_col(label.col, inlay_hints);
                     let label_text = format!("{}{}", label.label[0], label.label[1]);
                     let class = if label.dimmed { "jump-label-dimmed" } else { "jump-label" };
                     // Position using ch units relative to content start
@@ -304,17 +286,40 @@ fn Line(
             }
             // Color swatches overlay
             for (idx, swatch) in line.color_swatches.iter().enumerate() {
-                span {
-                    key: "swatch-{idx}",
-                    class: "color-swatch",
-                    style: "left: {swatch.col}ch; background-color: {swatch.color};",
+                {
+                    let swatch_left = visual_col(swatch.col, inlay_hints);
+                    rsx! {
+                        span {
+                            key: "swatch-{idx}",
+                            class: "color-swatch",
+                            style: "left: {swatch_left}ch; background-color: {swatch.color};",
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-/// Render content with syntax highlighting tokens, cursors, and selection.
+/// Compute visual column accounting for inline inlay hint characters.
+///
+/// Hints inserted before or at a logical column shift all subsequent positions
+/// to the right. Each hint contributes its label length plus any padding.
+#[must_use]
+fn visual_col(logical_col: usize, hints: &[InlayHintSnapshot]) -> usize {
+    let offset: usize = hints
+        .iter()
+        .filter(|h| h.column <= logical_col)
+        .map(|h| {
+            h.label.chars().count()
+                + usize::from(h.padding_left)
+                + usize::from(h.padding_right)
+        })
+        .sum();
+    logical_col + offset
+}
+
+/// Render content with syntax highlighting tokens, cursors, selection, and inlay hints.
 #[allow(clippy::indexing_slicing, clippy::too_many_arguments)]
 fn render_styled_content(
     chars: &[char],
@@ -325,6 +330,7 @@ fn render_styled_content(
     secondary_cursor_class: &str,
     selection_ranges: &[(usize, usize)],
     whitespace: &WhitespaceSnapshot,
+    inlay_hints: &[InlayHintSnapshot],
 ) -> Element {
     // Build a list of spans to render
     let mut spans: Vec<Element> = Vec::new();
@@ -335,10 +341,41 @@ fn render_styled_content(
     let mut sorted_tokens = tokens.to_vec();
     sorted_tokens.sort_by_key(|t| t.start);
 
+    // Sort inlay hints by column for insertion
+    let mut sorted_hints = inlay_hints.to_vec();
+    sorted_hints.sort_by_key(|h| h.column);
+
     let mut token_idx = 0;
+    let mut hint_idx = 0;
 
     while pos <= len {
-        // Find the next boundary (token start, token end, cursor, selection bounds, or end of line)
+        // Insert any inlay hints positioned at the current column
+        while hint_idx < sorted_hints.len() && sorted_hints[hint_idx].column == pos {
+            let hint = &sorted_hints[hint_idx];
+            let kind_class = match hint.kind {
+                InlayHintKind::Type => "inlay-hint-type",
+                InlayHintKind::Parameter => "inlay-hint-param",
+            };
+            let mut hint_text = String::new();
+            if hint.padding_left {
+                hint_text.push(' ');
+            }
+            hint_text.push_str(&hint.label);
+            if hint.padding_right {
+                hint_text.push(' ');
+            }
+            let hint_key = format!("hint-{pos}-{hint_idx}");
+            spans.push(rsx! {
+                span {
+                    key: "{hint_key}",
+                    class: "inlay-hint {kind_class}",
+                    "{hint_text}"
+                }
+            });
+            hint_idx += 1;
+        }
+
+        // Find the next boundary (token start, token end, cursor, selection bounds, hint column, or end of line)
         let mut next_pos = len;
 
         // Check for token boundaries
@@ -368,6 +405,14 @@ fn render_styled_content(
             }
             if sel_end > pos && sel_end < next_pos {
                 next_pos = sel_end;
+            }
+        }
+
+        // Check for next inlay hint column
+        if hint_idx < sorted_hints.len() {
+            let hint_col = sorted_hints[hint_idx].column;
+            if hint_col > pos && hint_col < next_pos {
+                next_pos = hint_col;
             }
         }
 
@@ -455,6 +500,32 @@ fn render_styled_content(
         }
     }
 
+    // Insert any remaining hints at end of line
+    while hint_idx < sorted_hints.len() {
+        let hint = &sorted_hints[hint_idx];
+        let kind_class = match hint.kind {
+            InlayHintKind::Type => "inlay-hint-type",
+            InlayHintKind::Parameter => "inlay-hint-param",
+        };
+        let mut hint_text = String::new();
+        if hint.padding_left {
+            hint_text.push(' ');
+        }
+        hint_text.push_str(&hint.label);
+        if hint.padding_right {
+            hint_text.push(' ');
+        }
+        let hint_key = format!("hint-end-{hint_idx}");
+        spans.push(rsx! {
+            span {
+                key: "{hint_key}",
+                class: "inlay-hint {kind_class}",
+                "{hint_text}"
+            }
+        });
+        hint_idx += 1;
+    }
+
     // Handle cursors at end of line
     for &cursor in cursor_cols {
         if cursor >= len {
@@ -471,4 +542,102 @@ fn render_styled_content(
     }
 
     rsx! { {spans.into_iter()} }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn type_hint(column: usize, label: &str, padding_left: bool, padding_right: bool) -> InlayHintSnapshot {
+        InlayHintSnapshot {
+            line: 1,
+            column,
+            label: label.to_string(),
+            kind: InlayHintKind::Type,
+            padding_left,
+            padding_right,
+        }
+    }
+
+    fn param_hint(column: usize, label: &str, padding_left: bool, padding_right: bool) -> InlayHintSnapshot {
+        InlayHintSnapshot {
+            line: 1,
+            column,
+            label: label.to_string(),
+            kind: InlayHintKind::Parameter,
+            padding_left,
+            padding_right,
+        }
+    }
+
+    #[test]
+    fn visual_col_no_hints() {
+        assert_eq!(visual_col(0, &[]), 0);
+        assert_eq!(visual_col(5, &[]), 5);
+        assert_eq!(visual_col(100, &[]), 100);
+    }
+
+    #[test]
+    fn visual_col_single_type_hint() {
+        // `let x = 42;` → hint `: i32` at column 5 (after `x`), padding_left=true
+        let hints = vec![type_hint(5, ": i32", true, false)];
+        // Columns before hint: unchanged
+        assert_eq!(visual_col(0, &hints), 0);
+        assert_eq!(visual_col(4, &hints), 4);
+        // Column at hint position: shifted by label len (5) + padding_left (1)
+        assert_eq!(visual_col(5, &hints), 5 + 5 + 1);
+        // Column after hint: also shifted
+        assert_eq!(visual_col(10, &hints), 10 + 5 + 1);
+    }
+
+    #[test]
+    fn visual_col_single_param_hint() {
+        // `foo(42)` → hint `value:` at column 4, padding_right=true
+        let hints = vec![param_hint(4, "value:", false, true)];
+        assert_eq!(visual_col(3, &hints), 3);
+        // At column 4: shifted by "value:" (6) + padding_right (1) = 7
+        assert_eq!(visual_col(4, &hints), 4 + 6 + 1);
+    }
+
+    #[test]
+    fn visual_col_multiple_hints() {
+        // Two hints on the same line
+        let hints = vec![
+            type_hint(3, ": u8", true, false),   // 4 chars + 1 padding = 5
+            param_hint(8, "key:", false, true),   // 4 chars + 1 padding = 5
+        ];
+        // Before first hint
+        assert_eq!(visual_col(2, &hints), 2);
+        // At first hint column: +5
+        assert_eq!(visual_col(3, &hints), 3 + 5);
+        // Between hints: only first applies
+        assert_eq!(visual_col(5, &hints), 5 + 5);
+        // At second hint: both apply
+        assert_eq!(visual_col(8, &hints), 8 + 5 + 5);
+        // After both
+        assert_eq!(visual_col(12, &hints), 12 + 5 + 5);
+    }
+
+    #[test]
+    fn visual_col_hint_at_column_zero() {
+        let hints = vec![param_hint(0, "x:", false, true)];
+        // Column 0 is at/after hint position → shifted
+        assert_eq!(visual_col(0, &hints), 0 + 2 + 1);
+        assert_eq!(visual_col(3, &hints), 3 + 2 + 1);
+    }
+
+    #[test]
+    fn visual_col_hint_with_both_padding() {
+        let hints = vec![type_hint(5, ": T", true, true)];
+        // ": T" = 3 chars + padding_left (1) + padding_right (1) = 5
+        assert_eq!(visual_col(5, &hints), 5 + 3 + 1 + 1);
+    }
+
+    #[test]
+    fn visual_col_hint_no_padding() {
+        let hints = vec![type_hint(5, ": i32", false, false)];
+        // ": i32" = 5 chars, no padding
+        assert_eq!(visual_col(5, &hints), 5 + 5);
+        assert_eq!(visual_col(4, &hints), 4);
+    }
 }
