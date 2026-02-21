@@ -103,8 +103,12 @@ pub struct EditorContext {
     // LSP state - pub(crate) for operations access
     /// Whether the completion popup is visible.
     pub(crate) completion_visible: bool,
-    /// Completion items.
+    /// Filtered completion items (displayed in the popup).
     pub(crate) completion_items: Vec<CompletionItemSnapshot>,
+    /// Full sorted completion list from the server (before prefix filtering).
+    completion_items_all: Vec<CompletionItemSnapshot>,
+    /// Char offset where the completed word starts (for prefix computation).
+    completion_trigger_offset: usize,
     /// Selected completion index.
     pub(crate) completion_selected: usize,
     /// Whether hover is visible.
@@ -528,6 +532,8 @@ impl EditorContext {
             // LSP state
             completion_visible: false,
             completion_items: Vec::new(),
+            completion_items_all: Vec::new(),
+            completion_trigger_offset: 0,
             completion_selected: 0,
             hover_visible: false,
             hover_content: None,
@@ -844,6 +850,9 @@ impl EditorContext {
             // Editing operations
             EditorCommand::InsertChar(c) => {
                 self.insert_char(doc_id, view_id, c);
+                if self.completion_visible {
+                    self.refilter_completions();
+                }
                 if !self.maybe_auto_trigger_signature_help(c) {
                     self.maybe_retrigger_signature_help();
                 }
@@ -858,6 +867,9 @@ impl EditorContext {
             }
             EditorCommand::DeleteCharBackward => {
                 self.delete_char_backward(doc_id, view_id);
+                if self.completion_visible {
+                    self.refilter_completions();
+                }
                 self.maybe_retrigger_signature_help();
             }
             EditorCommand::DeleteCharForward => {
@@ -1292,6 +1304,7 @@ impl EditorContext {
             EditorCommand::CompletionCancel => {
                 self.completion_visible = false;
                 self.completion_items.clear();
+                self.completion_items_all.clear();
                 self.completion_selected = 0;
             }
 
@@ -1731,10 +1744,22 @@ impl EditorContext {
     /// Handle an LSP response.
     fn handle_lsp_response(&mut self, response: LspResponse) {
         match response {
-            LspResponse::Completions(items) => {
-                self.completion_items = items;
-                self.completion_selected = 0;
-                self.completion_visible = !self.completion_items.is_empty();
+            LspResponse::Completions(mut items) => {
+                // Sort: preselected items first, then by sort_text, then by
+                // original server index as tiebreaker. This puts the most
+                // relevant item at top while ranking local vars above imports.
+                items.sort_by(|a, b| {
+                    b.preselect
+                        .cmp(&a.preselect)
+                        .then_with(|| {
+                            let sa = a.sort_text.as_deref().unwrap_or(&a.label);
+                            let sb = b.sort_text.as_deref().unwrap_or(&b.label);
+                            sa.cmp(sb)
+                        })
+                        .then(a.index.cmp(&b.index))
+                });
+                self.completion_items_all = items;
+                self.refilter_completions();
             }
             LspResponse::Hover(hover) => {
                 self.hover_content = hover;
@@ -2930,6 +2955,19 @@ impl EditorContext {
             return;
         };
 
+        // Compute trigger offset (word start before cursor)
+        let text = doc.text();
+        let cursor = doc.selection(view_id).primary().cursor(text.slice(..));
+        let mut word_start = cursor;
+        while word_start > 0 {
+            let ch = text.char(word_start - 1);
+            if !ch.is_alphanumeric() && ch != '_' {
+                break;
+            }
+            word_start -= 1;
+        }
+        self.completion_trigger_offset = word_start;
+
         // Get language server with completion support
         let Some(ls) = doc
             .language_servers_with_feature(LanguageServerFeature::Completion)
@@ -3010,7 +3048,45 @@ impl EditorContext {
         // Clear completion state
         self.completion_visible = false;
         self.completion_items.clear();
+        self.completion_items_all.clear();
         self.completion_selected = 0;
+    }
+
+    /// Compute the typed prefix between the trigger offset and the current cursor.
+    fn get_completion_prefix(&self) -> String {
+        let view_id = self.editor.tree.focus;
+        let view = self.editor.tree.get(view_id);
+        let Some(doc) = self.editor.document(view.doc) else {
+            return String::new();
+        };
+        let text = doc.text();
+        let cursor = doc.selection(view_id).primary().cursor(text.slice(..));
+        if self.completion_trigger_offset >= cursor {
+            return String::new();
+        }
+        text.slice(self.completion_trigger_offset..cursor).to_string()
+    }
+
+    /// Re-filter completion items from the full list using the current typed prefix.
+    fn refilter_completions(&mut self) {
+        let prefix = self.get_completion_prefix();
+        let prefix_lower = prefix.to_lowercase();
+        self.completion_items = self
+            .completion_items_all
+            .iter()
+            .filter(|item| {
+                if prefix_lower.is_empty() {
+                    return true;
+                }
+                let text = item.filter_text.as_deref().unwrap_or(&item.label);
+                text.to_lowercase().contains(&prefix_lower)
+            })
+            .cloned()
+            .collect();
+        if self.completion_selected >= self.completion_items.len() {
+            self.completion_selected = 0;
+        }
+        self.completion_visible = !self.completion_items.is_empty();
     }
 
     /// Trigger hover at the current cursor position.

@@ -203,6 +203,8 @@ pub struct CompletionItemSnapshot {
     pub filter_text: Option<String>,
     /// Sort text used for ordering (if different from label).
     pub sort_text: Option<String>,
+    /// Whether the LSP server marked this item as preselected.
+    pub preselect: bool,
     /// Index in the original completion list (for applying edits).
     pub index: usize,
 }

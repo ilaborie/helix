@@ -75,9 +75,11 @@ pub fn InlineListDialog(
     /// Child elements (should be `InlineListItem` components).
     children: Element,
 ) -> Element {
-    // Mark selected as used (it's provided for context, actual selection
-    // styling is handled by InlineListItem)
-    let _ = selected;
+    // Scroll the selected item into view when selection changes
+    use_effect(move || {
+        let _ = selected;
+        dioxus::document::eval("scrollSelectedInlineDialogItem()");
+    });
 
     let combined_class = match class {
         Some(c) => format!("inline-dialog-list {c}"),

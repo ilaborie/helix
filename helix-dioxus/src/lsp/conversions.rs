@@ -63,6 +63,7 @@ fn convert_completion_item(item: lsp::CompletionItem, index: usize) -> Completio
         deprecated,
         filter_text: item.filter_text,
         sort_text: item.sort_text,
+        preselect: item.preselect.unwrap_or(false),
         index,
     }
 }
