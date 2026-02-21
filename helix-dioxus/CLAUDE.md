@@ -80,11 +80,18 @@ helix-dioxus/src/
 │   │   ├── generic.rs          # Main picker container (two-column with preview)
 │   │   ├── item.rs             # PickerItemRow component
 │   │   ├── highlight.rs        # HighlightedText for fuzzy matches
-│   │   └── preview.rs          # PickerPreviewPanel: syntax-highlighted file preview
+│   │   ├── preview.rs          # PickerPreviewPanel: syntax-highlighted file preview
+│   │   └── scrollbar.rs        # PickerScrollbar: track+thumb position indicator
 │   └── inline_dialog/          # Inline dialog primitives (cursor-positioned)
 │       ├── mod.rs              # Re-exports InlineDialogContainer, InlineListDialog
 │       ├── container.rs        # Base container with positioning logic
 │       └── list.rs             # List dialog with selection support
+│
+├── keymap/                     # Configurable Keymap System (trie-based)
+│   ├── mod.rs                  # DhxKeymapResult, keymap dispatch, key sequence state
+│   ├── command.rs              # CommandSlot, AwaitCharKind, command name → EditorCommand mapping
+│   ├── default.rs              # Default keymaps for all modes (normal, insert, select, g, Space, etc.)
+│   └── trie.rs                 # DhxKeyTrie, DhxKeyTrieNode, TrieSearchResult — trie data structure
 │
 ├── state/                      # State Management
 │   ├── mod.rs                  # EditorContext, command dispatch, config loading
@@ -451,6 +458,11 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - Cause: Dioxus desktop WebView can lose focus on the app container div after re-renders, causing `onkeydown` to stop firing
 - Solution: Global `document.addEventListener('keydown', ...)` in `script.js` re-focuses the app container whenever focus is lost
 - This is essential — without it, keyboard input intermittently stops working
+
+### Scrollbar track click and thumb drag not working
+- Cause: Both interactions require the scrollbar track's pixel height to convert mouse Y coordinates into a document-line ratio. All approaches to obtain element height in the Dioxus desktop WebView (getBoundingClientRect, onmounted, ResizeObserver) return 0
+- Status: **BLOCKED** — see [SCROLLBAR_FIX_INVESTIGATION.md](SCROLLBAR_FIX_INVESTIGATION.md) for detailed investigation and unexplored approaches
+- Marker click-to-navigate and tooltips work correctly (they use known line numbers, not pixel ratios)
 
 ### Alt+key bindings not working on macOS
 - Cause: macOS Option key composes special characters (Alt+o → ø, Alt+i → ˆ, Alt+c → ç). `evt.key()` returns the composed character, so `KeyCode::Char('o')` with ALT modifier never matches

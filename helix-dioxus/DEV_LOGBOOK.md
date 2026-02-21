@@ -1554,6 +1554,8 @@ Massive sprint bringing helix-dioxus to 100% keybinding coverage and full LSP in
 - [x] KbdKey reusable component (physical key styling)
 - [x] Error lens (inline diagnostics)
 - [x] Emoji picker (`Ctrl+Cmd+Space`)
+- [x] Buffer bar right-click context menu (Close, Close Others, Close All, Copy Path, Save)
+- [x] Shared ModalOverlay and PopupMenu reusable components
 
 ### LSP Integration
 - [x] LSP snapshot types (thread-safe for UI rendering)
@@ -1594,7 +1596,7 @@ Massive sprint bringing helix-dioxus to 100% keybinding coverage and full LSP in
 - [x] Changed files picker (modified buffers)
 - [x] File explorer picker (`Space e` / `Space E`)
 - [x] Emoji picker (`Ctrl+Cmd+Space` / `:emoji`)
-- [ ] Scrollbar for long lists
+- [x] Scrollbar for long lists (picker track+thumb indicator)
 
 ### Theming
 - [x] Dynamic CSS variable system
@@ -1603,10 +1605,11 @@ Massive sprint bringing helix-dioxus to 100% keybinding coverage and full LSP in
 - [x] Cursor glow pulse and selection opacity
 
 ### Remaining TODOs
-- [ ] Scrollbar interactions (track click, thumb drag) — **BLOCKED** by Dioxus element height issue
+- [ ] Scrollbar interactions (track click, thumb drag) — **BLOCKED** by Dioxus element height issue (see [SCROLLBAR_FIX_INVESTIGATION.md](SCROLLBAR_FIX_INVESTIGATION.md))
 - [ ] Signature help parameter position highlighting
-- [ ] Buffer bar: hide option, right-click context menu
+- [ ] Buffer bar: hide option
 - [ ] macOS dock icon (needs .app bundle)
+- [ ] Configurable keymaps via `[keys]` in config.toml (trie infrastructure in `keymap/` module — not yet wired to key dispatch)
 
 ### Architecture Note
 Split views are **not planned** for helix-dioxus. For multiple views, users should launch multiple editor instances. This keeps the architecture simpler and aligns with a single-document-focus paradigm.
@@ -1687,6 +1690,108 @@ DAP/Debug is **not supported** — `Space G` sub-menu will not be implemented.
 - `src/keybindings/normal.rs` — `.` key mapping, 1 unit test
 - `src/integration_tests.rs` — 5 integration tests (insert chars, preserves recording, open line below, backspace, no re-record during replay)
 - `KEYBINDINGS.md` — added `.` to Normal Mode Matches
+
+---
+
+## 2026-02-21: Picker Scrollbar
+
+### Progress
+- Added a lightweight scrollbar to the picker item list to indicate scroll position within large filtered lists
+- The picker renders a 15-item sliding window from potentially large lists — previously there was no visual indicator of position
+- Created `PickerScrollbar` component using CSS-only track+thumb positioning
+- Extracted `PICKER_WINDOW_SIZE` constant and `scrollbar_thumb_geometry()` pure function with unit tests for edge cases
+- Replaced native `overflow-y: auto` with `overflow: hidden` (list is already server-side windowed)
+
+### Files Created
+- `src/components/picker/scrollbar.rs` — PickerScrollbar component
+
+### Files Modified
+- `src/components/picker/generic.rs` — Integrate scrollbar, use constant for window size
+- `src/components/picker/mod.rs` — Export new component
+- `src/state/types.rs` — `scrollbar_thumb_geometry()` function + unit tests
+- `src/state/mod.rs` — Pass scroll position data to snapshot
+- `assets/styles.css` — `.picker-scrollbar-track`, `.picker-scrollbar-thumb` styles
+
+---
+
+## 2026-02-21: Buffer Bar Right-Click Context Menu
+
+### Progress
+- Added right-click context menu to buffer bar tabs
+- Menu actions: Close, Close Others, Close All, Copy Path, Save
+- Context-aware disabled states:
+  - Close Others disabled when only one buffer open
+  - Save disabled when buffer is unmodified
+  - Copy Path hidden for scratch buffers
+
+### Files Modified
+- `src/components/buffer_bar.rs` — Context menu rendering and event handling (+189 lines)
+- `src/operations/buffer.rs` — Added `CopyPath` command support
+- `src/state/types.rs` — Added `CopyPath` command variant
+- `assets/styles.css` — `.context-menu-*` styles (`.context-menu`, `.context-menu-backdrop`, `.context-menu-item`, `.context-menu-item-disabled`, `.context-menu-separator`)
+
+---
+
+## 2026-02-21: JS-Based Inline Dialog Positioning and Shared Modal/Popup Components
+
+### Progress
+- Moved inline dialog positioning from Rust (async `document::eval` round-trip) to JavaScript
+  - Dialogs now render with `visibility: hidden`, then `use_effect` calls `positionInlineDialogs()` which reads `getBoundingClientRect()` and sets `top`/`left`/`visibility` in one synchronous JS pass
+  - Removes `CursorPixelPosition` struct and all `cursor_pos` props throughout the component tree
+- Extracted shared reusable components:
+  - `ModalOverlay` — shared overlay+backdrop+container for all modal dialogs
+  - `PopupMenu` — positioned context menu with backdrop (used by buffer bar context menu)
+- Consolidated duplicate CSS overlay styles across picker, confirmation, LSP dialog, location picker
+
+### Files Created
+- `src/components/modal_overlay.rs` — Reusable ModalOverlay component
+- `src/components/popup_menu.rs` — Reusable PopupMenu component
+
+### Files Modified (18 files, -648/+586 lines — net reduction)
+- `assets/script.js` — Added `positionInlineDialogs()` function
+- `assets/styles.css` — Consolidated overlay CSS, added `.modal-overlay`, `.modal-container` shared classes
+- `src/components/inline_dialog/container.rs` — Simplified: removed Rust-side pixel positioning
+- `src/components/buffer_bar.rs` — Use PopupMenu for context menu
+- `src/components/dialog/confirmation.rs` — Use ModalOverlay
+- `src/components/dialog/lsp_status.rs` — Use ModalOverlay
+- `src/components/lsp/location_picker.rs` — Use ModalOverlay
+- `src/components/picker/generic.rs` — Use ModalOverlay
+
+### Technical Notes
+- The JS-based approach eliminates the async eval round-trip that caused flickering on dialog open
+- `positionInlineDialogs()` is defined in `script.js` and queries all `.inline-dialog` elements
+
+---
+
+## 2026-02-21: Completion Item Sorting, Filtering, and Scroll-into-View
+
+### Progress
+- Completion popup now sorts items by preselect flag → sort_text → original server index (previously showed raw LSP order, burying local variables)
+- Typed prefix filters the completion list in real-time on each keystroke (`InsertChar`/`DeleteCharBackward`)
+- Selected item scrolls into view during arrow-key navigation via `scrollInlineDialogItemIntoView()` JS function
+
+### Files Modified
+- `src/state/mod.rs` — Sorting logic, prefix filtering on keystroke, filter refresh
+- `src/lsp/types.rs` — Added `sort_text` field to `CompletionItemSnapshot`
+- `src/lsp/conversions.rs` — Populate `sort_text` from LSP response
+- `src/components/inline_dialog/list.rs` — Added `id` attribute for scroll-into-view targeting
+- `assets/script.js` — Added `scrollInlineDialogItemIntoView()` function
+
+---
+
+## 2026-02-21: Strip LSP Snippet Placeholders from Completion Text
+
+### Progress
+- Completion items from rust-analyzer often include snippet syntax (`$0`, `$1`, `${1:default}`) which was being inserted literally into the document
+- Added `strip_snippet_placeholders()` function that removes tabstop markers and preserves default text from placeholders
+- Examples: `clone()$0` → `clone()`, `fn ${1:name}($2)$0` → `fn name()`
+
+### Files Modified
+- `src/state/mod.rs` — Added `strip_snippet_placeholders()` with comprehensive unit tests (+128 lines)
+
+### Technical Notes
+- Function handles nested placeholders, escaped `\$`, and mixed plain text + snippet syntax
+- Applied during `CompletionConfirm` command processing before text insertion
 
 ---
 
