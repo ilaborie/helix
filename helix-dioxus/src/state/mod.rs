@@ -2942,6 +2942,74 @@ impl EditorContext {
     }
 }
 
+/// Strip LSP snippet placeholders from insert text.
+///
+/// Handles: `$0`, `$1`…`$9`, `${0}`, `${1:default}` (keeps default text),
+/// nested `${1:${2:inner}}` (keeps inner placeholders' defaults), and
+/// escaped `\\$` (preserved as literal `$`).
+#[allow(clippy::indexing_slicing)] // bounds checked via `i < bytes.len()` before each access
+fn strip_snippet_placeholders(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let bytes = text.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'\\' && i + 1 < bytes.len() && bytes[i + 1] == b'$' {
+            // Escaped dollar sign
+            result.push('$');
+            i += 2;
+        } else if bytes[i] == b'$' {
+            i += 1;
+            if i < bytes.len() && bytes[i] == b'{' {
+                // ${N} or ${N:default} — extract default text if present
+                i += 1;
+                // Skip the number
+                while i < bytes.len() && bytes[i].is_ascii_digit() {
+                    i += 1;
+                }
+                if i < bytes.len() && bytes[i] == b':' {
+                    // Has default text — collect until matching '}'
+                    i += 1;
+                    let default_start = i;
+                    let mut depth = 1u32;
+                    while i < bytes.len() && depth > 0 {
+                        match bytes[i] {
+                            b'{' => depth += 1,
+                            b'}' => depth -= 1,
+                            b'\\' if i + 1 < bytes.len() => {
+                                i += 1; // skip escaped char
+                            }
+                            _ => {}
+                        }
+                        if depth > 0 {
+                            i += 1;
+                        }
+                    }
+                    // Recursively strip nested snippets from the default text
+                    let default_text = &text[default_start..i];
+                    result.push_str(&strip_snippet_placeholders(default_text));
+                    if i < bytes.len() && bytes[i] == b'}' {
+                        i += 1;
+                    }
+                } else {
+                    // ${N} with no default — skip the closing brace
+                    if i < bytes.len() && bytes[i] == b'}' {
+                        i += 1;
+                    }
+                }
+            } else {
+                // $N — skip the digit(s)
+                while i < bytes.len() && bytes[i].is_ascii_digit() {
+                    i += 1;
+                }
+            }
+        } else {
+            result.push(bytes[i] as char);
+            i += 1;
+        }
+    }
+    result
+}
+
 // LSP operations implementation
 impl EditorContext {
     /// Trigger completion at the current cursor position.
@@ -3037,10 +3105,13 @@ impl EditorContext {
             word_start -= 1;
         }
 
+        // Strip LSP snippet placeholders ($0, $1, ${1:text} → text)
+        let clean_text = strip_snippet_placeholders(&item.insert_text);
+
         // Create transaction to replace word with completion
         let transaction = helix_core::Transaction::change(
             text,
-            [(word_start, cursor, Some(item.insert_text.as_str().into()))].into_iter(),
+            [(word_start, cursor, Some(clean_text.as_str().into()))].into_iter(),
         );
 
         doc.apply(&transaction, view_id);
@@ -5127,5 +5198,61 @@ mod tests {
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].content, "abcd");
         assert_eq!(result[1].content, "ef");
+    }
+
+    // --- strip_snippet_placeholders ---
+
+    #[test]
+    fn snippet_no_placeholders() {
+        assert_eq!(strip_snippet_placeholders("clone()"), "clone()");
+    }
+
+    #[test]
+    fn snippet_final_cursor_marker() {
+        assert_eq!(strip_snippet_placeholders("clone()$0"), "clone()");
+    }
+
+    #[test]
+    fn snippet_numbered_tabstop() {
+        assert_eq!(strip_snippet_placeholders("foo($1)$0"), "foo()");
+    }
+
+    #[test]
+    fn snippet_tabstop_with_default() {
+        assert_eq!(
+            strip_snippet_placeholders("fn ${1:name}($2)$0"),
+            "fn name()"
+        );
+    }
+
+    #[test]
+    fn snippet_nested_placeholders() {
+        assert_eq!(
+            strip_snippet_placeholders("${1:Option<${2:T}>}$0"),
+            "Option<T>"
+        );
+    }
+
+    #[test]
+    fn snippet_escaped_dollar() {
+        assert_eq!(strip_snippet_placeholders("cost \\$5"), "cost $5");
+    }
+
+    #[test]
+    fn snippet_braced_no_default() {
+        assert_eq!(strip_snippet_placeholders("foo(${1})$0"), "foo()");
+    }
+
+    #[test]
+    fn snippet_plain_text_unchanged() {
+        assert_eq!(strip_snippet_placeholders("hello world"), "hello world");
+    }
+
+    #[test]
+    fn snippet_multiple_tabstops() {
+        assert_eq!(
+            strip_snippet_placeholders("map(|${1:x}| ${2:x})$0"),
+            "map(|x| x)"
+        );
     }
 }
