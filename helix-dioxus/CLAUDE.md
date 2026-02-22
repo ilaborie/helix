@@ -109,7 +109,7 @@ helix-dioxus/src/
 │   ├── search.rs               # SearchOps: execute_search, search_next
 │   ├── picker_ops.rs           # PickerOps: show_*_picker, picker_confirm
 │   ├── buffer.rs               # BufferOps: switch_to_buffer, save_document
-│   ├── cli.rs                  # CliOps: execute_command (sort, reflow, config-open, encoding, etc.)
+│   ├── cli.rs                  # CliOps: execute_command (88 commands — buffer, clipboard, config, LSP, tree-sitter, etc.)
 │   ├── shell.rs                # ShellOps: execute_shell_command (pipe selections)
 │   ├── text_manipulation.rs    # TextManipulationOps: sort_selections, reflow_selections
 │   ├── theme.rs                # ThemeOps: list_themes, apply_theme, theme_to_css_vars

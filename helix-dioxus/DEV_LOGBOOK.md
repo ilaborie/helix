@@ -1884,6 +1884,26 @@ DAP/Debug is **not supported** — `Space G` sub-menu will not be implemented.
 
 ---
 
+## 2026-02-22: Implement 42 Missing CLI Commands (88 total)
+
+### Progress
+- Implemented 42 new CLI commands across 4 batches, bringing the total from 46 to 88
+- **Batch 1 — Buffer/File Aliases & Force Variants** (15 commands): `buffer-close`/`bc`/`bclose`, `buffer-close!`, `buffer-close-others!`/`bco!`, `exit`/`xit`, `exit!`/`xit!`, `write-all!`/`wa!`, `write-buffer-close`/`wbc`, `write-buffer-close!`/`wbc!`, `write-quit-all`/`wqa`/`xa`, `write-quit-all!`/`wqa!`/`xa!`, `update`/`u`, `reload-all`/`rla`, `read`/`r`, `move`/`mv`, `move!`/`mv!`
+- **Batch 2 — Config & Language** (5 commands): `get-option`/`get`, `set-language`/`lang`, `indent-style`, `config-open-workspace`, `tutor`
+- **Batch 3 — Register & Clipboard** (16 commands): `clipboard-yank`, `clipboard-paste-after/before/replace`, `primary-clipboard-yank`, `primary-clipboard-paste-after/before/replace`, `show-clipboard-provider`, `yank-join`, `yank-diagnostic`, `clear-register`, `set-register`, `character-info`, `echo`, `goto`
+- **Batch 4 — LSP & Misc** (6 commands): `lsp-stop`, `reset-diff-change`/`diffget`/`diffg`, `tree-sitter-highlight-name`, `tree-sitter-subtree`/`ts-subtree`, `cquit`/`cq`, `cquit!`/`cq!`
+- Refactored `buffer_close_others` and `write_all` to accept `force: bool` parameter
+- Added 7 new methods to `BufferOps` trait: `write_all_impl`, `write_buffer_close`, `reload_all`, `read_file`, `move_file`, `update_document`
+- Added helper methods on `EditorContext`: `get_option`, `set_language`, `indent_style_command`, `yank_join`, `yank_diagnostic_impl`, `show_character_info`, `lsp_stop`
+
+### Files Changed
+- `src/operations/cli.rs` — 42 `CommandCompletion` entries + match arms + helper methods (+706 lines)
+- `src/operations/buffer.rs` — 7 new trait methods + implementations (+157 lines)
+- `src/operations/vcs.rs` — `reset-diff-change` reuses `revert_hunk_at_line()`
+- `src/state/mod.rs` — updated `buffer_close_others` → `buffer_close_others_impl(false)`
+
+---
+
 ## Template for Future Entries
 
 ```markdown

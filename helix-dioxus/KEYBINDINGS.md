@@ -399,6 +399,48 @@ When typing `:` commands, a completion popup appears above the prompt showing fi
 | `:format` | `:fmt` | Format document via LSP |
 | `:lsp-restart` | | Restart LSP server(s) for current document |
 | `:emoji` | | Open emoji picker |
+| `:buffer-close` | `:bc`, `:bclose` | Close buffer (alias for `:bdelete`) |
+| `:buffer-close!` | `:bc!`, `:bclose!` | Force close buffer |
+| `:buffer-close-others!` | `:bco!` | Force close all other buffers |
+| `:exit` | `:xit` | Save and quit (alias for `:wq`) |
+| `:exit!` | `:xit!` | Force save and quit |
+| `:write-all!` | `:wa!` | Force save all buffers |
+| `:write-buffer-close` | `:wbc` | Save current buffer then close it |
+| `:write-buffer-close!` | `:wbc!` | Force save then close |
+| `:write-quit-all` | `:wqa`, `:xa` | Save all and quit all |
+| `:write-quit-all!` | `:wqa!`, `:xa!` | Force save all and quit all |
+| `:update` | `:u` | Save only if modified |
+| `:reload-all` | `:rla` | Reload all documents from disk |
+| `:read` | `:r` | Read file and insert at cursor |
+| `:move` | `:mv` | Rename/move current file |
+| `:move!` | `:mv!` | Force rename/move (overwrite) |
+| `:get-option` | `:get` | Show config option value |
+| `:set-language` | `:lang` | Set document language |
+| `:indent-style` | | Show/set indent style |
+| `:config-open-workspace` | | Open workspace config file |
+| `:tutor` | | Open tutor file |
+| `:clipboard-yank` | | Yank to system clipboard |
+| `:clipboard-paste-after` | | Paste from system clipboard after |
+| `:clipboard-paste-before` | | Paste from system clipboard before |
+| `:clipboard-paste-replace` | | Replace selection with system clipboard |
+| `:primary-clipboard-yank` | | Yank to primary clipboard |
+| `:primary-clipboard-paste-after` | | Paste from primary clipboard after |
+| `:primary-clipboard-paste-before` | | Paste from primary clipboard before |
+| `:primary-clipboard-paste-replace` | | Replace selection with primary clipboard |
+| `:show-clipboard-provider` | | Show clipboard provider name |
+| `:yank-join` | | Join selections with separator and yank |
+| `:yank-diagnostic` | | Yank diagnostic message at cursor |
+| `:clear-register` | | Clear a named register |
+| `:set-register` | | Set register content |
+| `:character-info` | | Show Unicode info for char at cursor |
+| `:echo` | | Echo message as notification |
+| `:goto` | | Go to line number |
+| `:lsp-stop` | | Stop LSP servers for current document |
+| `:reset-diff-change` | `:diffget`, `:diffg` | Revert diff hunk at cursor |
+| `:tree-sitter-highlight-name` | | Show highlight scope at cursor |
+| `:tree-sitter-subtree` | `:ts-subtree` | Show tree-sitter subtree at cursor |
+| `:cquit` | `:cq` | Quit with exit code |
+| `:cquit!` | `:cq!` | Force quit with exit code |
 
 ---
 
@@ -442,7 +484,7 @@ When typing `:` commands, a completion popup appears above the prompt showing fi
 | Select Mode | 35+ bindings | 0 | 100% |
 | Insert Mode | 20 bindings | 0 | 100% |
 | Macros | 4 bindings | 0 | 100% |
-| Commands | 46 commands | 0 | 100% |
+| Commands | 88 commands | 0 | 100% |
 | **Overall** | **100%** | | |
 
 ### Design Decisions
