@@ -87,6 +87,11 @@ imagesize = "0.13"
 # Markdown rendering
 pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = { version = "0.6", default-features = false }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["NSApplication", "NSImage", "NSResponder"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["NSData"] }
+
 [dev-dependencies]
 tempfile = "3"
 

@@ -52,6 +52,8 @@ pub mod state;
 
 // Internal modules
 mod app;
+#[cfg(target_os = "macos")]
+mod platform;
 
 #[cfg(test)]
 mod integration_tests;
@@ -195,6 +197,18 @@ pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
                 )
                 .with_custom_head(custom_head)
                 .with_custom_event_handler(move |event, _target| {
+                    // Set macOS dock icon on first event loop iteration.
+                    // Bare binaries (cargo install / cargo run) lack an .app bundle,
+                    // so we set it programmatically via NSApplication API.
+                    #[cfg(target_os = "macos")]
+                    {
+                        static SET_DOCK_ICON: std::sync::Once = std::sync::Once::new();
+                        SET_DOCK_ICON.call_once(|| {
+                            let icon_bytes = include_bytes!("../../contrib/helix.png");
+                            platform::set_dock_icon(icon_bytes);
+                        });
+                    }
+
                     // Handle window events for resize and scale factor changes
                     if let dioxus::desktop::tao::event::Event::WindowEvent { event: win_event, .. } = event {
                         match win_event {

@@ -118,6 +118,10 @@ helix-dioxus/src/
 │   ├── lsp.rs                  # LspOps: diagnostic navigation, LSP lifecycle
 │   └── word_jump.rs            # WordJumpOps: compute labels, filter, jump
 │
+├── platform/                   # Platform-specific code (cfg-gated)
+│   ├── mod.rs                  # Platform module declaration
+│   └── macos.rs                # macOS dock icon via NSApplication API
+│
 └── keybindings/                # Key Handling
     ├── mod.rs                  # Re-exports + shared helpers (direction_from_key, handle_move_keys, etc.)
     ├── translate.rs            # Dioxus KeyboardEvent → helix KeyEvent translation
@@ -639,8 +643,9 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - Solution: tracing.rs filters these messages
 
 ### macOS dock icon not showing
-- Cause: Dock icons require .app bundle on macOS
-- Status: Known issue, marked as TODO
+- Cause: Dock icons require either a `.app` bundle or a runtime API call on macOS
+- Solution: `platform::macos::set_dock_icon()` calls `NSApplication::setApplicationIconImage` on the first event loop iteration via `std::sync::Once`, using the same `helix.png` embedded for the window icon
+- The call runs inside `with_custom_event_handler` which is guaranteed to be on the main thread
 
 ### LSP rename corrupts text (missing characters after rename)
 - Cause: LSP server not receiving `textDocument/didChange` notifications
