@@ -940,7 +940,7 @@ let gutter_key = format!("{}-{}-{}", line.line_number, version, is_cursor);
 - Buffer shows as "[scratch]" in buffer bar
 
 **Save As Dialog:**
-- Added `rfd = "0.15"` dependency for native file dialogs
+- Added `rfd` dependency for native file dialogs
 - Used async dialog to avoid blocking UI thread
 - Flow: `:w` → detect scratch buffer → spawn async dialog → send `SaveDocumentToPath` command
 - After save, `doc.set_path()` updates the document's internal path

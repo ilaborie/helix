@@ -4,7 +4,8 @@
 //! for rendering via `dangerous_inner_html` in the `WebView`.
 //! Optionally syntax-highlights fenced code blocks via a callback.
 
-use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
+use comrak::nodes::{NodeHtmlBlock, NodeValue};
+use comrak::{Arena, Options, format_html, parse_document};
 
 /// Escape special HTML characters in text content.
 fn escape_html(text: &str) -> String {
@@ -23,9 +24,7 @@ fn escape_html(text: &str) -> String {
 
 /// Convert markdown text to an HTML string.
 ///
-/// Uses `pulldown-cmark` with strikethrough support enabled.
-/// Filters `<code>...</code>` HTML tags into `Event::Code` events
-/// (matching helix-term behavior) so they render as inline code.
+/// Uses `comrak` with strikethrough and raw HTML passthrough enabled.
 ///
 /// If `highlight_code` is provided, fenced code blocks with a language tag
 /// are passed to the callback for syntax highlighting. The callback receives
@@ -33,79 +32,53 @@ fn escape_html(text: &str) -> String {
 /// pre-escaped HTML spans, or `None` to fall back to plain text.
 #[allow(clippy::type_complexity)] // dyn Fn callback type is inherently complex
 pub fn markdown_to_html(md: &str, highlight_code: Option<&dyn Fn(&str, &str) -> Option<String>>) -> String {
-    let mut options = Options::empty();
-    options.insert(Options::ENABLE_STRIKETHROUGH);
-    let parser = Parser::new_ext(md, options);
+    let arena = Arena::new();
+    let mut options = Options::default();
+    options.extension.strikethrough = true;
+    options.render.r#unsafe = true;
+    let root = parse_document(&arena, md, &options);
 
-    // Transform text in `<code>` blocks into `Event::Code`
-    // (same approach as helix-term/src/ui/markdown.rs)
-    let mut in_html_code = false;
-    let events: Vec<_> = parser
-        .filter_map(|event| match event {
-            Event::Html(tag) if tag.starts_with("<code") && matches!(tag.chars().nth(5), Some(' ' | '>')) => {
-                in_html_code = true;
-                None
-            }
-            Event::Html(tag) if *tag == *"</code>" => {
-                in_html_code = false;
-                None
-            }
-            Event::Text(text) if in_html_code => Some(Event::Code(text)),
-            _ => Some(event),
-        })
-        .collect();
+    if let Some(highlight_fn) = highlight_code {
+        // Collect code block nodes first to avoid mutating the tree while iterating.
+        let code_nodes: Vec<_> = root
+            .descendants()
+            .filter(|node| matches!(node.data.borrow().value, NodeValue::CodeBlock(_)))
+            .collect();
 
-    let Some(highlight_fn) = highlight_code else {
-        let mut html_output = String::new();
-        pulldown_cmark::html::push_html(&mut html_output, events.into_iter());
-        return html_output;
-    };
-
-    // Process events, replacing fenced code blocks with highlighted HTML
-    let mut processed_events: Vec<Event<'_>> = Vec::new();
-    let mut in_code_block = false;
-    let mut code_block_lang = String::new();
-    let mut code_block_text = String::new();
-
-    for event in events {
-        if in_code_block {
-            match event {
-                Event::Text(text) => code_block_text.push_str(&text),
-                Event::End(TagEnd::CodeBlock) => {
-                    in_code_block = false;
-                    if let Some(highlighted) = highlight_fn(&code_block_text, &code_block_lang) {
-                        let html = format!(
-                            "<pre><code class=\"language-{}\">{}</code></pre>\n",
-                            escape_html(&code_block_lang),
-                            highlighted,
-                        );
-                        processed_events.push(Event::Html(html.into()));
-                    } else {
-                        // Fallback: emit original events (unhighlighted)
-                        processed_events.push(Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(
-                            code_block_lang.clone().into(),
-                        ))));
-                        processed_events.push(Event::Text(code_block_text.clone().into()));
-                        processed_events.push(Event::End(TagEnd::CodeBlock));
-                    }
+        for node in code_nodes {
+            let replacement = {
+                let data = node.data.borrow();
+                let NodeValue::CodeBlock(ref cb) = data.value else {
+                    continue;
+                };
+                if !cb.fenced || cb.info.is_empty() {
+                    continue;
                 }
-                _ => {} // Ignore unexpected events inside code block
-            }
-            continue;
-        }
+                if let Some(highlighted) = highlight_fn(&cb.literal, &cb.info) {
+                    format!(
+                        "<pre><code class=\"language-{}\">{}</code></pre>\n",
+                        escape_html(&cb.info),
+                        highlighted,
+                    )
+                } else {
+                    // Leave the node unchanged — comrak will render it normally.
+                    continue;
+                }
+            };
 
-        match event {
-            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(ref lang))) if !lang.is_empty() => {
-                in_code_block = true;
-                code_block_lang = lang.to_string();
-                code_block_text.clear();
-            }
-            _ => processed_events.push(event),
+            let html_node = arena.alloc(comrak::nodes::AstNode::from(
+                NodeValue::HtmlBlock(NodeHtmlBlock {
+                    block_type: 6,
+                    literal: replacement,
+                }),
+            ));
+            node.insert_before(html_node);
+            node.detach();
         }
     }
 
     let mut html_output = String::new();
-    pulldown_cmark::html::push_html(&mut html_output, processed_events.into_iter());
+    format_html(root, &options, &mut html_output).expect("comrak format_html failed");
     html_output
 }
 
@@ -307,7 +280,7 @@ mod tests {
         let highlighter = |_code: &str, _lang: &str| -> Option<String> { None };
 
         let result = markdown_to_html("```rust\nfn main() {}\n```", Some(&highlighter));
-        // Should fall back to standard push_html rendering
+        // Should fall back to standard comrak rendering
         assert!(result.contains("<pre><code class=\"language-rust\">"));
         assert!(result.contains("fn main() {}"));
     }
