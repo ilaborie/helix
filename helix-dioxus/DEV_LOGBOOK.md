@@ -1846,6 +1846,44 @@ DAP/Debug is **not supported** — `Space G` sub-menu will not be implemented.
 
 ---
 
+## 2026-02-22: Performance Optimizations (use_memo, row keys, peek)
+
+### Progress
+- Added `use_memo` to `BufferBar` — extracts only `open_buffers` + `buffer_scroll_offset` (2 of ~50 fields), eliminating ~95% of unnecessary re-renders (cursor moves, mode changes, content edits no longer trigger)
+- Added `use_memo` to `StatusLine` with `StatusLineData` struct — extracts 12 fields (mode, cursor, diagnostics, LSP), skips re-renders from content-only changes
+- Removed `{version}` from `EditorView` row keys — version was incremented on every snapshot, making every key unique and defeating VDOM diffing entirely. For a 500-line file, this changes from destroying/recreating ~500 DOM subtrees to diffing only the ~5 that actually changed
+- Changed `snapshot_signal.read()` to `.peek()` in `onkeydown` handler — makes non-subscribing intent explicit
+- Updated `hooks.rs` doc comments to recommend `use_memo` pattern
+- Updated CLAUDE.md with new "Performance: Memoization and Signal Usage" section
+
+### Rationale
+- Zero `use_memo` usage existed in the codebase despite `EditorSnapshot` having ~50 fields
+- Components like `BufferBar` (2 fields) and `StatusLine` (12 fields) were re-rendering on every keystroke
+- The `version` in row keys was the single biggest performance issue — every render destroyed and recreated the entire document DOM
+
+### Files Changed
+- `src/components/buffer_bar.rs` — `use_memo` replacing `use_snapshot()`
+- `src/components/statusline.rs` — `StatusLineData` struct + `use_memo`
+- `src/components/editor_view.rs` — removed `{version}` from `row_key`
+- `src/app.rs` — `.read()` → `.peek()` in event handler
+- `src/hooks.rs` — updated doc comments
+
+---
+
+## 2026-02-22: Fix Picker Scroll Not Following Keyboard Navigation
+
+### Progress
+- Fixed `use_effect` in `GenericPicker` and `InlineListDialog` that only ran once on mount
+- Root cause: `use_effect` in Dioxus 0.7 only re-runs when *signal* dependencies change — capturing a plain `usize` prop creates no reactive dependency
+- Solution: Bridge prop → signal pattern (`use_signal` + `.peek()`/`.set()` + `.read()` in effect)
+- `scrollSelectedPickerItem()` and `scrollSelectedInlineDialogItem()` JS functions now fire on every selection change
+
+### Files Changed
+- `src/components/picker/generic.rs` — prop-to-signal bridge for scroll effect
+- `src/components/inline_dialog/list.rs` — same pattern for inline list dialogs
+
+---
+
 ## Template for Future Entries
 
 ```markdown

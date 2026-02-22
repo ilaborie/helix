@@ -142,7 +142,7 @@ helix-dioxus/assets/
 - `use_context::<T>()` — read shared state from ancestor provider (`let app_state = use_context::<AppState>();`)
 - `use_context_provider(|| ...)` — provide shared state to descendants
 - `use_signal(|| initial)` — local mutable state within a component
-- `use_effect(move || { ... })` — side effects (DOM manipulation via `document::eval`)
+- `use_effect(move || { ... })` — side effects (DOM manipulation via `document::eval`). **Only re-runs when signal dependencies change** — plain prop values captured in the closure create no dependency. Bridge props to signals with the `use_signal` + `peek`/`set` pattern (see "Prop-to-Signal Bridge" below)
 - `use_future(move || async { ... })` — background async tasks (LSP polling, notification drain)
 - `use_memo(move || { ... })` — memoized derived values (see Performance section below)
 
@@ -227,6 +227,23 @@ let data = buffer_data.read();
 - `.peek()` → never subscribes, explicit "read without tracking" intent
 - Clone signals freely — they are `Arc`-wrapped and cheap to clone
 
+**Prop-to-Signal Bridge** (for `use_effect` that depends on props):
+
+`use_effect` only tracks *signal* reads — a plain prop value creates no dependency and the effect runs only once. Bridge the prop into a signal:
+
+```rust
+let mut scroll_target = use_signal(|| selected);  // init from prop
+if *scroll_target.peek() != selected {             // peek: don't subscribe component body
+    scroll_target.set(selected);                   // update signal when prop changes
+}
+use_effect(move || {
+    scroll_target.read();                          // read: subscribe the effect
+    document::eval("scrollSelectedItem();");
+});
+```
+
+Used in `GenericPicker` and `InlineListDialog` for scroll-into-view effects.
+
 **Row Keys for `for` Loops:**
 - Encode structural flags that change RSX branches (`is_cursor`, `has_sel`, `diff_type`)
 - **Never** include monotonically increasing counters (`version`, `render_count`)
@@ -300,6 +317,50 @@ impl MovementOps for EditorContext {
 use crate::operations::{MovementOps, EditingOps, ...};
 // Methods automatically available on EditorContext
 ```
+
+### All dioxus primitives
+
+list with `dx component list`
+
+- accordion: An accordion component for displaying collapsible content sections.
+- alert_dialog: An alert dialog component for displaying important messages and requiring user confirmation.
+- aspect_ratio: An aspect ratio component for maintaining a consistent width-to-height ratio of an element.
+- avatar: An avatar component for displaying user profile images or initials.
+- badge: A small label to display status or categorization
+- button: A button component for triggering actions or events when clicked.
+- calendar: A calendar grid component for selecting dates.
+- card: A simple card component
+- checkbox: A togglable checkbox component.
+- collapsible: A collapsible component for showing and hiding content sections.
+- context_menu: A context menu component for displaying a list of actions or option after right clicking an area.
+- date_picker: A date picker component to select or input dates.
+- dialog: A dialog component for displaying modal content.
+- dropdown_menu: A dropdown menu component for selecting options from a list.
+- form: A form component for collecting user input.
+- hover_card: A hover card component for displaying additional information on hover.
+- input: An input field component for user text entry.
+- label: An accessible label component for form elements.
+- menubar: A menubar component for a collection of menu items.
+- navbar: A navbar component for navigation between pages.
+- pagination: Navigation controls for paged content.
+- popover: A popover component for colapsible content.
+- progress: An accessable progress bar indicator.
+- radio_group: A group of radio buttons for selecting one option from a set.
+- scroll_area: A scrollable area component.
+- select: A select dropdown component with typeahead support.
+- separator: A visual separator between different sections of the page.
+- sheet: A sheet component as an edge panel that complements the main content
+- sidebar: A sidebar component as a vertical interface panel fixed to the screen edge, enable quick access to different sections of an application
+- skeleton: A placeholder component for all loading elements.
+- slider: An accessable slider component.
+- switch: A togglable switch component.
+- tabs: A tabbed interface component.
+- textarea: a textarea component used to allow users to enter multi-line text input
+- toast: A toast notification component.
+- toggle: A simple toggle button component.
+- toggle_group: A group of toggle buttons for selecting one or more options from a set.
+- toolbar: A toolbar component for grouping related inputs.
+- tooltip: A tooltip component for additional information on hover or focus.
 
 ### Assets Pattern
 

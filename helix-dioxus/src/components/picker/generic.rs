@@ -45,9 +45,14 @@ pub fn GenericPicker(
         .map(|(i, item)| (window_offset + i, item))
         .collect();
 
-    // Scroll selected item into view when selection changes
+    // Scroll selected item into view when selection changes.
+    // Bridge prop → signal so use_effect re-runs when the value changes.
+    let mut scroll_target = use_signal(|| selected);
+    if *scroll_target.peek() != selected {
+        scroll_target.set(selected);
+    }
     use_effect(move || {
-        let _ = selected;
+        scroll_target.read();
         document::eval("scrollSelectedPickerItem();");
     });
 
