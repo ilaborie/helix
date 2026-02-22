@@ -137,12 +137,147 @@ helix-dioxus/assets/
 
 ### Dioxus 0.7 Patterns
 
-- `Signal<EditorSnapshot>` is provided as context; components use `use_snapshot()` hook to read it
-- After sending commands, call `app_state.process_and_notify(&mut snapshot_signal)` to update the signal
-- Use `use_context::<AppState>()` to access shared state
-- Use `use_effect` for side effects (scrollIntoView, focus)
-- Conditional rendering with `if condition { rsx! { ... } }`
-- Reading a signal in a component body subscribes it to changes automatically
+**Hooks Reference:**
+
+- `use_context::<T>()` — read shared state from ancestor provider (`let app_state = use_context::<AppState>();`)
+- `use_context_provider(|| ...)` — provide shared state to descendants
+- `use_signal(|| initial)` — local mutable state within a component
+- `use_effect(move || { ... })` — side effects (DOM manipulation via `document::eval`)
+- `use_future(move || async { ... })` — background async tasks (LSP polling, notification drain)
+- `use_memo(move || { ... })` — memoized derived values (see Performance section below)
+
+**Component Patterns:**
+
+```rust
+// Basic component with props
+#[component]
+pub fn MyComponent(title: String, count: usize, #[props(default)] optional: bool) -> Element {
+    rsx! { div { "{title}: {count}" } }
+}
+
+// Component with children
+#[component]
+pub fn Wrapper(class: String, children: Element) -> Element {
+    rsx! { div { class, {children} } }
+}
+
+// Component with event handler prop
+#[component]
+pub fn Button(label: String, on_click: EventHandler<MouseEvent>) -> Element {
+    rsx! { div { onmousedown: move |evt| on_click.call(evt), "{label}" } }
+}
+
+// Empty return for conditional components
+if items.is_empty() {
+    return rsx! {};
+}
+```
+
+**Event Handling:**
+- Use `onmousedown` (not `onclick`) for immediate response — `onclick` fires on mouse-up, causing latency
+- `evt.stop_propagation()` — prevent event from reaching parent handlers (e.g., backdrop clicks)
+- `evt.prevent_default()` — suppress browser defaults (e.g., key events)
+- Clone `app_state` for each closure: `let app_state_close = app_state.clone();`
+
+**Conditional Rendering** — use `if` blocks directly inside `rsx!`:
+
+```rust
+rsx! {
+    if snapshot.picker_visible {
+        GenericPicker { /* ... */ }
+    }
+    if snapshot.hover_visible {
+        if let Some(ref html) = snapshot.hover_html {
+            HoverPopup { hover_html: html.clone() }
+        }
+    }
+}
+```
+
+**Document API:**
+
+```rust
+document::Style { {include_str!("../assets/styles.css")} }  // Embed CSS
+document::Title { "helix-dioxus - {snapshot.file_name}" }    // Dynamic window title
+document::eval("scrollCursorIntoView();");                   // Call JS from Rust
+```
+
+### Performance: Memoization and Signal Usage
+
+`EditorSnapshot` has ~50 fields. Every component using `use_snapshot()` re-renders on **any** field change. For components that only need a few fields, use `use_memo` with `use_snapshot_signal()`:
+
+```rust
+// BufferBar only needs 2 fields — skip re-renders from cursor/content/mode changes
+let signal = use_snapshot_signal();
+let buffer_data = use_memo(move || {
+    let s = signal.read();
+    (s.open_buffers.clone(), s.buffer_scroll_offset)
+});
+let data = buffer_data.read();
+```
+
+**When to use each pattern:**
+- `use_snapshot()` — components that use many fields or the full snapshot (e.g., `EditorView`)
+- `use_memo` + `use_snapshot_signal()` — components using few fields (e.g., `BufferBar` uses 2, `StatusLine` uses 12)
+- `.peek()` — read signal without subscribing (event handlers, side effects)
+
+**Signal Best Practices:**
+- `.read()` in component body → subscribes, triggers re-render on change
+- `.read()` in event handler → does NOT subscribe (handlers aren't tracked scopes)
+- `.peek()` → never subscribes, explicit "read without tracking" intent
+- Clone signals freely — they are `Arc`-wrapped and cheap to clone
+
+**Row Keys for `for` Loops:**
+- Encode structural flags that change RSX branches (`is_cursor`, `has_sel`, `diff_type`)
+- **Never** include monotonically increasing counters (`version`, `render_count`)
+- Stable keys let Dioxus diff attributes/children instead of destroying/recreating DOM nodes
+
+**Process-and-Notify Pattern:**
+
+After sending commands, always call `process_and_notify` to update the signal and trigger re-renders:
+
+```rust
+// In event handlers (e.g., onmousedown, onkeydown)
+app_state.send_command(EditorCommand::SwitchBuffer(doc_id));
+app_state.process_and_notify(&mut snapshot_signal);
+```
+
+- `process_commands_sync()` — processes commands + updates the mutex snapshot (used by the polling loop)
+- `process_and_notify()` — calls `process_commands_sync()` + pushes to the Dioxus `Signal` (used by UI event handlers)
+- The LSP polling `use_future` in `app.rs` calls `process_commands_sync()` on a 100ms interval, comparing `snapshot_version` to avoid redundant signal writes
+
+### dioxus-primitives: Toast Notifications
+
+**Dependency:** `dioxus-primitives` (git, `default-features = false`) — only the `ToastProvider` component is used.
+
+**Architecture** (4-part pipeline):
+
+1. **`ToastProvider`** wraps the app in `app.rs` — manages toast lifecycle, auto-dismiss, and max 5 toasts
+2. **`NotificationBridge`** (invisible component inside `ToastProvider`) — drains an async `mpsc` channel via `use_future`
+3. **`EditorContext`** sends `PendingNotification` via `tokio::sync::mpsc::unbounded_channel` from any operation
+4. **Bridge** maps `NotificationSeverity` → `ToastType` and calls `toasts.show()`
+
+**How to send a notification from editor operations:**
+
+```rust
+// In any EditorContext method (operations/*.rs, state/mod.rs)
+self.show_notification("Renamed to 'new_name'".to_string(), NotificationSeverity::Success);
+```
+
+`show_notification` sends a `PendingNotification` through the channel — the bridge picks it up asynchronously.
+
+**Severity mapping and durations:**
+
+| `NotificationSeverity` | `ToastType` | Duration |
+|------------------------|-------------|----------|
+| `Error` | `ToastType::Error` | 10 seconds |
+| `Warning` | `ToastType::Warning` | default (~5s) |
+| `Info` | `ToastType::Info` | default |
+| `Success` | `ToastType::Success` | default |
+
+**CSS classes** (in `styles.css`): `.toast`, `.toast-container`, `.toast-list`, `.toast-content`, `.toast-title`, `.toast-close`
+
+**Why NOT other dioxus-primitives components:** Only `ToastProvider` is used — other components (context_menu, dialog, tooltip) were evaluated but have build system and interaction model incompatibilities with the desktop WebView.
 
 ### Extension Traits Pattern
 
