@@ -403,13 +403,9 @@ impl VcsOps for EditorContext {
     }
 
     fn show_changed_files_picker(&mut self) {
-        let Ok(cwd) = std::env::current_dir() else {
-            self.show_notification(
-                "Cannot determine current directory".to_string(),
-                NotificationSeverity::Error,
-            );
-            return;
-        };
+        // Use helix_stdx's frozen working directory (set at startup) so paths
+        // remain stable even after the file picker navigates to other directories.
+        let cwd = helix_stdx::env::current_working_dir();
 
         let providers = self.editor.diff_providers.clone();
         let (tx, rx) = mpsc::channel::<FileChange>();

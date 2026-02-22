@@ -41,11 +41,17 @@ pub trait BufferOps {
     // Additional buffer management operations
     fn reload_document(&mut self);
     fn write_all(&mut self);
+    fn write_all_impl(&mut self, force: bool);
     fn quit_all(&mut self, force: bool);
     fn buffer_close_all(&mut self, force: bool);
-    fn buffer_close_others(&mut self);
+    fn buffer_close_others_impl(&mut self, force: bool);
     fn change_directory(&mut self, path: &Path);
     fn print_working_directory(&mut self);
+    fn write_buffer_close(&mut self, force: bool);
+    fn reload_all(&mut self);
+    fn read_file(&mut self, path: &Path);
+    fn move_file(&mut self, new_path: PathBuf, force: bool);
+    fn update_document(&mut self);
 }
 
 impl BufferOps for EditorContext {
@@ -259,6 +265,11 @@ impl BufferOps for EditorContext {
 
     /// Save all modified buffers.
     fn write_all(&mut self) {
+        self.write_all_impl(false);
+    }
+
+    /// Save all modified buffers with optional force flag.
+    fn write_all_impl(&mut self, force: bool) {
         let doc_ids: Vec<_> = self
             .editor
             .documents()
@@ -275,7 +286,7 @@ impl BufferOps for EditorContext {
         let mut error_count = 0;
 
         for doc_id in doc_ids {
-            match self.save_doc_inner(doc_id, None, false) {
+            match self.save_doc_inner(doc_id, None, force) {
                 Ok(event) => {
                     if let Some(doc) = self.editor.document_mut(doc_id) {
                         doc.set_last_saved_revision(event.revision, event.save_time);
@@ -349,7 +360,7 @@ impl BufferOps for EditorContext {
     }
 
     /// Close all buffers except the current one.
-    fn buffer_close_others(&mut self) {
+    fn buffer_close_others_impl(&mut self, force: bool) {
         let view_id = self.editor.tree.focus;
         let current_doc_id = self.editor.tree.get(view_id).doc;
 
@@ -362,7 +373,7 @@ impl BufferOps for EditorContext {
 
         let mut closed_count = 0;
         for doc_id in other_ids {
-            if let Ok(()) = self.editor.close_document(doc_id, false) {
+            if let Ok(()) = self.editor.close_document(doc_id, force) {
                 closed_count += 1;
             }
         }
@@ -395,6 +406,144 @@ impl BufferOps for EditorContext {
             Err(e) => {
                 self.show_notification(format!("Failed to get cwd: {e}"), NotificationSeverity::Error);
             }
+        }
+    }
+
+    /// Save current buffer then close it.
+    fn write_buffer_close(&mut self, force: bool) {
+        let view_id = self.editor.tree.focus;
+        let doc_id = self.editor.tree.get(view_id).doc;
+
+        match self.save_doc_inner(doc_id, None, force) {
+            Ok(event) => {
+                if let Some(doc) = self.editor.document_mut(doc_id) {
+                    doc.set_path(Some(&event.path));
+                    doc.set_last_saved_revision(event.revision, event.save_time);
+                }
+                let _ = self.editor.close_document(doc_id, true);
+            }
+            Err(e) => {
+                self.show_notification(format!("Save failed: {e}"), NotificationSeverity::Error);
+            }
+        }
+    }
+
+    /// Reload all documents from disk.
+    fn reload_all(&mut self) {
+        let docs_with_paths: Vec<_> = self
+            .editor
+            .documents()
+            .filter_map(|doc| doc.path().cloned().map(|p| (doc.id(), p)))
+            .collect();
+
+        if docs_with_paths.is_empty() {
+            self.show_notification("No files to reload".to_string(), NotificationSeverity::Info);
+            return;
+        }
+
+        let mut reloaded = 0;
+        let mut errors = 0;
+        for (_doc_id, path) in &docs_with_paths {
+            match self.editor.open(path, helix_view::editor::Action::Replace) {
+                Ok(_) => reloaded += 1,
+                Err(e) => {
+                    log::error!("Failed to reload {}: {e}", path.display());
+                    errors += 1;
+                }
+            }
+        }
+
+        if errors > 0 {
+            self.show_notification(
+                format!("Reloaded {reloaded} files, {errors} errors"),
+                NotificationSeverity::Warning,
+            );
+        } else {
+            self.show_notification(format!("Reloaded {reloaded} files"), NotificationSeverity::Success);
+        }
+    }
+
+    /// Read file content and insert at cursor position.
+    fn read_file(&mut self, path: &Path) {
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(e) => {
+                self.show_notification(format!("Failed to read {}: {e}", path.display()), NotificationSeverity::Error);
+                return;
+            }
+        };
+
+        let view_id = self.editor.tree.focus;
+        let doc_id = self.editor.tree.get(view_id).doc;
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let cursor = doc.selection(view_id).primary().cursor(text);
+
+        let transaction = helix_core::Transaction::insert(
+            doc.text(),
+            &helix_core::Selection::point(cursor),
+            content.into(),
+        );
+        doc.apply(&transaction, view_id);
+    }
+
+    /// Rename/move the current file on disk and update the document path.
+    fn move_file(&mut self, new_path: PathBuf, force: bool) {
+        let view_id = self.editor.tree.focus;
+        let doc_id = self.editor.tree.get(view_id).doc;
+
+        let old_path = {
+            let Some(doc) = self.editor.document(doc_id) else {
+                return;
+            };
+            let Some(path) = doc.path().cloned() else {
+                self.show_notification(
+                    "Cannot move: buffer has no file path".to_string(),
+                    NotificationSeverity::Warning,
+                );
+                return;
+            };
+            path
+        };
+
+        if new_path.exists() && !force {
+            self.show_notification(
+                format!("'{}' already exists. Use :move! to overwrite.", new_path.display()),
+                NotificationSeverity::Error,
+            );
+            return;
+        }
+
+        // Rename on disk
+        if let Err(e) = std::fs::rename(&old_path, &new_path) {
+            self.show_notification(format!("Move failed: {e}"), NotificationSeverity::Error);
+            return;
+        }
+
+        // Update document path
+        let canonical = helix_stdx::path::canonicalize(&new_path);
+        if let Some(doc) = self.editor.document_mut(doc_id) {
+            doc.set_path(Some(&canonical));
+        }
+
+        self.show_notification(
+            format!("Moved to {}", new_path.display()),
+            NotificationSeverity::Success,
+        );
+    }
+
+    /// Save document only if it's been modified (`:update`).
+    fn update_document(&mut self) {
+        let view_id = self.editor.tree.focus;
+        let doc_id = self.editor.tree.get(view_id).doc;
+
+        let is_modified = self
+            .editor
+            .document(doc_id)
+            .is_some_and(helix_view::Document::is_modified);
+
+        if is_modified {
+            self.save_document(None, false);
         }
     }
 }

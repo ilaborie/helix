@@ -1663,7 +1663,7 @@ impl EditorContext {
                 self.buffer_close_all(force);
             }
             EditorCommand::BufferCloseOthers => {
-                self.buffer_close_others();
+                self.buffer_close_others_impl(false);
             }
 
             // Directory commands

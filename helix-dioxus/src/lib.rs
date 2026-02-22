@@ -96,6 +96,14 @@ fn load_icon() -> Option<Icon> {
 /// - A Tokio runtime is active (via `Runtime::enter()`)
 #[allow(clippy::needless_pass_by_value)] // called once at startup, ownership is natural
 pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
+    // Freeze the initial working directory so it stays stable even when the
+    // file picker later calls `std::env::set_current_dir` to navigate directories.
+    // This matches helix-term's startup behavior.
+    let cwd = helix_stdx::env::current_working_dir();
+    if let Err(err) = helix_stdx::env::set_current_working_dir(&cwd) {
+        log::warn!("Failed to freeze initial working directory: {err}");
+    }
+
     // Register helix-view events with helix_event.
     // This must be done before creating handlers that register hooks for these events.
     events::register();

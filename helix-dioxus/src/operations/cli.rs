@@ -1,9 +1,12 @@
 //! CLI command execution operations.
 
+use std::fmt::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::operations::{BufferOps, EditingOps, JumpOps, PickerOps, ShellOps, TextManipulationOps, ThemeOps};
+use crate::operations::{
+    BufferOps, ClipboardOps, EditingOps, JumpOps, PickerOps, ShellOps, TextManipulationOps, ThemeOps, VcsOps,
+};
 use crate::state::{EditorContext, NotificationSeverity, ShellBehavior};
 
 /// A command completion entry: name, aliases, and human-readable description.
@@ -248,6 +251,220 @@ pub fn command_completions() -> &'static [CommandCompletion] {
             aliases: &[],
             description: "Open emoji picker",
         },
+        // --- Batch 1: Buffer/File Aliases & Force Variants ---
+        CommandCompletion {
+            name: "buffer-close",
+            aliases: &["bc", "bclose"],
+            description: "Close current buffer",
+        },
+        CommandCompletion {
+            name: "buffer-close!",
+            aliases: &["bc!", "bclose!"],
+            description: "Force close current buffer",
+        },
+        CommandCompletion {
+            name: "buffer-close-others!",
+            aliases: &["bco!"],
+            description: "Force close other buffers",
+        },
+        CommandCompletion {
+            name: "exit",
+            aliases: &["xit"],
+            description: "Save and quit",
+        },
+        CommandCompletion {
+            name: "exit!",
+            aliases: &["xit!"],
+            description: "Force save and quit",
+        },
+        CommandCompletion {
+            name: "write-all!",
+            aliases: &["wa!"],
+            description: "Force save all buffers",
+        },
+        CommandCompletion {
+            name: "write-buffer-close",
+            aliases: &["wbc"],
+            description: "Save and close current buffer",
+        },
+        CommandCompletion {
+            name: "write-buffer-close!",
+            aliases: &["wbc!"],
+            description: "Force save and close buffer",
+        },
+        CommandCompletion {
+            name: "write-quit-all",
+            aliases: &["wqa", "xa"],
+            description: "Save all and quit",
+        },
+        CommandCompletion {
+            name: "write-quit-all!",
+            aliases: &["wqa!", "xa!"],
+            description: "Force save all and quit",
+        },
+        CommandCompletion {
+            name: "update",
+            aliases: &["u"],
+            description: "Save if modified",
+        },
+        CommandCompletion {
+            name: "reload-all",
+            aliases: &["rla"],
+            description: "Reload all files from disk",
+        },
+        CommandCompletion {
+            name: "read",
+            aliases: &["r"],
+            description: "Read file into buffer",
+        },
+        CommandCompletion {
+            name: "move",
+            aliases: &["mv"],
+            description: "Move/rename current file",
+        },
+        CommandCompletion {
+            name: "move!",
+            aliases: &["mv!"],
+            description: "Force move/rename file",
+        },
+        // --- Batch 2: Config & Language Commands ---
+        CommandCompletion {
+            name: "get-option",
+            aliases: &["get"],
+            description: "Get config option value",
+        },
+        CommandCompletion {
+            name: "set-language",
+            aliases: &["lang"],
+            description: "Set document language",
+        },
+        CommandCompletion {
+            name: "indent-style",
+            aliases: &[],
+            description: "Show/set indent style",
+        },
+        CommandCompletion {
+            name: "config-open-workspace",
+            aliases: &[],
+            description: "Open workspace config",
+        },
+        CommandCompletion {
+            name: "tutor",
+            aliases: &[],
+            description: "Open tutorial",
+        },
+        // --- Batch 3: Register & Clipboard Commands ---
+        CommandCompletion {
+            name: "clipboard-yank",
+            aliases: &[],
+            description: "Yank to system clipboard",
+        },
+        CommandCompletion {
+            name: "clipboard-paste-after",
+            aliases: &[],
+            description: "Paste from clipboard after",
+        },
+        CommandCompletion {
+            name: "clipboard-paste-before",
+            aliases: &[],
+            description: "Paste from clipboard before",
+        },
+        CommandCompletion {
+            name: "clipboard-paste-replace",
+            aliases: &[],
+            description: "Replace with clipboard",
+        },
+        CommandCompletion {
+            name: "primary-clipboard-yank",
+            aliases: &[],
+            description: "Yank to primary clipboard",
+        },
+        CommandCompletion {
+            name: "primary-clipboard-paste-after",
+            aliases: &[],
+            description: "Paste from primary after",
+        },
+        CommandCompletion {
+            name: "primary-clipboard-paste-before",
+            aliases: &[],
+            description: "Paste from primary before",
+        },
+        CommandCompletion {
+            name: "primary-clipboard-paste-replace",
+            aliases: &[],
+            description: "Replace with primary clipboard",
+        },
+        CommandCompletion {
+            name: "show-clipboard-provider",
+            aliases: &[],
+            description: "Show clipboard provider",
+        },
+        CommandCompletion {
+            name: "yank-join",
+            aliases: &[],
+            description: "Yank joined selections",
+        },
+        CommandCompletion {
+            name: "yank-diagnostic",
+            aliases: &[],
+            description: "Yank diagnostic at cursor",
+        },
+        CommandCompletion {
+            name: "clear-register",
+            aliases: &[],
+            description: "Clear a register",
+        },
+        CommandCompletion {
+            name: "set-register",
+            aliases: &[],
+            description: "Set register content",
+        },
+        CommandCompletion {
+            name: "character-info",
+            aliases: &[],
+            description: "Show character info at cursor",
+        },
+        CommandCompletion {
+            name: "echo",
+            aliases: &[],
+            description: "Echo message",
+        },
+        CommandCompletion {
+            name: "goto",
+            aliases: &[],
+            description: "Go to line number",
+        },
+        // --- Batch 4: LSP & Misc ---
+        CommandCompletion {
+            name: "lsp-stop",
+            aliases: &[],
+            description: "Stop LSP servers",
+        },
+        CommandCompletion {
+            name: "reset-diff-change",
+            aliases: &["diffget", "diffg"],
+            description: "Revert diff hunk at cursor",
+        },
+        CommandCompletion {
+            name: "tree-sitter-highlight-name",
+            aliases: &[],
+            description: "Show TS highlight at cursor",
+        },
+        CommandCompletion {
+            name: "tree-sitter-subtree",
+            aliases: &["ts-subtree"],
+            description: "Show TS subtree at cursor",
+        },
+        CommandCompletion {
+            name: "cquit",
+            aliases: &["cq"],
+            description: "Quit with exit code",
+        },
+        CommandCompletion {
+            name: "cquit!",
+            aliases: &["cq!"],
+            description: "Force quit with exit code",
+        },
     ];
     COMMANDS
 }
@@ -314,11 +531,11 @@ impl CliOps for EditorContext {
                 let path = args.map(PathBuf::from);
                 self.save_document(path, true);
             }
-            "wq" | "x" => {
+            "wq" | "x" | "exit" | "xit" => {
                 self.save_document(None, false);
                 self.try_quit(false);
             }
-            "wq!" | "x!" => {
+            "wq!" | "x!" | "exit!" | "xit!" => {
                 self.save_document(None, true);
                 self.try_quit(true);
             }
@@ -338,10 +555,10 @@ impl CliOps for EditorContext {
             "bp" | "bprev" | "bprevious" => {
                 self.cycle_buffer(-1);
             }
-            "bd" | "bdelete" => {
+            "bd" | "bdelete" | "bc" | "bclose" | "buffer-close" => {
                 self.close_current_buffer(false);
             }
-            "bd!" | "bdelete!" => {
+            "bd!" | "bdelete!" | "bc!" | "bclose!" | "buffer-close!" => {
                 self.close_current_buffer(true);
             }
 
@@ -373,7 +590,7 @@ impl CliOps for EditorContext {
 
             // Buffer close others
             "buffer-close-others" | "bco" => {
-                self.buffer_close_others();
+                self.buffer_close_others_impl(false);
             }
 
             // Directory commands
@@ -673,6 +890,280 @@ impl CliOps for EditorContext {
                 self.show_notification(msg, NotificationSeverity::Info);
             }
 
+            // --- Batch 1: Buffer/File Aliases & Force Variants ---
+            "bco!" | "buffer-close-others!" => {
+                self.buffer_close_others_impl(true);
+            }
+            "wa!" | "write-all!" => {
+                self.write_all_impl(true);
+            }
+            "wbc" | "write-buffer-close" => {
+                self.write_buffer_close(false);
+            }
+            "wbc!" | "write-buffer-close!" => {
+                self.write_buffer_close(true);
+            }
+            "wqa" | "xa" | "write-quit-all" => {
+                self.write_all();
+                self.quit_all(false);
+            }
+            "wqa!" | "xa!" | "write-quit-all!" => {
+                self.write_all_impl(true);
+                self.quit_all(true);
+            }
+            "u" | "update" => {
+                self.update_document();
+            }
+            "rla" | "reload-all" => {
+                self.reload_all();
+            }
+            "r" | "read" => {
+                if let Some(filename) = args {
+                    let path = PathBuf::from(filename);
+                    self.read_file(&path);
+                } else {
+                    self.show_notification("Usage: :read <file>".to_string(), NotificationSeverity::Warning);
+                }
+            }
+            "mv" | "move" => {
+                if let Some(filename) = args {
+                    self.move_file(PathBuf::from(filename), false);
+                } else {
+                    self.show_notification("Usage: :move <path>".to_string(), NotificationSeverity::Warning);
+                }
+            }
+            "mv!" | "move!" => {
+                if let Some(filename) = args {
+                    self.move_file(PathBuf::from(filename), true);
+                } else {
+                    self.show_notification("Usage: :move! <path>".to_string(), NotificationSeverity::Warning);
+                }
+            }
+
+            // --- Batch 2: Config & Language Commands ---
+            "get" | "get-option" => {
+                if let Some(key) = args {
+                    let key = key.to_string();
+                    self.get_option(&key);
+                } else {
+                    self.show_notification("Usage: :get-option <key>".to_string(), NotificationSeverity::Warning);
+                }
+            }
+            "lang" | "set-language" => {
+                if let Some(lang_id) = args {
+                    let lang_id = lang_id.to_string();
+                    self.set_language(&lang_id);
+                } else {
+                    // Show current language
+                    let lang = {
+                        let (_view, doc) = helix_view::current_ref!(self.editor);
+                        doc.language_name().unwrap_or("plaintext").to_string()
+                    };
+                    self.show_notification(lang, NotificationSeverity::Info);
+                }
+            }
+            "indent-style" => {
+                let args_owned = args.map(str::to_string);
+                self.indent_style_command(args_owned.as_deref());
+            }
+            "config-open-workspace" => {
+                self.open_file(&helix_loader::workspace_config_file());
+            }
+            "tutor" => {
+                self.open_file(&helix_loader::runtime_file("tutor"));
+            }
+
+            // --- Batch 3: Register & Clipboard Commands ---
+            "clipboard-yank" => {
+                let view_id = self.editor.tree.focus;
+                let doc_id = self.editor.tree.get(view_id).doc;
+                self.editor.selected_register = Some('+');
+                self.yank(doc_id, view_id);
+            }
+            "clipboard-paste-after" => {
+                let view_id = self.editor.tree.focus;
+                let doc_id = self.editor.tree.get(view_id).doc;
+                self.editor.selected_register = Some('+');
+                self.paste(doc_id, view_id, false);
+            }
+            "clipboard-paste-before" => {
+                let view_id = self.editor.tree.focus;
+                let doc_id = self.editor.tree.get(view_id).doc;
+                self.editor.selected_register = Some('+');
+                self.paste(doc_id, view_id, true);
+            }
+            "clipboard-paste-replace" => {
+                let view_id = self.editor.tree.focus;
+                let doc_id = self.editor.tree.get(view_id).doc;
+                self.editor.selected_register = Some('+');
+                self.replace_with_yanked(doc_id, view_id);
+            }
+            "primary-clipboard-yank" => {
+                let view_id = self.editor.tree.focus;
+                let doc_id = self.editor.tree.get(view_id).doc;
+                self.editor.selected_register = Some('*');
+                self.yank(doc_id, view_id);
+            }
+            "primary-clipboard-paste-after" => {
+                let view_id = self.editor.tree.focus;
+                let doc_id = self.editor.tree.get(view_id).doc;
+                self.editor.selected_register = Some('*');
+                self.paste(doc_id, view_id, false);
+            }
+            "primary-clipboard-paste-before" => {
+                let view_id = self.editor.tree.focus;
+                let doc_id = self.editor.tree.get(view_id).doc;
+                self.editor.selected_register = Some('*');
+                self.paste(doc_id, view_id, true);
+            }
+            "primary-clipboard-paste-replace" => {
+                let view_id = self.editor.tree.focus;
+                let doc_id = self.editor.tree.get(view_id).doc;
+                self.editor.selected_register = Some('*');
+                self.replace_with_yanked(doc_id, view_id);
+            }
+            "show-clipboard-provider" => {
+                let name = self.editor.registers.clipboard_provider_name();
+                self.show_notification(format!("Clipboard provider: {name}"), NotificationSeverity::Info);
+            }
+            "yank-join" => {
+                let separator = args.unwrap_or(" ").to_string();
+                self.yank_join(&separator);
+            }
+            "yank-diagnostic" => {
+                // Capture diagnostic messages before mutable borrow
+                let diag_messages: Vec<String> = {
+                    let (view, doc) = helix_view::current_ref!(self.editor);
+                    let primary = doc.selection(view.id).primary();
+                    doc.diagnostics()
+                        .iter()
+                        .filter(|d| primary.overlaps(&helix_core::Range::new(d.range.start, d.range.end)))
+                        .map(|d| d.message.clone())
+                        .collect()
+                };
+                self.yank_diagnostic_impl(diag_messages);
+            }
+            "clear-register" => {
+                if let Some(reg) = args.and_then(|a| a.chars().next()) {
+                    self.editor.registers.remove(reg);
+                    self.show_notification(format!("Cleared register '{reg}'"), NotificationSeverity::Info);
+                } else {
+                    self.show_notification(
+                        "Usage: :clear-register <char>".to_string(),
+                        NotificationSeverity::Warning,
+                    );
+                }
+            }
+            "set-register" => {
+                if let Some(set_args) = args {
+                    let set_args = set_args.to_string();
+                    let mut chars = set_args.chars();
+                    if let Some(reg) = chars.next() {
+                        let content: String = chars.skip_while(|c| c.is_whitespace()).collect();
+                        if let Err(e) = self.editor.registers.write(reg, vec![content]) {
+                            self.show_notification(format!("Failed to set register: {e}"), NotificationSeverity::Error);
+                        }
+                    } else {
+                        self.show_notification(
+                            "Usage: :set-register <char> <content>".to_string(),
+                            NotificationSeverity::Warning,
+                        );
+                    }
+                } else {
+                    self.show_notification(
+                        "Usage: :set-register <char> <content>".to_string(),
+                        NotificationSeverity::Warning,
+                    );
+                }
+            }
+            "character-info" => {
+                self.show_character_info();
+            }
+            "echo" => {
+                let message = args.unwrap_or("").to_string();
+                self.show_notification(message, NotificationSeverity::Info);
+            }
+            "goto" => {
+                if let Some(line_str) = args {
+                    if let Ok(line) = line_str.parse::<usize>() {
+                        let target = line.saturating_sub(1); // 1-indexed to 0-indexed
+                        self.goto_line_column(target, 0);
+                    } else {
+                        self.show_notification(
+                            format!("Invalid line number: {line_str}"),
+                            NotificationSeverity::Error,
+                        );
+                    }
+                } else {
+                    self.show_notification("Usage: :goto <line>".to_string(), NotificationSeverity::Warning);
+                }
+            }
+
+            // --- Batch 4: LSP & Misc ---
+            "lsp-stop" => {
+                self.lsp_stop();
+            }
+            "reset-diff-change" | "diffget" | "diffg" => {
+                let view_id = self.editor.tree.focus;
+                let doc_id = self.editor.tree.get(view_id).doc;
+                let cursor_line = {
+                    let doc = self.editor.document(doc_id).expect("doc exists");
+                    let text = doc.text().slice(..);
+                    let pos = doc.selection(view_id).primary().cursor(text);
+                    text.char_to_line(pos) + 1 // 1-indexed
+                };
+                self.revert_hunk_at_line(doc_id, view_id, cursor_line);
+            }
+            "tree-sitter-highlight-name" => {
+                let msg = {
+                    let (view, doc) = helix_view::current!(self.editor);
+                    let text = doc.text().slice(..);
+                    let pos = doc.selection(view.id).primary().cursor(text);
+                    #[allow(clippy::cast_possible_truncation)]
+                    let byte_pos = text.char_to_byte(pos) as u32;
+                    doc.syntax()
+                        .and_then(|syntax| {
+                            syntax
+                                .descendant_for_byte_range(byte_pos, byte_pos + 1)
+                                .map(|node| node.kind().to_string())
+                        })
+                        .unwrap_or_else(|| "No syntax tree available".to_string())
+                };
+                self.show_notification(msg, NotificationSeverity::Info);
+            }
+            "tree-sitter-subtree" | "ts-subtree" => {
+                let msg = {
+                    let (view, doc) = helix_view::current!(self.editor);
+                    let text = doc.text().slice(..);
+                    let primary = doc.selection(view.id).primary();
+                    #[allow(clippy::cast_possible_truncation)]
+                    let from = text.char_to_byte(primary.from()) as u32;
+                    #[allow(clippy::cast_possible_truncation)]
+                    let to = text.char_to_byte(primary.to()) as u32;
+                    doc.syntax()
+                        .and_then(|syntax| {
+                            syntax.descendant_for_byte_range(from, to).map(|node| {
+                                let mut contents = String::new();
+                                match helix_core::syntax::pretty_print_tree(&mut contents, node) {
+                                    Ok(()) => contents,
+                                    Err(_) => "Failed to print subtree".to_string(),
+                                }
+                            })
+                        })
+                        .unwrap_or_else(|| "No syntax tree available".to_string())
+                };
+                self.show_notification(msg, NotificationSeverity::Info);
+            }
+            "cq" | "cquit" => {
+                let code = args.and_then(|a| a.parse::<i32>().ok()).unwrap_or(1);
+                self.should_quit = true;
+                std::process::exit(code);
+            }
+            "cq!" | "cquit!" => {
+                let code = args.and_then(|a| a.parse::<i32>().ok()).unwrap_or(1);
+                std::process::exit(code);
+            }
+
             _ => {
                 log::warn!("Unknown command: {cmd}");
                 self.show_notification(format!("Unknown command: {cmd}"), NotificationSeverity::Error);
@@ -857,6 +1348,209 @@ impl CliOps for EditorContext {
         self.editor.config = Arc::new(arc_swap::ArcSwap::from_pointee(new_config));
         self.editor.refresh_config(&old_config);
         self.show_notification(format!("Toggled {key} = {display_val}"), NotificationSeverity::Info);
+    }
+}
+
+/// Additional helper methods for CLI commands.
+impl EditorContext {
+    fn get_option(&mut self, key: &str) {
+        let key = key.to_lowercase();
+        let config = self.editor.config();
+
+        let json = match serde_json::to_value(&*config) {
+            Ok(v) => v,
+            Err(err) => {
+                self.show_notification(
+                    format!("Config serialization error: {err}"),
+                    NotificationSeverity::Error,
+                );
+                return;
+            }
+        };
+
+        let pointer = format!("/{}", key.replace('.', "/"));
+        match json.pointer(&pointer) {
+            Some(value) => {
+                self.show_notification(format!("{key} = {value}"), NotificationSeverity::Info);
+            }
+            None => {
+                self.show_notification(format!("Unknown config key: {key}"), NotificationSeverity::Error);
+            }
+        }
+    }
+
+    fn set_language(&mut self, lang_id: &str) {
+        let lang_id = lang_id.to_string();
+        let loader = self.editor.syn_loader.load();
+
+        let doc_id = {
+            let (view, _doc) = helix_view::current_ref!(self.editor);
+            self.editor.tree.get(view.id).doc
+        };
+
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+
+        if lang_id == "text" || lang_id == "plaintext" {
+            doc.set_language(None, &loader);
+        } else if let Err(e) = doc.set_language_by_language_id(&lang_id, &loader) {
+            self.show_notification(format!("Unknown language: {e}"), NotificationSeverity::Error);
+            return;
+        }
+
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        doc.detect_indent_and_line_ending();
+        self.editor.refresh_language_servers(doc_id);
+
+        self.show_notification(format!("Language set to {lang_id}"), NotificationSeverity::Info);
+    }
+
+    fn indent_style_command(&mut self, args: Option<&str>) {
+        use helix_core::indent::IndentStyle;
+
+        let (_view, doc) = helix_view::current!(self.editor);
+        if let Some(arg) = args {
+            let style = match arg.to_ascii_lowercase().as_str() {
+                "tabs" | "tab" => Some(IndentStyle::Tabs),
+                _ => arg.parse::<u8>().ok().filter(|&n| n > 0 && n <= 16).map(IndentStyle::Spaces),
+            };
+            if let Some(s) = style {
+                doc.indent_style = s;
+                self.show_notification(format!("Indent style: {s:?}"), NotificationSeverity::Info);
+            } else {
+                self.show_notification(
+                    "Invalid indent style. Use 'tabs' or a number 1-16".to_string(),
+                    NotificationSeverity::Error,
+                );
+            }
+        } else {
+            let style = doc.indent_style;
+            self.show_notification(format!("{style:?}"), NotificationSeverity::Info);
+        }
+    }
+
+    fn yank_join(&mut self, separator: &str) {
+        let register = self.take_register();
+        let (view_id, text, selections_text) = {
+            let (view, doc) = helix_view::current_ref!(self.editor);
+            let text = doc.text().slice(..);
+            let selection = doc.selection(view.id);
+            let count = selection.len();
+            let joined = selection
+                .fragments(text)
+                .fold(String::new(), |mut acc, fragment| {
+                    if !acc.is_empty() {
+                        acc.push_str(separator);
+                    }
+                    acc.push_str(&fragment);
+                    acc
+                });
+            (view.id, joined, count)
+        };
+        let _ = view_id; // used for context
+
+        match self.editor.registers.write(register, vec![text.clone()]) {
+            Ok(()) => {
+                let s = if selections_text == 1 { "" } else { "s" };
+                self.show_notification(
+                    format!("Joined and yanked {selections_text} selection{s} to register '{register}'"),
+                    NotificationSeverity::Info,
+                );
+            }
+            Err(e) => {
+                self.show_notification(format!("Failed to yank: {e}"), NotificationSeverity::Error);
+            }
+        }
+    }
+
+    fn yank_diagnostic_impl(&mut self, diag_messages: Vec<String>) {
+        if diag_messages.is_empty() {
+            self.show_notification(
+                "No diagnostics under primary selection".to_string(),
+                NotificationSeverity::Warning,
+            );
+            return;
+        }
+
+        let n = diag_messages.len();
+        match self.editor.registers.write('+', diag_messages) {
+            Ok(()) => {
+                let s = if n == 1 { "" } else { "s" };
+                self.show_notification(
+                    format!("Yanked {n} diagnostic{s} to clipboard"),
+                    NotificationSeverity::Info,
+                );
+            }
+            Err(e) => {
+                self.show_notification(format!("Failed to yank: {e}"), NotificationSeverity::Error);
+            }
+        }
+    }
+
+    fn show_character_info(&mut self) {
+        use helix_core::graphemes;
+
+        let (view, doc) = helix_view::current_ref!(self.editor);
+        let text = doc.text().slice(..);
+        let pos = doc.selection(view.id).primary().cursor(text);
+        let end = graphemes::next_grapheme_boundary(text, pos);
+
+        if pos == end {
+            return;
+        }
+
+        let grapheme: String = text.slice(pos..end).into();
+        let mut info = String::new();
+
+        for (i, ch) in grapheme.chars().enumerate() {
+            if i > 0 {
+                info.push_str(", ");
+            }
+            let printable = match ch {
+                '\0' => "\\0".to_string(),
+                '\t' => "\\t".to_string(),
+                '\n' => "\\n".to_string(),
+                '\r' => "\\r".to_string(),
+                _ => ch.to_string(),
+            };
+            let codepoint = ch as u32;
+            let _ = write!(info, "'{printable}' U+{codepoint:04X}");
+            if ch.is_ascii() {
+                let _ = write!(info, " Dec {}", ch as u8);
+            }
+        }
+
+        self.show_notification(info, NotificationSeverity::Info);
+    }
+
+    fn lsp_stop(&mut self) {
+        let server_names: Vec<String> = {
+            let (_view, doc) = helix_view::current_ref!(self.editor);
+            doc.language_servers()
+                .map(|ls| ls.name().to_string())
+                .collect()
+        };
+
+        if server_names.is_empty() {
+            self.show_notification("No language servers running".to_string(), NotificationSeverity::Info);
+            return;
+        }
+
+        for ls_name in &server_names {
+            self.editor.language_servers.stop(ls_name);
+
+            for doc in self.editor.documents_mut() {
+                if let Some(client) = doc.remove_language_server_by_name(ls_name) {
+                    doc.clear_diagnostics_for_language_server(client.id());
+                    doc.reset_all_inlay_hints();
+                    doc.inlay_hints_oudated = true;
+                }
+            }
+        }
+
+        self.show_notification(
+            format!("Stopped {} language server(s)", server_names.len()),
+            NotificationSeverity::Info,
+        );
     }
 }
 

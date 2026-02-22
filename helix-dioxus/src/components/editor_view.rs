@@ -101,7 +101,7 @@ pub fn EditorView() -> Element {
                         let has_hints = !line.inlay_hints.is_empty();
 
                         // Single key on first cell — Dioxus uses it to diff the entire block
-                        let row_key = format!("row-{line_num}-{version}-{show_lightbulb}-{is_cursor}-{has_sel}-{has_jump_labels}-{has_hints}-{diff_type:?}");
+                        let row_key = format!("row-{line_num}-{show_lightbulb}-{is_cursor}-{has_sel}-{has_jump_labels}-{has_hints}-{diff_type:?}");
 
                         rsx! {
                             // Cell 1: Indicator

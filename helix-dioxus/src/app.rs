@@ -248,7 +248,7 @@ pub fn App() -> Element {
             app_state_for_handler.process_and_notify(&mut snapshot_signal);
 
             // Sync word jump pending state with EditorContext
-            let post_snapshot = snapshot_signal.read().clone();
+            let post_snapshot = snapshot_signal.peek().clone();
             if post_snapshot.word_jump_active && pending_key() == PendingKeySequence::None {
                 if post_snapshot.word_jump_first_char.is_some() {
                     pending_key.set(PendingKeySequence::WordJumpSecondChar);

@@ -5,10 +5,30 @@
 use crate::icons::{lucide, Icon};
 use dioxus::prelude::*;
 
-use crate::hooks::{use_snapshot, use_snapshot_signal};
+use crate::hooks::use_snapshot_signal;
 use crate::lsp::{LspServerSnapshot, LspServerStatus};
 use crate::state::EditorCommand;
 use crate::AppState;
+
+/// Extracted subset of `EditorSnapshot` fields used by the status line.
+///
+/// By memoizing this struct, the `StatusLine` component only re-renders when
+/// one of these fields actually changes — not on every content edit or scroll.
+#[derive(Clone, PartialEq)]
+struct StatusLineData {
+    mode: String,
+    file_name: String,
+    is_modified: bool,
+    cursor_line: usize,
+    cursor_col: usize,
+    total_lines: usize,
+    error_count: usize,
+    warning_count: usize,
+    lsp_servers: Vec<LspServerSnapshot>,
+    selection_count: usize,
+    selected_register: Option<char>,
+    macro_recording: Option<char>,
+}
 
 /// Determine the aggregate status for display.
 fn aggregate_lsp_status(servers: &[LspServerSnapshot]) -> LspServerStatus {
@@ -90,20 +110,39 @@ fn LspStatusBlock(servers: Vec<LspServerSnapshot>, on_click: EventHandler<MouseE
 #[component]
 pub fn StatusLine() -> Element {
     let app_state = use_context::<AppState>();
-    let snapshot = use_snapshot();
     let mut snapshot_signal = use_snapshot_signal();
 
-    let mode = &snapshot.mode;
-    let file_name = &snapshot.file_name;
-    let line = snapshot.cursor_line;
-    let col = snapshot.cursor_col;
-    let total_lines = snapshot.total_lines;
-    let error_count = snapshot.error_count;
-    let warning_count = snapshot.warning_count;
-    let lsp_servers = snapshot.lsp_servers.clone();
-    let selection_count = snapshot.selection_count;
-    let selected_register = snapshot.selected_register;
-    let macro_recording = snapshot.macro_recording;
+    // Memo: only re-render when status-relevant fields change
+    let status_data = use_memo(move || {
+        let s = snapshot_signal.read();
+        StatusLineData {
+            mode: s.mode.clone(),
+            file_name: s.file_name.clone(),
+            is_modified: s.is_modified,
+            cursor_line: s.cursor_line,
+            cursor_col: s.cursor_col,
+            total_lines: s.total_lines,
+            error_count: s.error_count,
+            warning_count: s.warning_count,
+            lsp_servers: s.lsp_servers.clone(),
+            selection_count: s.selection_count,
+            selected_register: s.selected_register,
+            macro_recording: s.macro_recording,
+        }
+    });
+    let data = status_data.read();
+
+    let mode = &data.mode;
+    let file_name = &data.file_name;
+    let line = data.cursor_line;
+    let col = data.cursor_col;
+    let total_lines = data.total_lines;
+    let error_count = data.error_count;
+    let warning_count = data.warning_count;
+    let lsp_servers = data.lsp_servers.clone();
+    let selection_count = data.selection_count;
+    let selected_register = data.selected_register;
+    let macro_recording = data.macro_recording;
 
     // Mode-specific colors (from CSS custom properties)
     let (mode_bg, mode_fg) = match mode.as_str() {
@@ -112,7 +151,7 @@ pub fn StatusLine() -> Element {
         _ => ("var(--mode-normal-bg)", "var(--mode-normal-fg)"),
     };
 
-    let modified_indicator = if snapshot.is_modified { " [+]" } else { "" };
+    let modified_indicator = if data.is_modified { " [+]" } else { "" };
     let file_display = format!("{file_name}{modified_indicator}");
 
     let percentage = if total_lines > 0 { (line * 100) / total_lines } else { 0 };

@@ -6,7 +6,7 @@ use crate::icons::{lucide, Icon};
 use dioxus::prelude::*;
 use helix_view::DocumentId;
 
-use crate::hooks::{use_snapshot, use_snapshot_signal};
+use crate::hooks::use_snapshot_signal;
 use crate::state::{BufferInfo, EditorCommand};
 use crate::AppState;
 
@@ -30,11 +30,16 @@ struct ContextMenuState {
 #[component]
 pub fn BufferBar() -> Element {
     let app_state = use_context::<AppState>();
-    let snapshot = use_snapshot();
     let mut snapshot_signal = use_snapshot_signal();
 
-    let buffers = &snapshot.open_buffers;
-    let scroll_offset = snapshot.buffer_scroll_offset;
+    // Memo: only re-render when buffer list or scroll offset actually changes
+    let buffer_data = use_memo(move || {
+        let snap = snapshot_signal.read();
+        (snap.open_buffers.clone(), snap.buffer_scroll_offset)
+    });
+    let data = buffer_data.read();
+    let buffers = &data.0;
+    let scroll_offset = data.1;
 
     // Context menu state (local to BufferBar)
     let mut context_menu: Signal<Option<ContextMenuState>> = use_signal(|| None);
