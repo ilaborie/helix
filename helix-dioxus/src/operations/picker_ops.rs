@@ -40,25 +40,11 @@ impl EditorContext {
         let selection = helix_core::Selection::point(pos);
         doc.set_selection(view_id, selection);
     }
-}
 
-/// Extension trait for picker operations.
-pub trait PickerOps {
-    fn show_file_picker(&mut self);
-    fn show_files_recursive_picker(&mut self);
-    fn show_buffer_picker(&mut self);
-    fn show_keybindings_picker(&mut self);
-    fn picker_confirm(&mut self);
-}
-
-impl PickerOps for EditorContext {
-    /// Show the file picker with files from current directory.
-    fn show_file_picker(&mut self) {
+    /// Populate the directory browser for an explicit path without changing the process cwd.
+    fn show_file_picker_at(&mut self, cwd: PathBuf) {
         self.command_mode = false;
         self.command_input.clear();
-
-        // Get the current working directory
-        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
         // Collect files and directories
         let mut items = Vec::new();
@@ -121,6 +107,23 @@ impl PickerOps for EditorContext {
         self.last_picker_mode = Some(PickerMode::DirectoryBrowser);
         self.picker_current_path = Some(cwd);
         self.invalidate_picker_cache();
+    }
+}
+
+/// Extension trait for picker operations.
+pub trait PickerOps {
+    fn show_file_picker(&mut self);
+    fn show_files_recursive_picker(&mut self);
+    fn show_buffer_picker(&mut self);
+    fn show_keybindings_picker(&mut self);
+    fn picker_confirm(&mut self);
+}
+
+impl PickerOps for EditorContext {
+    /// Show the file picker with files from current directory.
+    fn show_file_picker(&mut self) {
+        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        self.show_file_picker_at(cwd);
     }
 
     /// Show recursive file picker using the ignore crate.
@@ -235,10 +238,8 @@ impl PickerOps for EditorContext {
                             .as_ref()
                             .and_then(|p| p.parent().map(Path::to_path_buf))
                         {
-                            if std::env::set_current_dir(&parent).is_ok() {
-                                self.show_file_picker();
-                                return;
-                            }
+                            self.show_file_picker_at(parent);
+                            return;
                         }
                         return;
                     }
@@ -246,10 +247,7 @@ impl PickerOps for EditorContext {
                     if matches!(selected.icon, PickerIcon::Folder) {
                         // It's a directory, change to it and refresh picker
                         let path = PathBuf::from(&selected.id);
-                        if std::env::set_current_dir(&path).is_ok() {
-                            self.show_file_picker();
-                            return;
-                        }
+                        self.show_file_picker_at(path);
                         return;
                     }
 
@@ -348,7 +346,9 @@ impl PickerOps for EditorContext {
                 }
                 PickerMode::Commands => {
                     // Execute the CLI command via deferred dispatch so the picker closes first
-                    let _ = self.command_tx.send(EditorCommand::TypeableCommand(selected.id.clone()));
+                    let _ = self
+                        .command_tx
+                        .send(EditorCommand::TypeableCommand(selected.id.clone()));
                 }
                 PickerMode::JumpList => {
                     if let Ok(idx) = selected.id.parse::<usize>() {
@@ -498,10 +498,8 @@ impl EditorContext {
             .and_then(|p| p.parent().map(Path::to_path_buf));
 
         if let Some(dir) = buffer_dir {
-            if std::env::set_current_dir(&dir).is_ok() {
-                self.show_file_picker();
-                return;
-            }
+            self.show_file_picker_at(dir);
+            return;
         }
 
         // Fallback: open regular file picker
@@ -1060,7 +1058,6 @@ fn execute_global_search_blocking(
     Ok(())
 }
 
-
 /// Compute filtered picker items from source items using fuzzy matching.
 /// This is a free function to avoid borrow conflicts when populating the cache.
 pub(crate) fn compute_filtered_items(
@@ -1267,6 +1264,7 @@ fn collect_all_files(root: &std::path::Path) -> Vec<PickerItem> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_helpers::test_context;
     use std::fs;
 
     #[test]
@@ -1340,5 +1338,39 @@ mod tests {
         let items = collect_all_files(dir.path());
         assert!(items.iter().all(|i| i.icon == PickerIcon::File));
         assert!(items.len() >= 2);
+    }
+
+    #[test]
+    fn show_file_picker_at_uses_explicit_directory() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::create_dir(dir.path().join("child")).expect("mkdir");
+        fs::write(dir.path().join("file.txt"), "").expect("write");
+
+        let mut ctx = test_context("#[|h]#ello");
+        ctx.show_file_picker_at(dir.path().to_path_buf());
+
+        assert_eq!(ctx.picker_current_path.as_deref(), Some(dir.path()));
+        let names: Vec<&str> = ctx.picker_items.iter().map(|item| item.display.as_str()).collect();
+        assert!(names.contains(&"child/"));
+        assert!(names.contains(&"file.txt"));
+    }
+
+    #[test]
+    fn picker_confirm_directory_updates_picker_path_without_rebasing_process_cwd() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let child = dir.path().join("child");
+        fs::create_dir(&child).expect("mkdir");
+
+        let mut ctx = test_context("#[|h]#ello");
+        ctx.show_file_picker_at(dir.path().to_path_buf());
+        ctx.picker_selected = ctx
+            .picker_items
+            .iter()
+            .position(|item| item.id == child.to_string_lossy())
+            .expect("child entry should be present");
+
+        ctx.picker_confirm();
+
+        assert_eq!(ctx.picker_current_path.as_deref(), Some(child.as_path()));
     }
 }

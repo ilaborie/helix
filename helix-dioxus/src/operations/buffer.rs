@@ -173,17 +173,14 @@ impl BufferOps for EditorContext {
                     doc.set_last_saved_revision(event.revision, event.save_time);
                 }
                 // Use relative path if shorter than absolute path
-                let display_path = if let Ok(cwd) = std::env::current_dir() {
-                    if let Ok(relative) = event.path.strip_prefix(&cwd) {
-                        let relative_str = relative.to_string_lossy();
-                        let absolute_str = event.path.to_string_lossy();
-                        if relative_str.len() < absolute_str.len() {
-                            relative_str.into_owned()
-                        } else {
-                            absolute_str.into_owned()
-                        }
+                let cwd = helix_stdx::env::current_working_dir();
+                let display_path = if let Ok(relative) = event.path.strip_prefix(&cwd) {
+                    let relative_str = relative.to_string_lossy();
+                    let absolute_str = event.path.to_string_lossy();
+                    if relative_str.len() < absolute_str.len() {
+                        relative_str.into_owned()
                     } else {
-                        event.path.to_string_lossy().into_owned()
+                        absolute_str.into_owned()
                     }
                 } else {
                     event.path.to_string_lossy().into_owned()
@@ -394,11 +391,10 @@ impl BufferOps for EditorContext {
 
     /// Change the current working directory.
     fn change_directory(&mut self, path: &Path) {
-        match std::env::set_current_dir(path) {
-            Ok(()) => {
-                if let Ok(cwd) = std::env::current_dir() {
-                    self.show_notification(format!("Changed to {}", cwd.display()), NotificationSeverity::Info);
-                }
+        match helix_stdx::env::set_current_working_dir(path) {
+            Ok(_) => {
+                let cwd = helix_stdx::env::current_working_dir();
+                self.show_notification(format!("Changed to {}", cwd.display()), NotificationSeverity::Info);
             }
             Err(e) => {
                 self.show_notification(format!("Failed to cd: {e}"), NotificationSeverity::Error);
@@ -408,14 +404,8 @@ impl BufferOps for EditorContext {
 
     /// Print the current working directory.
     fn print_working_directory(&mut self) {
-        match std::env::current_dir() {
-            Ok(cwd) => {
-                self.show_notification(cwd.display().to_string(), NotificationSeverity::Info);
-            }
-            Err(e) => {
-                self.show_notification(format!("Failed to get cwd: {e}"), NotificationSeverity::Error);
-            }
-        }
+        let cwd = helix_stdx::env::current_working_dir();
+        self.show_notification(cwd.display().to_string(), NotificationSeverity::Info);
     }
 
     /// Save current buffer then close it.

@@ -112,8 +112,11 @@ pub fn parse_args() -> ParsedArgs {
 fn parse_multiple_args(args: &[String]) -> StartupAction {
     let files: Vec<(PathBuf, Position)> = args.iter().map(|a| parse_file(a)).collect();
 
-    // Filter to files that actually exist on disk
-    let files: Vec<(PathBuf, Position)> = files.into_iter().filter(|(path, _)| path.is_file()).collect();
+    // Keep existing files and non-existent paths (new buffers), but skip directories.
+    let files: Vec<(PathBuf, Position)> = files
+        .into_iter()
+        .filter(|(path, _)| !path.exists() || path.is_file())
+        .collect();
 
     if files.is_empty() {
         log::warn!("No valid files in arguments");
@@ -318,6 +321,48 @@ mod tests {
         let (path, pos) = parse_file("nonexistent_file.rs:abc");
         assert_eq!(path, PathBuf::from("nonexistent_file.rs:abc"));
         assert_eq!(pos, Position::default());
+    }
+
+    // --- parse_multiple_args ---
+
+    #[test]
+    fn parse_multiple_args_keeps_nonexistent_files() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let existing = dir.path().join("existing.rs");
+        std::fs::write(&existing, "").expect("write");
+        let missing = dir.path().join("missing.rs");
+
+        let args = vec![
+            existing.to_string_lossy().into_owned(),
+            missing.to_string_lossy().into_owned(),
+        ];
+
+        let StartupAction::OpenFiles(files) = parse_multiple_args(&args) else {
+            panic!("expected OpenFiles");
+        };
+
+        assert_eq!(files.len(), 2);
+        assert!(files.iter().any(|(path, _)| path == &existing));
+        assert!(files.iter().any(|(path, _)| path == &missing));
+    }
+
+    #[test]
+    fn parse_multiple_args_still_skips_directories() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file = dir.path().join("file.rs");
+        std::fs::write(&file, "").expect("write");
+
+        let args = vec![
+            dir.path().to_string_lossy().into_owned(),
+            file.to_string_lossy().into_owned(),
+        ];
+
+        let StartupAction::OpenFiles(files) = parse_multiple_args(&args) else {
+            panic!("expected OpenFiles");
+        };
+
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].0, file);
     }
 
     // --- CliOverrides::apply ---
