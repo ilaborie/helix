@@ -249,10 +249,12 @@ impl MovementOps for EditorContext {
 
     fn scroll_up(&mut self, doc_id: DocumentId, view_id: ViewId, lines: usize) {
         self.scroll_by(doc_id, view_id, -lines.cast_signed());
+        self.dirty = true;
     }
 
     fn scroll_down(&mut self, doc_id: DocumentId, view_id: ViewId, lines: usize) {
         self.scroll_by(doc_id, view_id, lines.cast_signed());
+        self.dirty = true;
     }
 
     fn scroll_to_line(&mut self, doc_id: DocumentId, view_id: ViewId, target_line: usize) {

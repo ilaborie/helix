@@ -250,8 +250,11 @@ pub struct EditorContext {
     /// Updated via `ScaleFactorChanged` events, used to convert physical → logical pixels.
     pub(crate) scale_factor: f64,
 
-    /// Snapshot version counter, incremented on each snapshot creation.
+    /// Snapshot version counter, incremented only when editor state has mutated.
     snapshot_version: u64,
+
+    /// True when editor state has mutated since the last snapshot.
+    pub(crate) dirty: bool,
 
     /// Configurable keymaps (trie-based dispatch replacing hardcoded handlers).
     pub(crate) keymaps: crate::keymap::DhxKeymaps,
@@ -623,6 +626,7 @@ impl EditorContext {
             font_size,
             scale_factor: 1.0,
             snapshot_version: 0,
+            dirty: false,
             keymaps: load_keymaps(),
         })
     }
@@ -644,6 +648,7 @@ impl EditorContext {
         #[allow(clippy::cast_possible_truncation)]
         let rows = self.viewport_lines as u16;
         self.editor.resize(helix_view::graphics::Rect::new(0, 0, cols, rows));
+        self.dirty = true;
         log::info!(
             "viewport resized: {window_width}x{window_height} → {cols}x{rows} ({} lines)",
             self.viewport_lines
@@ -719,10 +724,14 @@ impl EditorContext {
         }
 
         // Poll for LSP events (diagnostics, progress, etc.)
-        self.poll_lsp_events();
+        let had_lsp = self.poll_lsp_events();
 
         // Check for code actions at cursor (for lightbulb indicator)
         self.check_code_actions_available();
+
+        if had_commands || had_lsp {
+            self.dirty = true;
+        }
 
         // Only snap cursor into view after cursor-moving commands, not after
         // viewport-only scroll (scroll_up/scroll_down are called directly, not
@@ -2601,8 +2610,11 @@ impl EditorContext {
             (Vec::new(), 0)
         };
 
-        // Increment snapshot version for change detection
-        self.snapshot_version += 1;
+        // Increment snapshot version only when state has actually mutated
+        if self.dirty {
+            self.snapshot_version += 1;
+            self.dirty = false;
+        }
 
         EditorSnapshot {
             snapshot_version: self.snapshot_version,

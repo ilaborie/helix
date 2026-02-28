@@ -156,6 +156,7 @@ impl BufferOps for EditorContext {
                 self.show_notification(format!("Failed to open file: {e}"), NotificationSeverity::Error);
             }
         }
+        self.dirty = true;
     }
 
     /// Save the current document.

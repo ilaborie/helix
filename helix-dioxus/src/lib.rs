@@ -223,6 +223,7 @@ pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
                             dioxus::desktop::tao::event::WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
                                 if let Ok(mut ctx) = editor_ctx_clone.try_borrow_mut() {
                                     ctx.scale_factor = *scale_factor;
+                                    ctx.dirty = true;
                                     log::info!("scale factor changed: {scale_factor}");
                                 }
                             }
@@ -289,17 +290,20 @@ pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
                         }
                     }
 
-                    // Process commands on each event loop iteration
+                    // Process commands on each event loop iteration, rebuilding the snapshot
+                    // only when state has actually mutated (dirty flag set by scroll/resize/commands).
                     if let Ok(mut ctx) = editor_ctx_clone.try_borrow_mut() {
                         ctx.process_commands();
-                        let new_snapshot = ctx.snapshot();
+                        if ctx.dirty {
+                            let new_snapshot = ctx.snapshot();
 
-                        // Check if we should quit
-                        if new_snapshot.should_quit {
-                            std::process::exit(0);
+                            // Check if we should quit
+                            if new_snapshot.should_quit {
+                                std::process::exit(0);
+                            }
+
+                            *snapshot_ref.lock() = new_snapshot;
                         }
-
-                        *snapshot_ref.lock() = new_snapshot;
                     }
                 }),
         )
@@ -428,9 +432,13 @@ impl AppState {
     /// Process pending commands, update the mutex snapshot, and push to the Dioxus signal.
     ///
     /// This is the primary way components trigger re-renders after sending commands.
+    /// Skips the signal write when `snapshot_version` has not changed, avoiding spurious re-renders.
     pub fn process_and_notify(&self, signal: &mut dioxus::prelude::Signal<EditorSnapshot>) {
         use dioxus::prelude::*;
         self.process_commands_sync();
-        signal.set(self.get_snapshot());
+        let new_snapshot = self.get_snapshot();
+        if new_snapshot.snapshot_version != signal.peek().snapshot_version {
+            signal.set(new_snapshot);
+        }
     }
 }

@@ -10,7 +10,8 @@ use super::EditorContext;
 /// LSP event handling operations for `EditorContext`.
 pub trait LspEventOps {
     /// Poll for LSP events non-blockingly and handle them.
-    fn poll_lsp_events(&mut self);
+    /// Returns `true` if any LSP message was processed.
+    fn poll_lsp_events(&mut self) -> bool;
 
     /// Handle an LSP message (notification or method call).
     fn handle_lsp_message(&mut self, server_id: helix_lsp::LanguageServerId, call: helix_lsp::Call);
@@ -27,7 +28,7 @@ pub trait LspEventOps {
 }
 
 impl LspEventOps for EditorContext {
-    fn poll_lsp_events(&mut self) {
+    fn poll_lsp_events(&mut self) -> bool {
         use futures::stream::StreamExt;
         use std::task::{Context, Poll};
 
@@ -35,16 +36,21 @@ impl LspEventOps for EditorContext {
         let waker = futures::task::noop_waker();
         let mut cx = Context::from_waker(&waker);
 
+        let mut had_events = false;
+
         // Poll the incoming stream for LSP messages
         loop {
             let incoming = &mut self.editor.language_servers.incoming;
             match incoming.poll_next_unpin(&mut cx) {
                 Poll::Ready(Some((server_id, call))) => {
                     self.handle_lsp_message(server_id, call);
+                    had_events = true;
                 }
                 Poll::Ready(None) | Poll::Pending => break,
             }
         }
+
+        had_events
     }
 
     fn handle_lsp_message(&mut self, server_id: helix_lsp::LanguageServerId, call: helix_lsp::Call) {

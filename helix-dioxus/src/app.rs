@@ -107,7 +107,7 @@ pub fn App() -> Element {
                 let snapshot = app_state.get_snapshot();
                 let current_version = snapshot.snapshot_version;
                 if current_version != last_snapshot_version() {
-                    log::info!(
+                    log::debug!(
                         "Snapshot changed: v{} -> v{}, diagnostics: {}, errors: {}, warnings: {}",
                         last_snapshot_version(),
                         current_version,
