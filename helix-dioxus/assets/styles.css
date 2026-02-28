@@ -734,6 +734,50 @@ body {
     background-color: #c0c0c0;
 }
 
+/* Commands picker: documentation preview */
+.picker-preview-doc {
+    padding: 24px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.picker-preview-doc-command code {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    color: var(--accent);
+    background: var(--bg-secondary);
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--bg-selection);
+}
+
+.picker-preview-doc-description {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.7;
+    font-family: system-ui, -apple-system, sans-serif;
+}
+
+.picker-preview-doc-aliases {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-dim);
+    font-family: system-ui, -apple-system, sans-serif;
+}
+
+.picker-preview-doc-alias-badge {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    background: var(--bg-secondary);
+    border: 1px solid var(--bg-selection);
+    padding: 1px 6px;
+    border-radius: 3px;
+}
+
 kbd {
     background-color: var(--kbd-bg);
     color: var(--kbd-text);

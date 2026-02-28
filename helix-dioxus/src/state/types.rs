@@ -230,7 +230,7 @@ impl PickerMode {
     /// Whether this picker mode supports file preview.
     #[must_use]
     pub fn supports_preview(&self) -> bool {
-        !matches!(self, Self::Registers | Self::Commands | Self::Themes | Self::Emojis)
+        !matches!(self, Self::Registers | Self::Themes | Self::Emojis)
     }
 }
 
@@ -275,6 +275,15 @@ pub enum PreviewContent {
         file_size: u64,
         dimensions: Option<(usize, usize)>,
         format: String,
+    },
+    /// Rich documentation view for command picker items.
+    Documentation {
+        /// Full command name with colon prefix, e.g. ":write".
+        command: String,
+        /// Human-readable description of the command.
+        description: String,
+        /// Short aliases for the command, e.g. `["w"]`.
+        aliases: Vec<String>,
     },
 }
 
@@ -1586,10 +1595,6 @@ mod tests {
             "Registers should not support preview"
         );
         assert!(
-            !PickerMode::Commands.supports_preview(),
-            "Commands should not support preview"
-        );
-        assert!(
             !PickerMode::Themes.supports_preview(),
             "Themes should not support preview"
         );
@@ -1597,6 +1602,11 @@ mod tests {
             !PickerMode::Emojis.supports_preview(),
             "Emojis should not support preview"
         );
+    }
+
+    #[test]
+    fn commands_supports_preview() {
+        assert!(PickerMode::Commands.supports_preview());
     }
 
     #[test]

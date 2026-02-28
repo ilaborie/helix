@@ -236,7 +236,29 @@ pub fn PickerPreviewPanel(preview: PickerPreview) -> Element {
                             }
                         }
                     }
-                }
+                },
+                PreviewContent::Documentation { command, description, aliases } => rsx! {
+                    div {
+                        class: "picker-preview-content picker-preview-doc",
+                        div {
+                            class: "picker-preview-doc-command",
+                            code { "{command}" }
+                        }
+                        div {
+                            class: "picker-preview-doc-description",
+                            "{description}"
+                        }
+                        if !aliases.is_empty() {
+                            div {
+                                class: "picker-preview-doc-aliases",
+                                span { class: "picker-preview-doc-label", "Aliases: " }
+                                for alias in aliases {
+                                    code { class: "picker-preview-doc-alias-badge", ":{alias}" }
+                                }
+                            }
+                        }
+                    }
+                },
             }}
         }
     }

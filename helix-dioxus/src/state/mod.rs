@@ -40,8 +40,8 @@ use crate::lsp::{
     SignatureHelpSnapshot, StoredCodeAction, SymbolKind, SymbolSnapshot,
 };
 use crate::operations::{
-    collect_search_match_lines, BufferOps, CliOps, ClipboardOps, EditingOps, JumpOps, LspOps, MacroOps, MovementOps,
-    PickerOps, SearchOps, SelectionOps, ShellOps, ThemeOps, VcsOps, WordJumpOps,
+    collect_search_match_lines, command_completions, BufferOps, CliOps, ClipboardOps, EditingOps, JumpOps, LspOps,
+    MacroOps, MovementOps, PickerOps, SearchOps, SelectionOps, ShellOps, ThemeOps, VcsOps, WordJumpOps,
 };
 
 use lsp_events::LspEventOps;
@@ -196,10 +196,6 @@ pub struct EditorContext {
     pub(crate) global_search_running: bool,
     /// Cancellation signal for running global search.
     pub(crate) global_search_cancel: Option<tokio::sync::watch::Sender<bool>>,
-
-    // Command panel state - pub(crate) for operations access
-    /// Commands stored for the command panel picker (indexed by picker item ID).
-    pub(crate) command_panel_commands: Vec<EditorCommand>,
 
     // Jump list picker state - pub(crate) for operations access
     /// Jump list entries stored for picker confirm (indexed by picker item ID).
@@ -616,8 +612,6 @@ impl EditorContext {
             global_search_results: Vec::new(),
             global_search_running: false,
             global_search_cancel: None,
-            // Command panel state
-            command_panel_commands: Vec::new(),
             jumplist_entries: Vec::new(),
             // File explorer state
             explorer_expanded: std::collections::HashSet::new(),
@@ -1242,7 +1236,6 @@ impl EditorContext {
                 self.picker_mode = PickerMode::default();
                 self.picker_current_path = None;
                 self.picker_search_focused = false;
-                self.command_panel_commands.clear();
                 // Explorer cleanup
                 self.explorer_expanded.clear();
                 self.explorer_root = None;
@@ -2959,6 +2952,24 @@ impl EditorContext {
         }
 
         let item_id = selected_item.id.clone();
+
+        // Commands picker: generate a rich documentation preview
+        if self.picker_mode == PickerMode::Commands {
+            if let Some(cmd) = command_completions().iter().find(|c| c.name == item_id.as_str()) {
+                let preview = types::PickerPreview {
+                    file_path: format!(":{}", cmd.name),
+                    content: types::PreviewContent::Documentation {
+                        command: format!(":{}", cmd.name),
+                        description: cmd.description.to_string(),
+                        aliases: cmd.aliases.iter().map(ToString::to_string).collect(),
+                    },
+                };
+                self.cached_preview = Some((item_id, preview.clone()));
+                return Some(preview);
+            }
+            return None;
+        }
+
         let preview_lines = 20usize;
 
         let (file_path, target_line) = self.resolve_preview_target(
