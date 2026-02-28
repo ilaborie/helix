@@ -108,6 +108,9 @@ Reference: `helix-term/src/keymap/default.rs`
 | `C-l` | `NextBuffer` | Buffer cycling shortcut |
 | `C-Space` | `ShowCodeActions` | Quick access to code actions |
 | `C-.` | `ShowCodeActions` | Quick access to code actions |
+| `Cmd+C` | Yank to OS clipboard | Sets `'+'` register, then yanks |
+| `Cmd+X` | Cut to OS clipboard | Sets `'+'` register, then deletes selection |
+| `Cmd+V` | Paste from OS clipboard | Sets `'+'` register, then pastes after cursor |
 
 ---
 
@@ -240,6 +243,9 @@ Reference: `helix-term/src/keymap/default.rs`
 | `d` | Delete selection |
 | `c` | Change selection |
 | `R`, `p` | Replace with yanked |
+| `Cmd+C` | Yank to OS clipboard (exits select) |
+| `Cmd+X` | Cut to OS clipboard |
+| `Cmd+V` | Paste from OS clipboard |
 | `;` | Collapse selection |
 | `,` | Keep primary selection |
 | `>/<` | Indent/unindent |
@@ -311,6 +317,7 @@ Reference: `helix-term/src/keymap/default.rs`
 | `C-Space` | `TriggerCompletion` | Explicit completion trigger |
 | `C-.` | `ShowCodeActions` | Quick fix in insert mode |
 | `C-Cmd-Space` | `ShowEmojiPicker` | Open emoji picker (`emojis` crate) |
+| `Cmd+V` | Paste from OS clipboard at cursor | Sets `'+'` register, pastes before cursor position |
 
 ---
 
@@ -475,14 +482,14 @@ When typing `:` commands, a completion popup appears above the prompt showing fi
 
 | Category | Implemented | Missing | Coverage |
 |----------|-------------|---------|----------|
-| Normal Mode | 65+ bindings | 0 | 100% |
+| Normal Mode | 68+ bindings | 0 | 100% |
 | Goto (g-prefix) | 23 bindings | 0 | 100% |
 | Space Leader | 26 bindings | 0 | 100% |
 | Bracket Sequences | 18 bindings | 0 | 100% |
 | View Mode (z/Z) | 13 bindings | 0 | 100% |
 | Match (m-prefix) | 6 bindings | 0 | 100% |
-| Select Mode | 35+ bindings | 0 | 100% |
-| Insert Mode | 20 bindings | 0 | 100% |
+| Select Mode | 38+ bindings | 0 | 100% |
+| Insert Mode | 21 bindings | 0 | 100% |
 | Macros | 4 bindings | 0 | 100% |
 | Commands | 88 commands | 0 | 100% |
 | **Overall** | **100%** | | |
