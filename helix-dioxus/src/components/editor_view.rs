@@ -16,6 +16,86 @@ use crate::lsp::{DiagnosticSnapshot, InlayHintKind, InlayHintSnapshot};
 use crate::state::{DiffLineType, EditorCommand, LineSnapshot, TokenSpan, WhitespaceSnapshot, WordJumpLabel};
 use crate::AppState;
 
+/// Line height multiplier matching CSS `--editor-line-height: 1.5`.
+const LINE_HEIGHT_RATIO: f64 = 1.5;
+
+/// Character width ratio for monospace fonts (width / font-size).
+const CHAR_WIDTH_RATIO: f64 = 0.6;
+
+/// Content cell left padding in pixels.
+const CONTENT_PADDING_PX: f64 = 8.0;
+
+/// Combined width of indicator (18px) + gutter (~60px) columns.
+const GUTTER_WIDTH_PX: f64 = 78.0;
+
+/// Height of the buffer bar in pixels (when shown).
+const BUFFER_BAR_HEIGHT_PX: f64 = 32.0;
+
+
+/// Convert a `WheelDelta` to a number of lines to scroll.
+/// Positive = scroll down, negative = scroll up.
+#[cfg(test)]
+#[allow(clippy::cast_possible_truncation)]
+fn wheel_delta_to_lines(delta: &dioxus::html::geometry::WheelDelta, line_height_px: f64) -> isize {
+    use dioxus::html::geometry::WheelDelta;
+    match delta {
+        WheelDelta::Pixels(px) => {
+            // Accumulate fractional lines — scroll at least 1 line per event
+            let lines = px.y / line_height_px;
+            if lines.abs() < 1.0 {
+                if lines > 0.0 { 1 } else if lines < 0.0 { -1 } else { 0 }
+            } else {
+                lines as isize
+            }
+        }
+        WheelDelta::Lines(l) => l.y as isize,
+        WheelDelta::Pages(p) => (p.y * 20.0) as isize,
+    }
+}
+
+/// Convert visual column (accounting for inlay hints) back to logical column.
+fn logical_col_from_visual(visual: usize, hints: &[InlayHintSnapshot]) -> usize {
+    let mut offset: usize = 0;
+    for h in hints {
+        let hint_width = h.label.chars().count() + usize::from(h.padding_left) + usize::from(h.padding_right);
+        // Check if this hint is positioned at or before the logical column we're converging on
+        if h.column + offset <= visual {
+            offset += hint_width;
+        } else {
+            break;
+        }
+    }
+    visual.saturating_sub(offset)
+}
+
+/// Compute the logical column from an x coordinate within a content cell.
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+fn compute_column_from_x(x: f64, font_size: f64, inlay_hints: &[InlayHintSnapshot]) -> usize {
+    let char_width = font_size * CHAR_WIDTH_RATIO;
+    let visual_col = ((x - CONTENT_PADDING_PX).max(0.0) / char_width).floor() as usize;
+    // Hints are pre-sorted by column in convert_inlay_hints() — no clone/sort needed here.
+    logical_col_from_visual(visual_col, inlay_hints)
+}
+
+/// Convert page coordinates to (`doc_line`, `logical_col`) accounting for viewport offset.
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+fn page_coords_to_line_col(
+    page_x: f64,
+    page_y: f64,
+    font_size: f64,
+    visible_start: usize,
+    total_lines: usize,
+    show_buffer_bar: bool,
+) -> (usize, usize) {
+    let line_height_px = font_size * LINE_HEIGHT_RATIO;
+    let char_width = font_size * CHAR_WIDTH_RATIO;
+    let top_offset = if show_buffer_bar { BUFFER_BAR_HEIGHT_PX } else { 0.0 };
+    let visual_row = ((page_y - top_offset).max(0.0) / line_height_px).floor() as usize;
+    let doc_line = (visible_start + visual_row).min(total_lines.saturating_sub(1));
+    let col = ((page_x - GUTTER_WIDTH_PX - CONTENT_PADDING_PX).max(0.0) / char_width).floor() as usize;
+    (doc_line, col)
+}
+
 /// Editor view component that renders the document content.
 #[component]
 pub fn EditorView() -> Element {
@@ -43,10 +123,64 @@ pub fn EditorView() -> Element {
         "editor-view"
     };
 
+    // --- Mouse drag state ---
+    let mut is_dragging = use_signal(|| false);
+    let mut drag_anchor_line = use_signal(|| 0usize);
+    let mut drag_anchor_col = use_signal(|| 0usize);
+
+    // Capture values needed in mouse closures
+    let font_size = snapshot.font_size;
+    let visible_start = snapshot.visible_start;
+    let total_lines = snapshot.total_lines;
+    let show_buffer_bar = snapshot.show_buffer_bar;
+    let mouse_blocked = snapshot.is_mouse_blocked();
+
+    // --- Drag overlay handlers ---
+    let drag_move_app_state = app_state.clone();
+    let handle_drag_move = move |evt: MouseEvent| {
+        let coords = evt.page_coordinates();
+        let (doc_line, col) = page_coords_to_line_col(
+            coords.x,
+            coords.y,
+            font_size,
+            visible_start,
+            total_lines,
+            show_buffer_bar,
+        );
+        let anchor_l = *drag_anchor_line.peek();
+        let anchor_c = *drag_anchor_col.peek();
+        drag_move_app_state.send_command(EditorCommand::MouseSelect {
+            anchor_line: anchor_l,
+            anchor_col: anchor_c,
+            head_line: doc_line,
+            head_col: col,
+        });
+        // Auto-scroll when dragging reaches the first or last visible line
+        if doc_line == visible_start && visible_start > 0 {
+            drag_move_app_state.send_command(EditorCommand::ScrollUp(1));
+        } else if doc_line + 1 >= visible_start + snapshot.viewport_lines {
+            drag_move_app_state.send_command(EditorCommand::ScrollDown(1));
+        }
+        drag_move_app_state.process_and_notify(&mut snapshot_signal);
+    };
+
+    let handle_drag_up = move |_: MouseEvent| {
+        is_dragging.set(false);
+    };
+
     rsx! {
         // Wrapper: positions the scrollbar alongside the grid
         div {
             class: "editor-view-wrapper",
+
+            // Full-screen overlay for drag selection
+            if is_dragging() {
+                div {
+                    class: "mouse-drag-overlay",
+                    onmousemove: handle_drag_move,
+                    onmouseup: handle_drag_up,
+                }
+            }
 
             div {
                 class: "{soft_wrap_class}",
@@ -103,6 +237,42 @@ pub fn EditorView() -> Element {
                         // Single key on first cell — Dioxus uses it to diff the entire block
                         let row_key = format!("row-{line_num}-{show_lightbulb}-{is_cursor}-{has_sel}-{has_jump_labels}-{has_hints}-{diff_type:?}");
 
+                        // --- Gutter click handler (select full line) ---
+                        let gutter_app_state = app_state.clone();
+                        let gutter_mousedown = move |evt: MouseEvent| {
+                            if mouse_blocked {
+                                return;
+                            }
+                            // Left button only
+                            if evt.trigger_button() != Some(dioxus::html::input_data::MouseButton::Primary) {
+                                return;
+                            }
+                            evt.stop_propagation();
+                            gutter_app_state.send_command(EditorCommand::SelectFullLine(line_num - 1));
+                            gutter_app_state.process_and_notify(&mut snapshot_signal);
+                        };
+
+                        // --- Content click handler (position cursor + start drag) ---
+                        let content_app_state = app_state.clone();
+                        let line_inlay_hints = line.inlay_hints.clone();
+                        let content_mousedown = move |evt: MouseEvent| {
+                            if mouse_blocked {
+                                return;
+                            }
+                            if evt.trigger_button() != Some(dioxus::html::input_data::MouseButton::Primary) {
+                                return;
+                            }
+                            evt.stop_propagation();
+                            let col = compute_column_from_x(evt.element_coordinates().x, font_size, &line_inlay_hints);
+                            // Start drag tracking
+                            is_dragging.set(true);
+                            drag_anchor_line.set(line_num - 1);
+                            drag_anchor_col.set(col);
+                            // Position cursor immediately
+                            content_app_state.send_command(EditorCommand::GoToLineColumn(line_num - 1, col));
+                            content_app_state.process_and_notify(&mut snapshot_signal);
+                        };
+
                         rsx! {
                             // Cell 1: Indicator
                             div {
@@ -136,6 +306,7 @@ pub fn EditorView() -> Element {
                             // Cell 2: Line number or wrap indicator
                             div {
                                 class: "{gutter_class}",
+                                onmousedown: gutter_mousedown,
                                 if let Some(ref indicator) = line.wrap_indicator {
                                     span { class: "wrap-indicator", "{indicator}" }
                                 } else {
@@ -175,6 +346,7 @@ pub fn EditorView() -> Element {
                             // Cell 3: Content
                             div {
                                 class: "content-cell",
+                                onmousedown: content_mousedown,
 
                                 Line {
                                     line: line.clone(),
@@ -660,5 +832,111 @@ mod tests {
         // ": i32" = 5 chars, no padding
         assert_eq!(visual_col(5, &hints), 5 + 5);
         assert_eq!(visual_col(4, &hints), 4);
+    }
+
+    // --- logical_col_from_visual (inverse of visual_col) ---
+
+    #[test]
+    fn logical_col_from_visual_no_hints() {
+        assert_eq!(logical_col_from_visual(0, &[]), 0);
+        assert_eq!(logical_col_from_visual(5, &[]), 5);
+        assert_eq!(logical_col_from_visual(100, &[]), 100);
+    }
+
+    #[test]
+    fn logical_col_from_visual_single_hint() {
+        // Hint ": i32" at column 5, padding_left=true → width = 5 + 1 = 6
+        let hints = vec![type_hint(5, ": i32", true, false)];
+        // Visual 0..4 → logical 0..4 (before hint)
+        assert_eq!(logical_col_from_visual(4, &hints), 4);
+        // Visual 11 = logical 5 (hint at col 5 adds 6)
+        assert_eq!(logical_col_from_visual(11, &hints), 5);
+        // Visual 16 = logical 10
+        assert_eq!(logical_col_from_visual(16, &hints), 10);
+    }
+
+    #[test]
+    fn logical_col_from_visual_roundtrip() {
+        let hints = vec![
+            type_hint(3, ": u8", true, false),  // width = 5
+            param_hint(8, "key:", false, true), // width = 5
+        ];
+        // Roundtrip for columns before/at/between/after hints
+        for logical in [0, 2, 3, 5, 8, 12] {
+            let visual = visual_col(logical, &hints);
+            assert_eq!(logical_col_from_visual(visual, &hints), logical,
+                "roundtrip failed for logical={logical}, visual={visual}");
+        }
+    }
+
+    // --- wheel_delta_to_lines ---
+
+    #[test]
+    fn wheel_delta_lines_variant() {
+        use dioxus::html::geometry::WheelDelta;
+        let delta = WheelDelta::lines(0.0, 3.0, 0.0);
+        assert_eq!(wheel_delta_to_lines(&delta, 24.0), 3);
+    }
+
+    #[test]
+    fn wheel_delta_lines_negative() {
+        use dioxus::html::geometry::WheelDelta;
+        let delta = WheelDelta::lines(0.0, -2.0, 0.0);
+        assert_eq!(wheel_delta_to_lines(&delta, 24.0), -2);
+    }
+
+    #[test]
+    fn wheel_delta_pixels_full_lines() {
+        use dioxus::html::geometry::WheelDelta;
+        // 48 pixels / 24px per line = 2 lines
+        let delta = WheelDelta::pixels(0.0, 48.0, 0.0);
+        assert_eq!(wheel_delta_to_lines(&delta, 24.0), 2);
+    }
+
+    #[test]
+    fn wheel_delta_pixels_fractional_rounds_to_one() {
+        use dioxus::html::geometry::WheelDelta;
+        // Small scroll: 5 pixels / 24px = 0.2 lines → rounds to 1
+        let delta = WheelDelta::pixels(0.0, 5.0, 0.0);
+        assert_eq!(wheel_delta_to_lines(&delta, 24.0), 1);
+        // Negative small scroll
+        let delta_neg = WheelDelta::pixels(0.0, -5.0, 0.0);
+        assert_eq!(wheel_delta_to_lines(&delta_neg, 24.0), -1);
+    }
+
+    #[test]
+    fn wheel_delta_zero_returns_zero() {
+        use dioxus::html::geometry::WheelDelta;
+        let delta = WheelDelta::pixels(0.0, 0.0, 0.0);
+        assert_eq!(wheel_delta_to_lines(&delta, 24.0), 0);
+    }
+
+    // --- is_mouse_blocked ---
+
+    #[test]
+    fn mouse_not_blocked_default_snapshot() {
+        let snapshot = crate::state::EditorSnapshot::default();
+        assert!(!snapshot.is_mouse_blocked());
+    }
+
+    #[test]
+    fn mouse_blocked_when_picker_visible() {
+        let mut snapshot = crate::state::EditorSnapshot::default();
+        snapshot.picker_visible = true;
+        assert!(snapshot.is_mouse_blocked());
+    }
+
+    #[test]
+    fn mouse_blocked_when_command_mode() {
+        let mut snapshot = crate::state::EditorSnapshot::default();
+        snapshot.command_mode = true;
+        assert!(snapshot.is_mouse_blocked());
+    }
+
+    #[test]
+    fn mouse_blocked_when_word_jump_active() {
+        let mut snapshot = crate::state::EditorSnapshot::default();
+        snapshot.word_jump_active = true;
+        assert!(snapshot.is_mouse_blocked());
     }
 }

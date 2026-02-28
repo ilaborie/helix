@@ -430,6 +430,7 @@ Functions defined in `script.js`:
 - `.lsp-dialog-*`, `.lsp-server-*`, `.lsp-restart-btn` (LSP status dialog)
 - `.keybinding-help-registers`, `.register-dialog-*` (register viewer)
 - `.location-picker-*` (location picker)
+- `.mouse-drag-overlay` (full-screen overlay for click-and-drag text selection)
 
 **Dynamic Styles**: Styles requiring Rust variables remain inline:
 - Mode colors: `style: "background-color: {mode_bg};"`
@@ -678,6 +679,25 @@ See [KEYBINDINGS.md](KEYBINDINGS.md) for a detailed comparison between helix-dio
 - **UI**: Reuses `GenericPicker` with `PickerMode::Emojis`, `PickerIcon::Emoji` (Smile icon)
 - **Insertion**: `EditorCommand::InsertText(String)` — supports multi-codepoint emojis (flags, ZWJ sequences)
 - **Meta modifier**: `translate_modifiers()` maps `mods.meta()` → `KeyModifiers::SUPER`
+
+### Mouse Interaction
+
+Mouse events are handled in `editor_view.rs` and `lib.rs`. All mouse interactions are blocked when modal dialogs (picker, confirmation, input, LSP, command/search/regex/shell prompts, word jump) are active.
+
+**Features:**
+- **Scroll wheel**: `onwheel` on `editor-view-wrapper`, converts `WheelDelta` (Pixels/Lines/Pages) to `ScrollUp`/`ScrollDown`
+- **Click to position**: `onmousedown` on `.content-cell`, computes column from `element_coordinates().x` accounting for inlay hints via `logical_col_from_visual()`, sends `GoToLineColumn`
+- **Gutter click**: `onmousedown` on `.gutter-cell`, sends `SelectFullLine` to select the entire line
+- **Click and drag**: Starts on content-cell mousedown, renders `.mouse-drag-overlay` (full-screen, `position: fixed`), tracks `onmousemove` → `MouseSelect`, `onmouseup` → stops. Auto-scrolls when near viewport edges
+- **File drop**: `DroppedFile` event in `with_custom_event_handler` calls `open_file()` directly on `EditorContext`
+
+**Coordinate conversion helpers** (in `editor_view.rs`):
+- `wheel_delta_to_lines(delta, line_height_px)` → scroll line count
+- `compute_column_from_x(x, font_size, inlay_hints)` → logical column
+- `logical_col_from_visual(visual, hints)` → inverse of `visual_col()`
+- `page_coords_to_line_col(x, y, font_size, visible_start, total_lines, show_buffer_bar)` → `(line, col)`
+
+**Commands:** `GoToLineColumn(line, col)`, `SelectFullLine(line)`, `MouseSelect { anchor_line, anchor_col, head_line, head_col }` — all 0-indexed
 
 ## Design Decisions
 

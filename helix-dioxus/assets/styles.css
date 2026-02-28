@@ -196,6 +196,7 @@ body {
     min-width: 40px;
     min-height: calc(var(--editor-line-height) * 1em);
     position: relative;
+    cursor: pointer;
 }
 .gutter-cell.gutter-line-active {
     color: var(--text);
@@ -209,6 +210,7 @@ body {
     user-select: none;
     position: relative;
     min-height: calc(var(--editor-line-height) * 1em);
+    cursor: text;
 }
 
 /* Wrap indicator for soft-wrap continuation lines */
@@ -1944,6 +1946,13 @@ kbd {
     bottom: 0;
     z-index: var(--z-tooltip);
     cursor: grabbing;
+}
+
+.mouse-drag-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-overlay);
+    cursor: text;
 }
 
 .scrollbar-marker {

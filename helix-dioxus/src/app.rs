@@ -87,14 +87,18 @@ pub fn App() -> Element {
 
     // Background coroutine to poll for LSP events (diagnostics, etc.)
     // This ensures UI updates when async events arrive without keyboard input.
+    // Also wakes immediately on scroll_notify to keep mouse wheel scrolling responsive.
     let app_state_for_poll = app_state.clone();
     use_future(move || {
         let app_state = app_state_for_poll.clone();
         async move {
             log::info!("LSP polling coroutine started");
             loop {
-                // Wait for a short interval before polling
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                // Wait for either the polling interval or a scroll notification
+                tokio::select! {
+                    () = tokio::time::sleep(std::time::Duration::from_millis(100)) => {},
+                    () = app_state.scroll_notify.notified() => {},
+                }
 
                 // Process any pending commands (including LSP events)
                 app_state.process_commands_sync();

@@ -494,6 +494,8 @@ pub struct EditorSnapshot {
     pub viewport_lines: usize,
     /// Whether soft wrap is enabled (from `editor.soft-wrap.enable` in config.toml).
     pub soft_wrap: bool,
+    /// Font size in pixels (for mouse coordinate → character position conversion).
+    pub font_size: f64,
 
     // Application state
     pub should_quit: bool,
@@ -1151,6 +1153,19 @@ pub enum EditorCommand {
     /// Insert a multi-character text string at cursor (used by emoji picker).
     InsertText(String),
 
+    // Mouse interaction
+    /// Move cursor to (line, column), both 0-indexed. Dismisses LSP popups.
+    GoToLineColumn(usize, usize),
+    /// Select the entire line (0-indexed). Used by gutter click.
+    SelectFullLine(usize),
+    /// Create a selection from anchor to head, all 0-indexed (line, col) pairs.
+    MouseSelect {
+        anchor_line: usize,
+        anchor_col: usize,
+        head_line: usize,
+        head_col: usize,
+    },
+
     // CLI passthrough
     /// Execute a CLI command by string (e.g., ":sort", ":reflow").
     CliCommand(String),
@@ -1270,8 +1285,10 @@ pub enum ConfirmationAction {
     /// No pending action.
     #[default]
     None,
-    /// Save and quit the editor.
+    /// Save the focused buffer and quit the editor.
     SaveAndQuit,
+    /// Save all modified buffers and quit the editor.
+    SaveAllAndQuit,
     /// Quit without saving.
     QuitWithoutSave,
     /// Close a buffer with unsaved changes.
@@ -1374,6 +1391,23 @@ pub struct GlobalSearchResult {
     pub line_num: usize,
     /// The matching line content (trimmed).
     pub line_content: String,
+}
+
+impl EditorSnapshot {
+    /// Returns `true` when modal dialogs or prompts are active, blocking mouse interaction.
+    #[must_use]
+    pub fn is_mouse_blocked(&self) -> bool {
+        self.picker_visible
+            || self.confirmation_dialog_visible
+            || self.input_dialog_visible
+            || self.lsp_dialog_visible
+            || self.command_mode
+            || self.search_mode
+            || self.regex_mode
+            || self.shell_mode
+            || self.word_jump_active
+            || self.location_picker_visible
+    }
 }
 
 #[cfg(test)]

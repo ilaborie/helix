@@ -242,23 +242,26 @@ impl BufferOps for EditorContext {
         let view_id = self.editor.tree.focus;
         let doc_id = self.editor.tree.get(view_id).doc;
 
-        if let Some(doc) = self.editor.document(doc_id) {
-            if let Some(path) = doc.path().cloned() {
-                match self.editor.open(&path, helix_view::editor::Action::Replace) {
-                    Ok(_) => {
-                        log::info!("Reloaded document from {}", path.display());
-                        self.show_notification("File reloaded".to_string(), NotificationSeverity::Info);
-                    }
-                    Err(e) => {
-                        log::error!("Failed to reload document: {e}");
-                        self.show_notification(format!("Failed to reload: {e}"), NotificationSeverity::Error);
-                    }
+        if self.editor.document(doc_id).and_then(helix_view::Document::path).is_none() {
+            self.show_notification(
+                "Cannot reload: buffer has no file path".to_string(),
+                NotificationSeverity::Warning,
+            );
+            return;
+        }
+
+        let diff_providers = self.editor.diff_providers.clone();
+        let view = self.editor.tree.get_mut(view_id);
+        if let Some(doc) = self.editor.documents.get_mut(&doc_id) {
+            match doc.reload(view, &diff_providers) {
+                Ok(()) => {
+                    log::info!("Reloaded document");
+                    self.show_notification("File reloaded".to_string(), NotificationSeverity::Info);
                 }
-            } else {
-                self.show_notification(
-                    "Cannot reload: buffer has no file path".to_string(),
-                    NotificationSeverity::Warning,
-                );
+                Err(e) => {
+                    log::error!("Failed to reload document: {e}");
+                    self.show_notification(format!("Failed to reload: {e}"), NotificationSeverity::Error);
+                }
             }
         }
     }
@@ -323,7 +326,7 @@ impl BufferOps for EditorContext {
                     &format!("{modified_count} buffer(s) have unsaved changes. What would you like to do?"),
                     "Save All & Quit",
                     Some("Discard All"),
-                    ConfirmationAction::SaveAndQuit,
+                    ConfirmationAction::SaveAllAndQuit,
                 );
                 self.confirmation_dialog_visible = true;
                 return;
@@ -441,14 +444,19 @@ impl BufferOps for EditorContext {
             return;
         }
 
+        let diff_providers = self.editor.diff_providers.clone();
+        let view_id = self.editor.tree.focus;
         let mut reloaded = 0;
         let mut errors = 0;
-        for (_doc_id, path) in &docs_with_paths {
-            match self.editor.open(path, helix_view::editor::Action::Replace) {
-                Ok(_) => reloaded += 1,
-                Err(e) => {
-                    log::error!("Failed to reload {}: {e}", path.display());
-                    errors += 1;
+        for (doc_id, path) in &docs_with_paths {
+            let view = self.editor.tree.get_mut(view_id);
+            if let Some(doc) = self.editor.documents.get_mut(doc_id) {
+                match doc.reload(view, &diff_providers) {
+                    Ok(()) => reloaded += 1,
+                    Err(e) => {
+                        log::error!("Failed to reload {}: {e}", path.display());
+                        errors += 1;
+                    }
                 }
             }
         }
@@ -550,7 +558,7 @@ impl BufferOps for EditorContext {
 
 impl EditorContext {
     /// Flush history and save a single document. Returns the save event on success.
-    fn save_doc_inner(
+    pub(crate) fn save_doc_inner(
         &mut self,
         doc_id: DocumentId,
         path: Option<PathBuf>,

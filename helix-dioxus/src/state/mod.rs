@@ -712,8 +712,10 @@ impl EditorContext {
 
     /// Process pending commands.
     pub fn process_commands(&mut self) {
+        let mut had_commands = false;
         while let Ok(cmd) = self.command_rx.try_recv() {
             self.handle_command(cmd);
+            had_commands = true;
         }
 
         // Poll for LSP events (diagnostics, progress, etc.)
@@ -722,9 +724,13 @@ impl EditorContext {
         // Check for code actions at cursor (for lightbulb indicator)
         self.check_code_actions_available();
 
-        // Ensure cursor stays visible in viewport after any cursor movements
-        let view_id = self.editor.tree.focus;
-        self.editor.ensure_cursor_in_view(view_id);
+        // Only snap cursor into view after cursor-moving commands, not after
+        // viewport-only scroll (scroll_up/scroll_down are called directly, not
+        // via the command channel, so had_commands is false during wheel scroll).
+        if had_commands {
+            let view_id = self.editor.tree.focus;
+            self.editor.ensure_cursor_in_view(view_id);
+        }
     }
 
     /// Handle a single command using operation traits.
@@ -1781,6 +1787,31 @@ impl EditorContext {
                 self.insert_text(doc_id, view_id, &text);
             }
 
+            // Mouse interaction
+            EditorCommand::GoToLineColumn(line, col) => {
+                // Exit select mode if active
+                if self.editor.mode == Mode::Select {
+                    self.editor.mode = Mode::Normal;
+                }
+                // Dismiss LSP popups
+                self.completion_visible = false;
+                self.signature_help_visible = false;
+                self.code_actions_visible = false;
+                self.hover_visible = false;
+                self.goto_line_column(line, col);
+            }
+            EditorCommand::SelectFullLine(line) => {
+                self.select_full_line(doc_id, view_id, line);
+            }
+            EditorCommand::MouseSelect {
+                anchor_line,
+                anchor_col,
+                head_line,
+                head_col,
+            } => {
+                self.mouse_select(doc_id, view_id, anchor_line, anchor_col, head_line, head_col);
+            }
+
             EditorCommand::CliCommand(cmd) => {
                 self.command_input = cmd;
                 self.execute_command();
@@ -2707,6 +2738,7 @@ impl EditorContext {
             picker_search_focused: self.picker_search_focused,
             viewport_lines: self.viewport_lines,
             soft_wrap: self.editor.config().soft_wrap.enable.unwrap_or(false),
+            font_size: self.font_size,
             should_quit: self.should_quit,
         }
     }
@@ -4259,9 +4291,40 @@ impl EditorContext {
         match action {
             ConfirmationAction::None => {}
             ConfirmationAction::SaveAndQuit => {
-                // Save first, then quit
-                self.save_document(None, false);
-                self.should_quit = true;
+                // Save focused buffer — only quit if save succeeded.
+                let view_id = self.editor.tree.focus;
+                let doc_id = self.editor.tree.get(view_id).doc;
+                match self.save_doc_inner(doc_id, None, false) {
+                    Ok(event) => {
+                        if let Some(doc) = self.editor.document_mut(doc_id) {
+                            doc.set_path(Some(&event.path));
+                            doc.set_last_saved_revision(event.revision, event.save_time);
+                        }
+                        self.should_quit = true;
+                    }
+                    Err(e) => {
+                        self.show_notification(format!("Save failed: {e}"), NotificationSeverity::Error);
+                    }
+                }
+            }
+            ConfirmationAction::SaveAllAndQuit => {
+                // Save every modified buffer — only quit if all saves succeeded.
+                let doc_ids: Vec<_> = self
+                    .editor
+                    .documents()
+                    .filter(|d| d.is_modified() && d.path().is_some())
+                    .map(helix_view::Document::id)
+                    .collect();
+                let mut all_saved = true;
+                for doc_id in doc_ids {
+                    if let Err(e) = self.save_doc_inner(doc_id, None, false) {
+                        self.show_notification(format!("Save failed: {e}"), NotificationSeverity::Error);
+                        all_saved = false;
+                    }
+                }
+                if all_saved {
+                    self.should_quit = true;
+                }
             }
             ConfirmationAction::QuitWithoutSave => {
                 // This is handled by deny, but can also be confirm if only two buttons
@@ -4272,8 +4335,7 @@ impl EditorContext {
                 self.close_current_buffer(true);
             }
             ConfirmationAction::ReloadFile => {
-                // TODO: Implement file reload
-                log::info!("ReloadFile not yet implemented");
+                self.reload_document();
             }
         }
     }
@@ -4289,15 +4351,15 @@ impl EditorContext {
         self.confirmation_dialog = ConfirmationDialogSnapshot::default();
 
         match action {
-            ConfirmationAction::SaveAndQuit => {
-                // User chose "Don't Save" - quit without saving
+            ConfirmationAction::SaveAndQuit | ConfirmationAction::SaveAllAndQuit => {
+                // User chose "Discard" — quit without saving
                 self.should_quit = true;
             }
             ConfirmationAction::None
             | ConfirmationAction::QuitWithoutSave
             | ConfirmationAction::CloseBuffer
             | ConfirmationAction::ReloadFile => {
-                // Deny on these actions means "cancel" - do nothing
+                // Deny on these actions means "cancel" — do nothing
             }
         }
     }

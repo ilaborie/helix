@@ -294,9 +294,12 @@ fn convert_code_action_snapshot(action: &lsp::CodeActionOrCommand, index: usize)
     }
 }
 
-/// Convert LSP inlay hints to inlay hint snapshots.
+/// Convert LSP inlay hints to inlay hint snapshots, sorted by (line, column).
+/// Sorting here ensures per-line slices are already ordered for binary search and column mapping.
 pub fn convert_inlay_hints(hints: Vec<lsp::InlayHint>, _offset_encoding: OffsetEncoding) -> Vec<InlayHintSnapshot> {
-    hints.into_iter().map(convert_inlay_hint).collect()
+    let mut snapshots: Vec<_> = hints.into_iter().map(convert_inlay_hint).collect();
+    snapshots.sort_by_key(|h| (h.line, h.column));
+    snapshots
 }
 
 /// Convert a single LSP inlay hint to a snapshot.

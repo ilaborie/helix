@@ -38,6 +38,16 @@ pub trait SelectionOps {
     fn extend_goto_column(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn expand_selection(&mut self, doc_id: DocumentId, view_id: ViewId);
     fn shrink_selection(&mut self, doc_id: DocumentId, view_id: ViewId);
+    fn select_full_line(&mut self, doc_id: DocumentId, view_id: ViewId, line: usize);
+    fn mouse_select(
+        &mut self,
+        doc_id: DocumentId,
+        view_id: ViewId,
+        anchor_line: usize,
+        anchor_col: usize,
+        head_line: usize,
+        head_col: usize,
+    );
 }
 
 impl SelectionOps for EditorContext {
@@ -656,6 +666,51 @@ impl SelectionOps for EditorContext {
             let selection = helix_core::object::shrink_selection(syntax, text, current_selection.clone());
             doc.set_selection(view.id, selection);
         }
+    }
+
+    /// Select a full line by 0-indexed line number (gutter click).
+    fn select_full_line(&mut self, doc_id: DocumentId, view_id: ViewId, line: usize) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let total_lines = text.len_lines();
+        let line = line.min(total_lines.saturating_sub(1));
+        let line_start = text.line_to_char(line);
+        let line_end = if line + 1 < total_lines {
+            text.line_to_char(line + 1)
+        } else {
+            text.len_chars()
+        };
+        doc.set_selection(view_id, helix_core::Selection::single(line_start, line_end));
+    }
+
+    /// Create a selection from (`anchor_line`, `anchor_col`) to (`head_line`, `head_col`),
+    /// all 0-indexed. Used for mouse drag selection.
+    #[allow(clippy::too_many_arguments)]
+    fn mouse_select(
+        &mut self,
+        doc_id: DocumentId,
+        view_id: ViewId,
+        anchor_line: usize,
+        anchor_col: usize,
+        head_line: usize,
+        head_col: usize,
+    ) {
+        let doc = self.editor.document_mut(doc_id).expect("doc exists");
+        let text = doc.text().slice(..);
+        let total_lines = text.len_lines();
+
+        let anchor_line = anchor_line.min(total_lines.saturating_sub(1));
+        let head_line = head_line.min(total_lines.saturating_sub(1));
+
+        let anchor_line_len = text.line(anchor_line).len_chars().saturating_sub(1);
+        let anchor_col = anchor_col.min(anchor_line_len);
+        let anchor_pos = text.line_to_char(anchor_line) + anchor_col;
+
+        let head_line_len = text.line(head_line).len_chars().saturating_sub(1);
+        let head_col = head_col.min(head_line_len);
+        let head_pos = text.line_to_char(head_line) + head_col;
+
+        doc.set_selection(view_id, helix_core::Selection::single(anchor_pos, head_pos));
     }
 }
 
@@ -1331,5 +1386,83 @@ mod tests {
         // After forward copy, primary is at index 1 (new cursor).
         // Rotating backward should move it back.
         assert_eq!(sel.primary_index(), 0, "should rotate back to first selection");
+    }
+
+    // --- select_full_line ---
+
+    #[test]
+    fn select_full_line_first_line() {
+        let mut ctx = test_context("#[|h]#ello\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.select_full_line(doc_id, view_id, 0);
+        assert_state(&ctx, "#[hello\n|]#world\n");
+    }
+
+    #[test]
+    fn select_full_line_second_line() {
+        let mut ctx = test_context("#[|h]#ello\nworld\nfoo\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.select_full_line(doc_id, view_id, 1);
+        assert_state(&ctx, "hello\n#[world\n|]#foo\n");
+    }
+
+    #[test]
+    fn select_full_line_last_line_no_trailing_newline() {
+        let mut ctx = test_context("#[|h]#ello\nworld");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.select_full_line(doc_id, view_id, 1);
+        assert_state(&ctx, "hello\n#[world|]#");
+    }
+
+    #[test]
+    fn select_full_line_clamps_beyond_end() {
+        let mut ctx = test_context("#[|h]#ello\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.select_full_line(doc_id, view_id, 999);
+        // Should clamp to last line
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        assert!(sel.to() <= doc.text().len_chars(), "should not exceed buffer end");
+    }
+
+    // --- mouse_select ---
+
+    #[test]
+    fn mouse_select_same_position() {
+        let mut ctx = test_context("#[|h]#ello\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.mouse_select(doc_id, view_id, 0, 2, 0, 2);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        // Point selection: ensure_invariants normalizes to 1-char range
+        assert_eq!(sel.to() - sel.from(), 1, "should be a point selection");
+        assert!(sel.from() == 2 || sel.head == 2, "cursor should be at col 2");
+    }
+
+    #[test]
+    fn mouse_select_across_lines() {
+        let mut ctx = test_context("#[|h]#ello\nworld\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        ctx.mouse_select(doc_id, view_id, 0, 1, 1, 3);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        // anchor at line 0 col 1 = char pos 1
+        assert_eq!(sel.anchor, 1, "anchor at line 0, col 1");
+        // head at line 1 col 3 = char pos 6 + 3 = 9
+        assert_eq!(sel.head, 9, "head at line 1, col 3");
+    }
+
+    #[test]
+    fn mouse_select_clamps_column() {
+        let mut ctx = test_context("#[|a]#b\ncd\n");
+        let (doc_id, view_id) = doc_view(&ctx);
+        // Column 999 should clamp to end of line
+        ctx.mouse_select(doc_id, view_id, 0, 999, 0, 999);
+        let (_view, doc) = helix_view::current_ref!(ctx.editor);
+        let sel = doc.selection(view_id).primary();
+        // "ab\n" has 3 chars, last col is 2 (saturating_sub(1) from len=3)
+        // Point selection → ensure_invariants normalizes to 1-char range
+        assert_eq!(sel.to() - sel.from(), 1, "should be a point selection");
+        assert_eq!(sel.from(), 2, "clamped to last non-newline col");
     }
 }

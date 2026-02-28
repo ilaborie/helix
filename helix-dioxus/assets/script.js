@@ -33,12 +33,21 @@ function positionInlineDialogs() {
     });
 }
 
-// Scroll the cursor element into view
+// Scroll the cursor element into view (horizontal only).
+// Vertical scrolling is managed by visible_start in Rust — we must not let
+// scrollIntoView change scrollTop on any ancestor, or it fights the viewport
+// and breaks mouse-wheel scrolling.
 function scrollCursorIntoView() {
     requestAnimationFrame(() => {
         const cursor = document.getElementById('editor-cursor');
-        if (cursor) {
-            cursor.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        if (!cursor) return;
+        cursor.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        // Reset vertical scroll on all ancestors so scrollIntoView doesn't
+        // fight with our viewport management (visible_start).
+        let el = cursor.parentElement;
+        while (el) {
+            if (el.scrollTop !== 0) el.scrollTop = 0;
+            el = el.parentElement;
         }
     });
 }
