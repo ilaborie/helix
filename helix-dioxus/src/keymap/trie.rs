@@ -185,6 +185,15 @@ pub fn special(code: KeyCode) -> KeyEvent {
     }
 }
 
+/// Helper to create a `KeyEvent` with Super (Cmd on macOS) modifier.
+#[must_use]
+pub fn super_(ch: char) -> KeyEvent {
+    KeyEvent {
+        code: KeyCode::Char(ch),
+        modifiers: helix_view::keyboard::KeyModifiers::SUPER,
+    }
+}
+
 /// Helper to create a `KeyEvent` with Ctrl+Super modifiers.
 #[must_use]
 pub fn ctrl_super(ch: char) -> KeyEvent {

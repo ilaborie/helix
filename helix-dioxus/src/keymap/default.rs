@@ -10,7 +10,7 @@ use helix_view::document::Mode;
 use helix_view::input::KeyCode;
 
 use super::command::AwaitCharKind;
-use super::trie::{alt, ctrl, ctrl_super, key, shift_tab, special, DhxKeyTrie, DhxKeyTrieNode};
+use super::trie::{alt, ctrl, ctrl_super, key, shift_tab, special, super_, DhxKeyTrie, DhxKeyTrieNode};
 use crate::state::{EditorCommand, ShellBehavior};
 
 /// Build the complete default keymaps for all modes.
@@ -103,6 +103,20 @@ pub fn normal_mode_defaults() -> DhxKeyTrieNode {
     root.insert(key('p'), DhxKeyTrie::cmd(EditorCommand::Paste));
     root.insert(key('P'), DhxKeyTrie::cmd(EditorCommand::PasteBefore));
     root.insert(key('y'), DhxKeyTrie::cmd(EditorCommand::Yank));
+
+    // --- Cmd+key shortcuts (macOS / GUI conventions) ---
+    root.insert(
+        super_('c'),
+        DhxKeyTrie::seq(vec![EditorCommand::SetSelectedRegister('+'), EditorCommand::Yank]),
+    );
+    root.insert(
+        super_('x'),
+        DhxKeyTrie::seq(vec![EditorCommand::SetSelectedRegister('+'), EditorCommand::DeleteSelection]),
+    );
+    root.insert(
+        super_('v'),
+        DhxKeyTrie::seq(vec![EditorCommand::SetSelectedRegister('+'), EditorCommand::Paste]),
+    );
 
     // --- Search ---
     root.insert(
@@ -278,6 +292,24 @@ pub fn select_mode_defaults() -> DhxKeyTrieNode {
     root.insert(key('d'), DhxKeyTrie::cmd(EditorCommand::DeleteSelection));
     root.insert(key('c'), DhxKeyTrie::cmd(EditorCommand::ChangeSelection));
 
+    // --- Cmd+key shortcuts (macOS / GUI conventions) ---
+    root.insert(
+        super_('c'),
+        DhxKeyTrie::seq(vec![
+            EditorCommand::SetSelectedRegister('+'),
+            EditorCommand::Yank,
+            EditorCommand::ExitSelectMode,
+        ]),
+    );
+    root.insert(
+        super_('x'),
+        DhxKeyTrie::seq(vec![EditorCommand::SetSelectedRegister('+'), EditorCommand::DeleteSelection]),
+    );
+    root.insert(
+        super_('v'),
+        DhxKeyTrie::seq(vec![EditorCommand::SetSelectedRegister('+'), EditorCommand::Paste]),
+    );
+
     // --- Search extend ---
     root.insert(key('n'), DhxKeyTrie::cmd(EditorCommand::ExtendSearchNext));
     root.insert(key('N'), DhxKeyTrie::cmd(EditorCommand::ExtendSearchPrev));
@@ -420,6 +452,13 @@ pub fn insert_mode_defaults() -> DhxKeyTrieNode {
 
     // --- Ctrl+Cmd+Space (emoji picker) ---
     root.insert(ctrl_super(' '), DhxKeyTrie::cmd(EditorCommand::ShowEmojiPicker));
+
+    // --- Cmd+key shortcuts (macOS / GUI conventions) ---
+    // Cmd+V: paste from OS clipboard at cursor position (before = insert at cursor, not after)
+    root.insert(
+        super_('v'),
+        DhxKeyTrie::seq(vec![EditorCommand::SetSelectedRegister('+'), EditorCommand::PasteBefore]),
+    );
 
     // --- Ctrl+key combinations ---
     root.insert(ctrl('c'), DhxKeyTrie::cmd(EditorCommand::ToggleLineComment));

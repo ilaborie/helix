@@ -520,6 +520,20 @@ impl EditorContext {
             editor.new_file(helix_view::editor::Action::VerticalSplit);
         }
 
+        // Pre-populate the internal clipboard from the OS clipboard so that "+" p works
+        // immediately at startup and the fallback in paste() has a value from the start.
+        let initial_clipboard = {
+            let config = editor.config();
+            config
+                .clipboard_provider
+                .get_contents(&helix_view::clipboard::ClipboardType::Clipboard)
+                .inspect_err(|e| log::debug!("Could not read OS clipboard at startup: {e}"))
+                .unwrap_or_default()
+        };
+        if !initial_clipboard.is_empty() {
+            log::info!("Pre-populated clipboard register ({} chars) from OS clipboard", initial_clipboard.len());
+        }
+
         Ok(Self {
             editor,
             command_rx,
@@ -550,7 +564,7 @@ impl EditorContext {
             cached_filtered_items: None,
             cached_preview: None,
             buffer_bar_scroll: 0,
-            clipboard: String::new(),
+            clipboard: initial_clipboard,
             // LSP state
             completion_visible: false,
             completion_items: Vec::new(),
