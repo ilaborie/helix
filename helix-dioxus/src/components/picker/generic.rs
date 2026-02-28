@@ -211,6 +211,7 @@ pub fn GenericPicker(
                                                 item: item.clone(),
                                                 is_selected: idx == selected,
                                                 on_click: handle_click,
+                                                secondary_as_kbd: mode == PickerMode::Keybindings,
                                             }
                                         }
                                     }

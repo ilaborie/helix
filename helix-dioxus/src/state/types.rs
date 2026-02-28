@@ -189,6 +189,7 @@ pub enum PickerMode {
     Themes,
     ChangedFiles,
     Emojis,
+    Keybindings,
 }
 
 impl PickerMode {
@@ -213,6 +214,7 @@ impl PickerMode {
             Self::Themes => "Themes",
             Self::ChangedFiles => "Changed Files",
             Self::Emojis => "Emojis",
+            Self::Keybindings => "Keybindings",
         }
     }
 
@@ -284,6 +286,8 @@ pub enum PreviewContent {
         description: String,
         /// Short aliases for the command, e.g. `["w"]`.
         aliases: Vec<String>,
+        /// Normal-mode key sequences that trigger this command, e.g. `["C-s"]`.
+        keybindings: Vec<String>,
     },
 }
 
@@ -1156,6 +1160,10 @@ pub enum EditorCommand {
     /// Unfocus picker search input (Esc in vim-style mode when search is focused).
     PickerUnfocusSearch,
 
+    // Keybinding browser
+    /// Show the keybinding browser picker.
+    ShowKeybindingsPicker,
+
     // Emoji picker
     /// Show the emoji picker.
     ShowEmojiPicker,
@@ -1539,6 +1547,7 @@ mod tests {
             PickerMode::Themes,
             PickerMode::ChangedFiles,
             PickerMode::Emojis,
+            PickerMode::Keybindings,
         ];
         for mode in modes {
             let title = mode.title();

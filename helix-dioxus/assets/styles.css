@@ -555,6 +555,12 @@ body {
     min-width: 0;
     max-height: 340px;
     overflow-y: auto;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+}
+
+.picker-list-items::-webkit-scrollbar {
+    display: none;
 }
 
 .picker-scrollbar-track {
@@ -776,6 +782,22 @@ body {
     border: 1px solid var(--bg-selection);
     padding: 1px 6px;
     border-radius: 3px;
+}
+
+.picker-preview-doc-keybindings {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-dim);
+    font-family: system-ui, -apple-system, sans-serif;
+    flex-wrap: wrap;
+}
+
+.picker-preview-doc-keybinding-seq {
+    display: inline-flex;
+    gap: 2px;
+    align-items: center;
 }
 
 kbd {

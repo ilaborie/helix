@@ -237,7 +237,7 @@ pub fn PickerPreviewPanel(preview: PickerPreview) -> Element {
                         }
                     }
                 },
-                PreviewContent::Documentation { command, description, aliases } => rsx! {
+                PreviewContent::Documentation { command, description, aliases, keybindings } => rsx! {
                     div {
                         class: "picker-preview-content picker-preview-doc",
                         div {
@@ -254,6 +254,19 @@ pub fn PickerPreviewPanel(preview: PickerPreview) -> Element {
                                 span { class: "picker-preview-doc-label", "Aliases: " }
                                 for alias in aliases {
                                     code { class: "picker-preview-doc-alias-badge", ":{alias}" }
+                                }
+                            }
+                        }
+                        if !keybindings.is_empty() {
+                            div {
+                                class: "picker-preview-doc-keybindings",
+                                span { class: "picker-preview-doc-label", "Keybindings: " }
+                                for seq in keybindings {
+                                    span { class: "picker-preview-doc-keybinding-seq",
+                                        for key_str in seq.split(' ') {
+                                            kbd { class: "kbd-key-compact", "{key_str}" }
+                                        }
+                                    }
                                 }
                             }
                         }

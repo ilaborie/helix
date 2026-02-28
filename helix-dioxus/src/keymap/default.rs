@@ -135,7 +135,7 @@ pub fn normal_mode_defaults() -> DhxKeyTrieNode {
     root.insert(key('*'), DhxKeyTrie::cmd(EditorCommand::SearchWordUnderCursor));
 
     // --- Command mode ---
-    root.insert(key(':'), DhxKeyTrie::cmd(EditorCommand::EnterCommandMode));
+    root.insert(key(':'), DhxKeyTrie::cmd(EditorCommand::ShowCommandPanel));
 
     // --- Selection operations ---
     root.insert(key(';'), DhxKeyTrie::cmd(EditorCommand::CollapseSelection));
@@ -582,7 +582,7 @@ fn bracket_prev_defaults() -> DhxKeyTrieNode {
 fn space_leader_defaults() -> DhxKeyTrieNode {
     let mut node = DhxKeyTrieNode::new("space");
     node.insert(key('/'), DhxKeyTrie::cmd(EditorCommand::ShowGlobalSearch));
-    node.insert(key('?'), DhxKeyTrie::cmd(EditorCommand::ShowCommandPanel));
+    node.insert(key('?'), DhxKeyTrie::cmd(EditorCommand::ShowKeybindingsPicker));
     node.insert(key('a'), DhxKeyTrie::cmd(EditorCommand::ShowCodeActions));
     node.insert(key('c'), DhxKeyTrie::cmd(EditorCommand::ToggleLineComment));
     node.insert(key('C'), DhxKeyTrie::cmd(EditorCommand::ToggleBlockComment));

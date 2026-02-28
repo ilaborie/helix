@@ -9,7 +9,8 @@ use grep_searcher::sinks::UTF8;
 use grep_searcher::{BinaryDetection, SearcherBuilder};
 use ignore::WalkBuilder;
 
-use crate::operations::{BufferOps, ThemeOps};
+use crate::keymap::all_keybindings;
+use crate::operations::{command_completions, BufferOps, ThemeOps};
 use crate::state::{EditorCommand, EditorContext, GlobalSearchResult, PickerIcon, PickerItem, PickerMode};
 
 impl EditorContext {
@@ -46,6 +47,7 @@ pub trait PickerOps {
     fn show_file_picker(&mut self);
     fn show_files_recursive_picker(&mut self);
     fn show_buffer_picker(&mut self);
+    fn show_keybindings_picker(&mut self);
     fn picker_confirm(&mut self);
 }
 
@@ -345,12 +347,8 @@ impl PickerOps for EditorContext {
                     }
                 }
                 PickerMode::Commands => {
-                    // Execute the selected command via deferred dispatch
-                    if let Ok(idx) = selected.id.parse::<usize>() {
-                        if let Some(cmd) = self.command_panel_commands.get(idx).cloned() {
-                            let _ = self.command_tx.send(cmd);
-                        }
-                    }
+                    // Execute the CLI command via deferred dispatch so the picker closes first
+                    let _ = self.command_tx.send(EditorCommand::TypeableCommand(selected.id.clone()));
                 }
                 PickerMode::JumpList => {
                     if let Ok(idx) = selected.id.parse::<usize>() {
@@ -397,6 +395,24 @@ impl PickerOps for EditorContext {
                     // Insert the emoji text via deferred dispatch (same pattern as Commands)
                     let _ = self.command_tx.send(EditorCommand::InsertText(selected.id.clone()));
                 }
+                PickerMode::Keybindings => {
+                    // Find the entry matching the selected key sequence and dispatch its slot
+                    let slot = all_keybindings()
+                        .iter()
+                        .find(|entry| entry.key_sequence == selected.id)
+                        .and_then(|entry| entry.slot.clone());
+                    match slot {
+                        Some(crate::keymap::command::CommandSlot::Cmd(cmd)) => {
+                            let _ = self.command_tx.send(cmd);
+                        }
+                        Some(crate::keymap::command::CommandSlot::Seq(cmds)) => {
+                            for cmd in cmds {
+                                let _ = self.command_tx.send(cmd);
+                            }
+                        }
+                        _ => {} // AwaitChar or None: close picker without executing
+                    }
+                }
                 PickerMode::References | PickerMode::Definitions => {
                     // Extract location data before mutable borrow
                     if let Ok(idx) = selected.id.parse::<usize>() {
@@ -432,13 +448,39 @@ impl PickerOps for EditorContext {
         self.picker_diagnostics.clear();
         self.global_search_results.clear();
         self.locations.clear();
-        self.command_panel_commands.clear();
         self.jumplist_entries.clear();
         self.cancel_global_search();
         // Explorer cleanup
         self.explorer_expanded.clear();
         self.explorer_root = None;
         self.explorer_all_files.clear();
+    }
+
+    /// Show the keybinding browser picker with all normal-mode bindings.
+    fn show_keybindings_picker(&mut self) {
+        self.command_mode = false;
+        self.command_input.clear();
+
+        let items: Vec<PickerItem> = all_keybindings()
+            .iter()
+            .map(|entry| PickerItem {
+                id: entry.key_sequence.clone(),
+                display: entry.command_label.clone(),
+                icon: PickerIcon::Command,
+                match_indices: vec![],
+                secondary: Some(entry.key_sequence.clone()),
+                depth: 0,
+            })
+            .collect();
+
+        self.picker_items = items;
+        self.picker_filter.clear();
+        self.picker_selected = 0;
+        self.picker_visible = true;
+        self.picker_mode = PickerMode::Keybindings;
+        self.last_picker_mode = Some(PickerMode::Keybindings);
+        self.picker_current_path = None;
+        self.invalidate_picker_cache();
     }
 }
 
@@ -629,26 +671,23 @@ impl EditorContext {
         self.invalidate_picker_cache();
     }
 
-    /// Show the command panel with all available editor commands.
+    /// Show the command panel with all available CLI commands.
     pub(crate) fn show_command_panel(&mut self) {
         self.command_mode = false;
         self.command_input.clear();
 
-        let entries = command_panel_entries();
-        let items: Vec<PickerItem> = entries
+        let items: Vec<PickerItem> = command_completions()
             .iter()
-            .enumerate()
-            .map(|(idx, (_, name, hint))| PickerItem {
-                id: format!("{idx}"),
-                display: (*name).to_string(),
+            .map(|cmd| PickerItem {
+                id: cmd.name.to_string(),
+                display: cmd.name.to_string(),
                 icon: PickerIcon::Command,
                 match_indices: vec![],
-                secondary: hint.map(ToString::to_string),
+                secondary: Some(cmd.description.to_string()),
                 depth: 0,
             })
             .collect();
 
-        self.command_panel_commands = entries.iter().map(|(cmd, _, _)| cmd.clone()).collect();
         self.picker_items = items;
         self.picker_filter.clear();
         self.picker_selected = 0;
@@ -1021,204 +1060,6 @@ fn execute_global_search_blocking(
     Ok(())
 }
 
-/// Fuzzy match with indices: returns (score, `match_indices`) or None if no match.
-/// Score is based on consecutive matches and start-of-word bonuses.
-/// Case-insensitive matching.
-/// Returns the static list of command panel entries: (command, display name, keybinding hint).
-fn command_panel_entries() -> Vec<(EditorCommand, &'static str, Option<&'static str>)> {
-    vec![
-        // File operations
-        (EditorCommand::ShowFilePicker, "Open File", Some("Space f")),
-        (EditorCommand::ShowFilesRecursivePicker, "Find Files", Some("Ctrl+f")),
-        (EditorCommand::ShowBufferPicker, "Switch Buffer", Some(":b")),
-        // Buffer management
-        (EditorCommand::NextBuffer, "Next Buffer", Some("Ctrl+l")),
-        (EditorCommand::PreviousBuffer, "Previous Buffer", Some("Ctrl+h")),
-        (EditorCommand::ReloadDocument, "Reload Document", Some(":reload")),
-        (EditorCommand::WriteAll, "Save All", Some(":wa")),
-        // Navigation
-        (EditorCommand::GotoFirstLine, "Go to First Line", Some("gg")),
-        (EditorCommand::GotoLastLine, "Go to Last Line", Some("G")),
-        (
-            EditorCommand::GotoFirstNonWhitespace,
-            "Go to First Non-Whitespace",
-            Some("gs"),
-        ),
-        (EditorCommand::PageUp, "Page Up", Some("C-b")),
-        (EditorCommand::PageDown, "Page Down", Some("C-f")),
-        (EditorCommand::HalfPageUp, "Half Page Up", Some("C-u")),
-        (EditorCommand::HalfPageDown, "Half Page Down", Some("C-d")),
-        // Search
-        (EditorCommand::ShowGlobalSearch, "Global Search", Some("Space /")),
-        (
-            EditorCommand::EnterSearchMode { backwards: false },
-            "Search Forward",
-            Some("/"),
-        ),
-        (
-            EditorCommand::EnterSearchMode { backwards: true },
-            "Search Backward",
-            Some("?"),
-        ),
-        // Editing
-        (EditorCommand::AlignSelections, "Align Selections", Some("&")),
-        // LSP
-        (EditorCommand::FormatDocument, "Format Document", None),
-        (EditorCommand::FormatSelections, "Format Selections", Some("=")),
-        (EditorCommand::RenameSymbol, "Rename Symbol", Some("Space r")),
-        (EditorCommand::GotoDeclaration, "Go to Declaration", Some("gD")),
-        (EditorCommand::GotoDefinition, "Go to Definition", Some("gd")),
-        (EditorCommand::GotoReferences, "Go to References", Some("gr")),
-        (EditorCommand::GotoTypeDefinition, "Go to Type Definition", Some("gy")),
-        (EditorCommand::GotoImplementation, "Go to Implementation", Some("gi")),
-        (EditorCommand::ShowCodeActions, "Show Code Actions", Some("Space a")),
-        (EditorCommand::ShowDocumentSymbols, "Document Symbols", Some("Space s")),
-        (
-            EditorCommand::ShowWorkspaceSymbols,
-            "Workspace Symbols",
-            Some("Space S"),
-        ),
-        (
-            EditorCommand::ShowDocumentDiagnostics,
-            "Document Diagnostics",
-            Some("Space d"),
-        ),
-        (
-            EditorCommand::ShowWorkspaceDiagnostics,
-            "Workspace Diagnostics",
-            Some("Space D"),
-        ),
-        (EditorCommand::NextDiagnostic, "Next Diagnostic", Some("]d")),
-        (EditorCommand::PrevDiagnostic, "Previous Diagnostic", Some("[d")),
-        (EditorCommand::ToggleInlayHints, "Toggle Inlay Hints", Some("Space i")),
-        (EditorCommand::ToggleLspDialog, "LSP Server Status", None),
-        (EditorCommand::TriggerHover, "Trigger Hover", Some("Space k")),
-        (
-            EditorCommand::TriggerCompletion,
-            "Trigger Completion",
-            Some("Ctrl+Space"),
-        ),
-        // Editing
-        (EditorCommand::ToggleLineComment, "Toggle Line Comment", Some("Space c")),
-        (
-            EditorCommand::ToggleBlockComment,
-            "Toggle Block Comment",
-            Some("Space C"),
-        ),
-        (EditorCommand::Undo, "Undo", Some("u")),
-        (EditorCommand::Redo, "Redo", Some("U")),
-        (EditorCommand::IndentLine, "Indent", Some(">")),
-        (EditorCommand::UnindentLine, "Unindent", Some("<")),
-        (EditorCommand::SelectAll, "Select All", Some("%")),
-        (EditorCommand::FlipSelections, "Flip Selections", Some("A-;")),
-        (
-            EditorCommand::ExpandSelection,
-            "Expand Selection (tree-sitter)",
-            Some("A-o"),
-        ),
-        (
-            EditorCommand::ShrinkSelection,
-            "Shrink Selection (tree-sitter)",
-            Some("A-i"),
-        ),
-        (EditorCommand::JoinLines, "Join Lines", Some("J")),
-        (EditorCommand::ToggleCase, "Toggle Case", Some("~")),
-        // Jump list
-        (EditorCommand::JumpBackward, "Jump Backward", Some("C-o")),
-        (EditorCommand::JumpForward, "Jump Forward", Some("C-i")),
-        (EditorCommand::SaveSelection, "Save Position to Jump List", Some("C-s")),
-        (EditorCommand::ShowJumpListPicker, "Jump List", Some("Space j")),
-        (
-            EditorCommand::CliCommand("jumplist-clear".to_string()),
-            "Clear Jump List",
-            Some(":jumplist-clear"),
-        ),
-        // Application
-        (
-            EditorCommand::PrintWorkingDirectory,
-            "Print Working Directory",
-            Some(":pwd"),
-        ),
-        // Shell integration
-        (
-            EditorCommand::EnterShellMode(crate::state::ShellBehavior::Replace),
-            "Shell Pipe (Replace)",
-            Some("|"),
-        ),
-        (
-            EditorCommand::EnterShellMode(crate::state::ShellBehavior::Insert),
-            "Shell Insert Output",
-            Some("!"),
-        ),
-        (
-            EditorCommand::EnterShellMode(crate::state::ShellBehavior::Ignore),
-            "Shell Pipe-To (Discard)",
-            Some("A-|"),
-        ),
-        (
-            EditorCommand::EnterShellMode(crate::state::ShellBehavior::Append),
-            "Shell Append Output",
-            Some("A-!"),
-        ),
-        // File explorer
-        (EditorCommand::ShowFileExplorer, "File Explorer", Some("Space e")),
-        (
-            EditorCommand::ShowFileExplorerInBufferDir,
-            "File Explorer (Buffer Dir)",
-            Some("Space E"),
-        ),
-        // Word jump
-        (EditorCommand::GotoWord, "Goto Word (Jump)", Some("gw")),
-        // Theme
-        (EditorCommand::ShowThemePicker, "Switch Theme", Some(":theme")),
-        // VCS
-        (EditorCommand::ShowChangedFilesPicker, "Changed Files", Some("Space g")),
-        (EditorCommand::NextChange, "Next Change", Some("]g")),
-        (EditorCommand::PrevChange, "Previous Change", Some("[g")),
-        (EditorCommand::GotoFirstChange, "First Change", Some("[G")),
-        (EditorCommand::GotoLastChange, "Last Change", Some("]G")),
-        // Emoji picker
-        (EditorCommand::ShowEmojiPicker, "Insert Emoji", Some("C-Cmd-Spc")),
-        // Text manipulation
-        (
-            EditorCommand::CliCommand("sort".to_string()),
-            "Sort Selections",
-            Some(":sort"),
-        ),
-        (
-            EditorCommand::CliCommand("reflow".to_string()),
-            "Reflow Text",
-            Some(":reflow"),
-        ),
-        // Configuration
-        (
-            EditorCommand::CliCommand("config-open".to_string()),
-            "Open Config File",
-            Some(":config-open"),
-        ),
-        (
-            EditorCommand::CliCommand("config-reload".to_string()),
-            "Reload Config",
-            Some(":config-reload"),
-        ),
-        (
-            EditorCommand::CliCommand("log-open".to_string()),
-            "Open Log File",
-            Some(":log-open"),
-        ),
-        // Document info
-        (
-            EditorCommand::CliCommand("encoding".to_string()),
-            "Show Encoding",
-            Some(":encoding"),
-        ),
-        (
-            EditorCommand::CliCommand("tree-sitter-scopes".to_string()),
-            "Tree-sitter Scopes",
-            Some(":tree-sitter-scopes"),
-        ),
-    ]
-}
 
 /// Compute filtered picker items from source items using fuzzy matching.
 /// This is a free function to avoid borrow conflicts when populating the cache.

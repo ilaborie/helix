@@ -122,7 +122,7 @@ use crate::state::ShellBehavior;
 /// Registry mapping helix-term command names to `CommandSlot` variants.
 ///
 /// Command names match helix-term so users can share `[keys]` configs.
-const COMMAND_REGISTRY: &[(&str, CommandSlot)] = &[
+pub const COMMAND_REGISTRY: &[(&str, CommandSlot)] = &[
     // Movement
     ("move_char_left", CommandSlot::Cmd(EditorCommand::MoveLeft)),
     ("move_char_right", CommandSlot::Cmd(EditorCommand::MoveRight)),

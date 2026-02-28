@@ -4,6 +4,7 @@ use dioxus::prelude::*;
 
 use crate::components::file_icons::{FileTypeIcon, FolderTypeIcon};
 use crate::icons::{lucide, Icon};
+use crate::keymap::command_keybindings;
 use crate::operations::command_completions;
 use crate::state::{PickerIcon, PickerItem};
 
@@ -16,6 +17,9 @@ pub fn PickerItemRow(
     item: PickerItem,
     is_selected: bool,
     #[props(default)] on_click: Option<EventHandler<MouseEvent>>,
+    /// Render the secondary text as `<kbd>` badges (used by the keybinding browser).
+    #[props(default)]
+    secondary_as_kbd: bool,
 ) -> Element {
     let item_class = if is_selected {
         "picker-item picker-item-selected"
@@ -184,9 +188,19 @@ pub fn PickerItemRow(
                     // Secondary text - NOT for buffers or parent directory
                     if !matches!(item.icon, PickerIcon::Buffer | PickerIcon::BufferModified) && item.display != ".." {
                         if let Some(ref secondary) = item.secondary {
-                            div {
-                                class: "picker-item-secondary",
-                                "{secondary}"
+                            if secondary_as_kbd {
+                                div {
+                                    class: "picker-preview-doc-keybinding-seq",
+                                    style: "padding: 1px 0;",
+                                    for key_str in secondary.split(' ') {
+                                        kbd { class: "kbd-key-compact", "{key_str}" }
+                                    }
+                                }
+                            } else {
+                                div {
+                                    class: "picker-item-secondary",
+                                    "{secondary}"
+                                }
                             }
                         }
                     }
@@ -224,19 +238,26 @@ pub fn PickerItemRow(
                     }
                 }
 
-                // Alias kbd badge for command items
+                // Keybinding or alias badge for command items
+                // Prefer the first normal-mode keybinding; fall back to alias
                 if matches!(item.icon, PickerIcon::Command) {
                     {
-                        let alias = command_completions()
-                            .iter()
-                            .find(|c| c.name == item.id.as_str())
-                            .and_then(|c| c.aliases.first())
-                            .map(|a| format!(":{a}"));
-                        if let Some(alias) = alias {
+                        let badge = command_keybindings()
+                            .get(item.id.as_str())
+                            .and_then(|v| v.first())
+                            .cloned()
+                            .or_else(|| {
+                                command_completions()
+                                    .iter()
+                                    .find(|c| c.name == item.id.as_str())
+                                    .and_then(|c| c.aliases.first())
+                                    .map(|a| format!(":{a}"))
+                            });
+                        if let Some(badge) = badge {
                             rsx! {
                                 span {
                                     class: "picker-item-shortcut",
-                                    kbd { class: "kbd-key-compact", "{alias}" }
+                                    kbd { class: "kbd-key-compact", "{badge}" }
                                 }
                             }
                         } else {

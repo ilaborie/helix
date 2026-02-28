@@ -70,6 +70,9 @@ fn dispatch_commands(ctx: &mut crate::state::EditorContext, commands: &[EditorCo
             EditorCommand::CommandInput(ch) => {
                 ctx.command_input.push(*ch);
             }
+            EditorCommand::ShowCommandPanel => {
+                ctx.show_command_panel();
+            }
             _ => {
                 // Skip commands not relevant to these tests
             }
@@ -199,17 +202,18 @@ fn search_forward_dispatch() {
     assert_eq!(selected, "world");
 }
 
-// --- Command mode ---
+// --- Command mode / command picker ---
 
 #[test]
-fn command_mode_entry() {
+fn colon_opens_command_picker() {
     let mut ctx = test_context("#[h|]#ello\n");
 
-    // : → enter command mode
+    // : → open the CLI command picker
     let cmds = keymap_dispatch(&mut ctx, Mode::Normal, &key(':'));
     dispatch_commands(&mut ctx, &cmds);
-    assert!(ctx.command_mode);
-    assert!(ctx.command_input.is_empty());
+    assert!(ctx.picker_visible);
+    assert_eq!(ctx.picker_mode, crate::state::PickerMode::Commands);
+    assert!(!ctx.command_mode);
 }
 
 // --- Select mode ---

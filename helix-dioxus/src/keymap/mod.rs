@@ -14,6 +14,9 @@ pub mod command;
 pub mod default;
 pub mod trie;
 
+use std::collections::HashMap;
+use std::sync::OnceLock;
+
 use helix_view::document::Mode;
 use helix_view::input::{KeyCode, KeyEvent};
 
@@ -272,6 +275,158 @@ pub fn merge_keys(base: &mut DhxKeyTrie, delta: DhxKeyTrie) {
             *base = delta;
         }
     }
+}
+
+/// Normal-mode reverse index: typable command name → `Vec<key sequence string>`.
+///
+/// Only captures `TypeableCommand` leaves (e.g. Cmd+S → "write").
+pub fn command_keybindings() -> &'static HashMap<String, Vec<String>> {
+    static INDEX: OnceLock<HashMap<String, Vec<String>>> = OnceLock::new();
+    INDEX.get_or_init(|| {
+        let keymaps = default::default_keymaps();
+        let mut index = HashMap::new();
+        if let Some(DhxKeyTrie::Node(root)) = keymaps.get(&Mode::Normal) {
+            collect_typable_bindings(root, &[], &mut index);
+        }
+        index
+    })
+}
+
+/// Recursively collect `TypeableCommand` leaf bindings into `index`.
+fn collect_typable_bindings(
+    node: &trie::DhxKeyTrieNode,
+    path: &[KeyEvent],
+    index: &mut HashMap<String, Vec<String>>,
+) {
+    for (key, child) in node.children() {
+        let mut new_path = path.to_vec();
+        new_path.push(*key);
+        match child {
+            DhxKeyTrie::Command(command::CommandSlot::Cmd(EditorCommand::TypeableCommand(name))) => {
+                index.entry(name.clone()).or_default().push(format_key_sequence(&new_path));
+            }
+            DhxKeyTrie::Node(child_node) => collect_typable_bindings(child_node, &new_path, index),
+            _ => {}
+        }
+    }
+}
+
+/// A single normal-mode keybinding entry for the keybinding browser.
+#[derive(Debug, Clone)]
+pub struct KeybindingEntry {
+    /// Formatted key sequence, e.g. "Space f" or "g g".
+    pub key_sequence: String,
+    /// Human-readable label: command name or typable command string.
+    pub command_label: String,
+    /// The command slot to execute on confirm (`None` for `AwaitChar`).
+    pub slot: Option<command::CommandSlot>,
+}
+
+/// All normal-mode leaf bindings as a flat sorted list.
+pub fn all_keybindings() -> &'static Vec<KeybindingEntry> {
+    static BINDINGS: OnceLock<Vec<KeybindingEntry>> = OnceLock::new();
+    BINDINGS.get_or_init(|| {
+        let keymaps = default::default_keymaps();
+        let mut entries = Vec::new();
+        if let Some(DhxKeyTrie::Node(root)) = keymaps.get(&Mode::Normal) {
+            collect_all_leaves(root, &[], &mut entries);
+        }
+        entries.sort_by(|a, b| a.key_sequence.cmp(&b.key_sequence));
+        entries
+    })
+}
+
+/// Recursively collect all leaf bindings into `out`.
+fn collect_all_leaves(
+    node: &trie::DhxKeyTrieNode,
+    path: &[KeyEvent],
+    out: &mut Vec<KeybindingEntry>,
+) {
+    for (key, child) in node.children() {
+        let mut new_path = path.to_vec();
+        new_path.push(*key);
+        match child {
+            DhxKeyTrie::Command(slot) => {
+                let key_sequence = format_key_sequence(&new_path);
+                let command_label = label_for_slot(slot);
+                let executable = matches!(slot, command::CommandSlot::Cmd(_) | command::CommandSlot::Seq(_));
+                out.push(KeybindingEntry {
+                    key_sequence,
+                    command_label,
+                    slot: executable.then(|| slot.clone()),
+                });
+            }
+            DhxKeyTrie::Sequence(slots) => {
+                let key_sequence = format_key_sequence(&new_path);
+                let label = slots
+                    .iter()
+                    .filter_map(|s| match s {
+                        command::CommandSlot::Cmd(cmd) => Some(label_for_cmd(cmd)),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" + ");
+                out.push(KeybindingEntry {
+                    key_sequence,
+                    command_label: label,
+                    slot: Some(command::CommandSlot::Seq(
+                        slots
+                            .iter()
+                            .filter_map(|s| match s {
+                                command::CommandSlot::Cmd(cmd) => Some(cmd.clone()),
+                                _ => None,
+                            })
+                            .collect(),
+                    )),
+                });
+            }
+            DhxKeyTrie::Node(child_node) => collect_all_leaves(child_node, &new_path, out),
+        }
+    }
+}
+
+/// Format a key sequence as a human-readable string (e.g. "Space f", "g g").
+fn format_key_sequence(keys: &[KeyEvent]) -> String {
+    keys.iter()
+        .map(|k| {
+            // KeyCode::Char(' ') formats to "space" (via keys::SPACE constant).
+            // Capitalize it for readability in the keybinding browser.
+            let s = k.to_string();
+            if s == "space" {
+                "Space".to_string()
+            } else {
+                s
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Get a human-readable label for a command slot.
+fn label_for_slot(slot: &command::CommandSlot) -> String {
+    match slot {
+        command::CommandSlot::Cmd(cmd) => label_for_cmd(cmd),
+        command::CommandSlot::Seq(cmds) => cmds
+            .iter()
+            .map(label_for_cmd)
+            .collect::<Vec<_>>()
+            .join(" + "),
+        command::CommandSlot::AwaitChar(kind) => format!("{kind:?} <char>"),
+    }
+}
+
+/// Get a human-readable label for a single `EditorCommand`.
+fn label_for_cmd(cmd: &EditorCommand) -> String {
+    if let EditorCommand::TypeableCommand(name) = cmd {
+        return format!(":{name}");
+    }
+    // Reverse-lookup by Debug string in COMMAND_REGISTRY
+    let cmd_debug = format!("{cmd:?}");
+    command::COMMAND_REGISTRY
+        .iter()
+        .find(|(_, slot)| matches!(slot, command::CommandSlot::Cmd(c) if format!("{c:?}") == cmd_debug))
+        .map(|(name, _)| (*name).to_string())
+        .unwrap_or(cmd_debug)
 }
 
 #[cfg(test)]

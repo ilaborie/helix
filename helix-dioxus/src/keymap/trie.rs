@@ -79,6 +79,11 @@ impl DhxKeyTrieNode {
         &self.name
     }
 
+    /// Iterate children in insertion order.
+    pub fn children(&self) -> impl Iterator<Item = (&KeyEvent, &DhxKeyTrie)> {
+        self.order.iter().filter_map(|k| self.map.get(k).map(|v| (k, v)))
+    }
+
     /// Merge another node into this one. Leaf entries in `other` override
     /// entries in `self`. Sub-nodes are merged recursively.
     pub fn merge(&mut self, other: Self) {

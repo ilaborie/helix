@@ -1715,6 +1715,10 @@ impl EditorContext {
             EditorCommand::ShowCommandPanel => {
                 self.show_command_panel();
             }
+            // Keybinding browser
+            EditorCommand::ShowKeybindingsPicker => {
+                self.show_keybindings_picker();
+            }
 
             // Theme
             EditorCommand::SetTheme(name) => {
@@ -2926,7 +2930,11 @@ impl EditorContext {
                 let line = doc.text().char_to_line(cursor) + 1;
                 Some((path, Some(line)))
             }
-            PickerMode::Registers | PickerMode::Commands | PickerMode::Themes | PickerMode::Emojis => None,
+            PickerMode::Registers
+            | PickerMode::Commands
+            | PickerMode::Themes
+            | PickerMode::Emojis
+            | PickerMode::Keybindings => None,
         }
     }
 
@@ -2956,16 +2964,49 @@ impl EditorContext {
         // Commands picker: generate a rich documentation preview
         if self.picker_mode == PickerMode::Commands {
             if let Some(cmd) = command_completions().iter().find(|c| c.name == item_id.as_str()) {
+                let keybindings = crate::keymap::command_keybindings()
+                    .get(cmd.name)
+                    .cloned()
+                    .unwrap_or_default();
                 let preview = types::PickerPreview {
                     file_path: format!(":{}", cmd.name),
                     content: types::PreviewContent::Documentation {
                         command: format!(":{}", cmd.name),
                         description: cmd.description.to_string(),
                         aliases: cmd.aliases.iter().map(ToString::to_string).collect(),
+                        keybindings,
                     },
                 };
                 self.cached_preview = Some((item_id, preview.clone()));
                 return Some(preview);
+            }
+            return None;
+        }
+
+        // Keybindings picker: show documentation preview for typable commands
+        if self.picker_mode == PickerMode::Keybindings {
+            // The item's display field is the command_label (e.g. ":write" or "move_char_left")
+            let cached = self.cached_filtered_items.as_deref()?;
+            let selected_item = cached.get(self.picker_selected)?;
+            let command_label = selected_item.display.as_str();
+            if let Some(name) = command_label.strip_prefix(':') {
+                if let Some(cmd) = command_completions().iter().find(|c| c.name == name) {
+                    let keybindings = crate::keymap::command_keybindings()
+                        .get(cmd.name)
+                        .cloned()
+                        .unwrap_or_default();
+                    let preview = types::PickerPreview {
+                        file_path: selected_item.id.clone(),
+                        content: types::PreviewContent::Documentation {
+                            command: format!(":{}", cmd.name),
+                            description: cmd.description.to_string(),
+                            aliases: cmd.aliases.iter().map(ToString::to_string).collect(),
+                            keybindings,
+                        },
+                    };
+                    self.cached_preview = Some((item_id, preview.clone()));
+                    return Some(preview);
+                }
             }
             return None;
         }
@@ -4754,6 +4795,7 @@ impl EditorContext {
             Some(PickerMode::Themes) => self.show_theme_picker(),
             Some(PickerMode::ChangedFiles) => self.show_changed_files_picker(),
             Some(PickerMode::Emojis) => self.show_emoji_picker(),
+            Some(PickerMode::Keybindings) => self.show_keybindings_picker(),
             None => {}
         }
     }
