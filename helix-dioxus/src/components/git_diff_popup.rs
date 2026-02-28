@@ -3,7 +3,16 @@
 //! Shows diff content when hovering over VCS gutter markers, with
 //! "Revert Change" and "Copy Original" action buttons.
 
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use dioxus::prelude::*;
+
+/// Generation counter for the git diff close grace-period timer.
+///
+/// Incremented on every "cancel" event (mouseenter on gutter or popup).
+/// The scheduled close task compares the generation it captured at spawn
+/// time against the current value — if they differ, the close was cancelled.
+pub(crate) static GIT_DIFF_CLOSE_GEN: AtomicU64 = AtomicU64::new(0);
 
 use crate::hooks::use_snapshot_signal;
 use crate::icons::{lucide, Icon};
@@ -56,7 +65,10 @@ pub fn GitDiffPopup(hunk: GitDiffHunkSnapshot, line: usize) -> Element {
         div {
             id: "git-diff-popup",
             class: "git-diff-popup",
-            onmouseenter: move |_| { /* Keep popup open while mouse is inside */ },
+            onmouseenter: move |_| {
+                // Cancel any pending grace-period close scheduled by the gutter zone.
+                GIT_DIFF_CLOSE_GEN.fetch_add(1, Ordering::Relaxed);
+            },
             onmouseleave: {
                 let mut close = close_handler.clone();
                 move |evt: MouseEvent| close(evt)

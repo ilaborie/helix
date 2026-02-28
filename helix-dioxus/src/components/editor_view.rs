@@ -3,13 +3,14 @@
 //! Renders the document content with syntax highlighting and cursor display.
 
 use std::fmt::Write as _;
+use std::sync::atomic::Ordering;
 
 use crate::icons::{lucide, Icon};
 use dioxus::prelude::*;
 
 use crate::components::{
     diagnostics_for_line, first_diagnostic_for_line, highest_severity_for_line, DiagnosticMarker, DiagnosticUnderline,
-    ErrorLens, Scrollbar,
+    ErrorLens, Scrollbar, GIT_DIFF_CLOSE_GEN,
 };
 use crate::hooks::{use_snapshot, use_snapshot_signal};
 use crate::lsp::{DiagnosticSnapshot, InlayHintKind, InlayHintSnapshot};
@@ -321,12 +322,24 @@ pub fn EditorView() -> Element {
                                                     class: "gutter-diff-zone",
                                                     "data-diff-line": "{hover_line}",
                                                     onmouseenter: move |_| {
+                                                        // Cancel any pending grace-period close.
+                                                        GIT_DIFF_CLOSE_GEN.fetch_add(1, Ordering::Relaxed);
                                                         app_state_hover.send_command(EditorCommand::ShowGitDiffHover(hover_line));
                                                         app_state_hover.process_and_notify(&mut snapshot_signal);
                                                     },
                                                     onmouseleave: move |_| {
-                                                        app_state_leave.send_command(EditorCommand::CloseGitDiffHover);
-                                                        app_state_leave.process_and_notify(&mut snapshot_signal);
+                                                        // Grace-period: wait 200ms before closing so the user has time
+                                                        // to move the mouse from the gutter marker to the popup.
+                                                        let gen = GIT_DIFF_CLOSE_GEN.fetch_add(1, Ordering::Relaxed) + 1;
+                                                        let app = app_state_leave.clone();
+                                                        let notify = app.scroll_notify.clone();
+                                                        spawn(async move {
+                                                            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                                                            if GIT_DIFF_CLOSE_GEN.load(Ordering::Relaxed) == gen {
+                                                                app.send_command(EditorCommand::CloseGitDiffHover);
+                                                                notify.notify_one();
+                                                            }
+                                                        });
                                                     },
                                                     if dt == DiffLineType::Deleted {
                                                         span { class: "gutter-diff-deleted" }

@@ -47,5 +47,6 @@ pub use dialog::{
     ShellPrompt,
 };
 pub use git_diff_popup::GitDiffPopup;
+pub(crate) use git_diff_popup::GIT_DIFF_CLOSE_GEN;
 pub use lsp::{CodeActionsMenu, CompletionPopup, HoverPopup, LocationPicker, SignatureHelpPopup};
 pub use picker::GenericPicker;
