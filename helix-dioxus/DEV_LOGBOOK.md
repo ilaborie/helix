@@ -1904,6 +1904,104 @@ DAP/Debug is **not supported** — `Space G` sub-menu will not be implemented.
 
 ---
 
+## 2026-02-28: Mouse Interaction & Save/Reload Fixes
+
+### Progress
+- Implemented full mouse interaction support: scroll wheel, click-to-position, gutter click (select line), click-and-drag text selection, file drop
+- Fixed save/reload bugs (document save events, reload from disk)
+- Added macOS dock icon via `NSApplication::setApplicationIconImage` at runtime using `std::sync::Once`
+
+### Files Changed
+- `src/components/editor_view.rs` — mouse event handlers, coordinate helpers
+- `src/lib.rs` — file drop via `DroppedFile` tao event, dock icon call
+- `src/platform/macos.rs` — `set_dock_icon()` using objc2 bindings
+
+---
+
+## 2026-02-28: Mutation-Driven snapshot_version (Performance)
+
+### Problem
+`snapshot_version` incremented unconditionally on every `snapshot()` call, so the "only re-render if changed" guard in `app.rs` was always satisfied. Every tao event (mouse moves, focus changes) and every 100ms polling tick triggered a full snapshot rebuild and signal write.
+
+### Solution
+Added a `pub(crate) dirty: bool` flag to `EditorContext`. Only operations that actually mutate state set `dirty = true`. `snapshot()` increments `snapshot_version` and clears `dirty` only when dirty. The tao event handler and `process_and_notify` both guard snapshot rebuilds and signal writes behind version comparison.
+
+### Mutation sources marked dirty
+- `process_commands()` — when commands or LSP events were processed
+- `scroll_up` / `scroll_down` — direct calls bypassing the command queue
+- `update_viewport_size()` — window resize
+- `open_file()` — DroppedFile tao event
+- Scale factor change in tao handler
+
+### Files Changed
+- `src/state/mod.rs` — `dirty` field, modified `snapshot()` and `process_commands()`
+- `src/state/lsp_events.rs` — `poll_lsp_events()` now returns `bool`
+- `src/operations/movement.rs` — `scroll_up/down` set dirty
+- `src/operations/buffer.rs` — `open_file` sets dirty
+- `src/lib.rs` — guarded snapshot rebuild and signal write
+- `src/app.rs` — downgraded per-snapshot log from `info` to `debug`
+
+---
+
+## 2026-02-28: Git Diff Popup Grace-Period Hover Fix
+
+### Problem
+The `.gutter-diff-zone` `onmouseleave` fired immediately when the mouse left the gutter marker, dismissing the popup before the user could reach the Revert button.
+
+### Solution
+Generation-counter debounce: `GIT_DIFF_CLOSE_GEN: AtomicU64` is shared between the gutter zone and the popup. On gutter `onmouseleave`, a 200ms async task is spawned (via `dioxus::prelude::spawn`) capturing the current generation. The task only sends `CloseGitDiffHover` if the generation still matches when the timer fires. Any `onmouseenter` on the gutter or popup increments the counter, cancelling the pending close.
+
+### Files Changed
+- `src/components/git_diff_popup.rs` — `GIT_DIFF_CLOSE_GEN` static, `onmouseenter` cancels close
+- `src/components/mod.rs` — `pub(crate) use` re-export of the static
+- `src/components/editor_view.rs` — gutter `onmouseenter` cancels, `onmouseleave` spawns delayed close
+
+---
+
+## 2026-02-28: Wheel Scroll Refactor (Dioxus Component Handler)
+
+### Problem
+Wheel scrolling was handled in the tao `with_custom_event_handler` closure, which required a `Notify` wakeup, accumulated pixel remainder in a `Cell`, and ran on every OS-level mouse event regardless of whether the app was focused.
+
+### Solution
+Moved wheel handling into a Dioxus `onwheel` handler on the `editor-view-wrapper` div. Extracted `wheel_delta_to_lines()` as a free function handling `Pixels/Lines/Pages` variants with signed-ceil and sub-line pixel accumulation tracked in `use_signal`. Added `AppState::scroll_viewport_by_lines()` that calls `scroll_up/down` directly on `EditorContext` and writes the signal in one shot, bypassing the command queue and `ensure_cursor_in_view`.
+
+### Files Changed
+- `src/components/editor_view.rs` — `wheel_delta_to_lines()` free function + `onwheel` handler, 7 unit tests
+- `src/lib.rs` — removed `MouseWheel` tao arm, added `scroll_viewport_by_lines()` to `AppState`
+- `src/app.rs` — `scroll_notify` doc comment updated
+- `src/operations/movement.rs` — added `scroll_up_and_down_only_move_view_offset` test
+
+---
+
+## 2026-02-28: Cmd+C/X/V Clipboard Shortcuts & Startup Sync
+
+### Progress
+- Added macOS-conventional Cmd+C (copy), Cmd+X (cut), Cmd+V (paste) keybindings
+- All three modes covered: Normal, Select, and Insert (Cmd+V only in Insert)
+- No new dependencies — routes through helix-view's `ClipboardProvider` (`pbcopy`/`pbpaste` on macOS, `wl-copy`/`wl-paste` on Wayland, etc.)
+- Added `super_()` key helper to `keymap/trie.rs` (Cmd/Super modifier)
+- Pre-populate `self.clipboard` from OS clipboard at startup via `clipboard_provider.get_contents()`
+
+### Keybinding details
+| Mode | Key | Sequence |
+|------|-----|----------|
+| Normal | Cmd+C | `SetSelectedRegister('+')` + `Yank` |
+| Normal | Cmd+X | `SetSelectedRegister('+')` + `DeleteSelection` |
+| Normal | Cmd+V | `SetSelectedRegister('+')` + `Paste` |
+| Select | Cmd+C | `SetSelectedRegister('+')` + `Yank` + `ExitSelectMode` |
+| Select | Cmd+X | `SetSelectedRegister('+')` + `DeleteSelection` |
+| Select | Cmd+V | `SetSelectedRegister('+')` + `Paste` |
+| Insert | Cmd+V | `SetSelectedRegister('+')` + `PasteBefore` (at cursor, not after) |
+
+### Files Changed
+- `src/keymap/trie.rs` — `super_()` helper
+- `src/keymap/default.rs` — Cmd+C/X/V in normal, select, insert modes
+- `src/state/mod.rs` — startup clipboard read into `self.clipboard`
+- `KEYBINDINGS.md` — documented new shortcuts in all three mode tables
+
+---
+
 ## Template for Future Entries
 
 ```markdown
