@@ -39,9 +39,6 @@ use dioxus::desktop::tao::window::Icon;
 use operations::{BufferOps as _, MovementOps as _};
 use state::PendingNotification;
 
-/// Line height multiplier — must match `--editor-line-height: 1.5` in `styles.css`.
-const LINE_HEIGHT_RATIO: f64 = 1.5;
-
 // Public library modules
 pub mod components;
 pub mod config;
@@ -184,8 +181,6 @@ pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
     // Clone for the closure
     let editor_ctx_clone = editor_ctx.clone();
     let snapshot_ref = app_state.snapshot.clone();
-    // Accumulates sub-line PixelDelta between events so trackpad micro-movements aren't lost.
-    let pixel_scroll_accum = std::cell::Cell::new(0.0f64);
 
     // Build custom head with JavaScript only (font CSS is injected via document::Style in App)
     let custom_head = format!("<script>{CUSTOM_SCRIPT}</script>");
@@ -240,52 +235,6 @@ pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
                                     ctx.open_file(path);
                                 }
                             }
-                            #[allow(deprecated)] // tao marks modifiers field as deprecated
-                            dioxus::desktop::tao::event::WindowEvent::MouseWheel { delta, .. } => {
-                                // Block scroll when modal dialogs are active
-                                if snapshot_ref.lock().is_mouse_blocked() {
-                                    return;
-                                }
-
-                                if let Ok(mut ctx) = editor_ctx_clone.try_borrow_mut() {
-                                    let line_height = ctx.font_size * LINE_HEIGHT_RATIO;
-                                    let view_id = ctx.editor.tree.focus;
-                                    let doc_id = ctx.editor.tree.get(view_id).doc;
-
-                                    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-                                    match delta {
-                                        dioxus::desktop::tao::event::MouseScrollDelta::LineDelta(_, y) => {
-                                            // LineDelta: positive y = scroll up (show earlier lines)
-                                            let lines = (y.abs().ceil()) as usize;
-                                            if lines == 0 { return; }
-                                            if *y > 0.0 {
-                                                ctx.scroll_up(doc_id, view_id, lines);
-                                            } else {
-                                                ctx.scroll_down(doc_id, view_id, lines);
-                                            }
-                                        }
-                                        dioxus::desktop::tao::event::MouseScrollDelta::PixelDelta(pos) => {
-                                            // PixelDelta: physical pixels — divide by scale_factor for
-                                            // logical pixels, accumulate across events so sub-line
-                                            // trackpad movements aren't silently dropped.
-                                            let logical_y = pos.y / ctx.scale_factor;
-                                            let accumulated = pixel_scroll_accum.get() + logical_y;
-                                            let whole_lines = (accumulated / line_height).trunc();
-                                            #[allow(clippy::cast_possible_truncation)]
-                                            let lines = whole_lines as isize;
-                                            pixel_scroll_accum.set(accumulated - whole_lines * line_height);
-                                            if lines == 0 { return; }
-                                            if lines > 0 {
-                                                ctx.scroll_up(doc_id, view_id, lines.unsigned_abs());
-                                            } else {
-                                                ctx.scroll_down(doc_id, view_id, lines.unsigned_abs());
-                                            }
-                                        }
-                                        _ => {}
-                                    }
-                                    scroll_notify.notify_one();
-                                }
-                            }
                             _ => {}
                         }
                     }
@@ -323,7 +272,7 @@ pub struct AppState {
     pub font_css: String,
     /// Notification receiver for the toast bridge.
     pub notification_receiver: NotificationReceiver,
-    /// Notifier to wake the polling loop immediately (e.g., after mouse wheel scroll).
+    /// Notifier to wake the polling loop immediately for async UI updates (for example delayed hover-close tasks).
     pub scroll_notify: Arc<tokio::sync::Notify>,
 }
 
@@ -348,6 +297,44 @@ impl AppState {
                     }
 
                     *self.snapshot.lock() = new_snapshot;
+                }
+            }
+        });
+    }
+
+    /// Scroll the focused view without going through the command queue.
+    ///
+    /// This keeps wheel scrolling viewport-only and avoids `ensure_cursor_in_view`.
+    pub(crate) fn scroll_viewport_by_lines(&self, lines: isize, signal: &mut dioxus::prelude::Signal<EditorSnapshot>) {
+        use dioxus::prelude::*;
+
+        if lines == 0 {
+            return;
+        }
+
+        EDITOR_CTX.with(|ctx| {
+            if let Some(ref editor_ctx) = *ctx.borrow() {
+                if let Ok(mut editor) = editor_ctx.try_borrow_mut() {
+                    let view_id = editor.editor.tree.focus;
+                    let doc_id = editor.editor.tree.get(view_id).doc;
+
+                    if lines < 0 {
+                        editor.scroll_up(doc_id, view_id, lines.unsigned_abs());
+                    } else {
+                        editor.scroll_down(doc_id, view_id, lines.unsigned_abs());
+                    }
+
+                    let new_snapshot = editor.snapshot();
+
+                    if new_snapshot.should_quit {
+                        std::process::exit(0);
+                    }
+
+                    let snapshot_changed = new_snapshot.snapshot_version != signal.peek().snapshot_version;
+                    *self.snapshot.lock() = new_snapshot.clone();
+                    if snapshot_changed {
+                        signal.set(new_snapshot);
+                    }
                 }
             }
         });

@@ -87,7 +87,7 @@ pub fn App() -> Element {
 
     // Background coroutine to poll for LSP events (diagnostics, etc.)
     // This ensures UI updates when async events arrive without keyboard input.
-    // Also wakes immediately on scroll_notify to keep mouse wheel scrolling responsive.
+    // Also wakes immediately on scroll_notify for async UI updates that should apply promptly.
     let app_state_for_poll = app_state.clone();
     use_future(move || {
         let app_state = app_state_for_poll.clone();

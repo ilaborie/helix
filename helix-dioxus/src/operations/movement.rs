@@ -1046,4 +1046,53 @@ mod tests {
         let anchor_line = text.char_to_line(offset.anchor);
         assert_eq!(anchor_line, 10, "view should be scrolled to line 10");
     }
+
+    #[test]
+    fn scroll_up_and_down_only_move_view_offset() {
+        let lines: String = (0..30).map(|i| format!("line{i}\n")).collect();
+        let annotated = format!("#[l|]#{}", &lines[1..]);
+        let mut ctx = test_context(&annotated);
+        let (doc_id, view_id) = doc_view(&ctx);
+
+        let selection_before = {
+            let doc = ctx.editor.document(doc_id).expect("doc exists");
+            doc.selection(view_id).clone()
+        };
+
+        ctx.scroll_down(doc_id, view_id, 3);
+
+        {
+            let doc = ctx.editor.document(doc_id).expect("doc exists");
+            let offset = doc.view_offset(view_id);
+            let text = doc.text().slice(..);
+            assert_eq!(
+                text.char_to_line(offset.anchor),
+                3,
+                "view should scroll down by 3 lines"
+            );
+            assert_eq!(
+                doc.selection(view_id),
+                &selection_before,
+                "scrolling should not move the cursor"
+            );
+        }
+
+        ctx.scroll_up(doc_id, view_id, 1);
+
+        {
+            let doc = ctx.editor.document(doc_id).expect("doc exists");
+            let offset = doc.view_offset(view_id);
+            let text = doc.text().slice(..);
+            assert_eq!(
+                text.char_to_line(offset.anchor),
+                2,
+                "view should scroll back up by 1 line"
+            );
+            assert_eq!(
+                doc.selection(view_id),
+                &selection_before,
+                "scrolling should remain viewport-only"
+            );
+        }
+    }
 }

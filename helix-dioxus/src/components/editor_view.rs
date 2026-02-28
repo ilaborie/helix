@@ -32,25 +32,43 @@ const GUTTER_WIDTH_PX: f64 = 78.0;
 /// Height of the buffer bar in pixels (when shown).
 const BUFFER_BAR_HEIGHT_PX: f64 = 32.0;
 
-
 /// Convert a `WheelDelta` to a number of lines to scroll.
 /// Positive = scroll down, negative = scroll up.
-#[cfg(test)]
-#[allow(clippy::cast_possible_truncation)]
-fn wheel_delta_to_lines(delta: &dioxus::html::geometry::WheelDelta, line_height_px: f64) -> isize {
+#[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+fn wheel_delta_to_lines(
+    delta: &dioxus::html::geometry::WheelDelta,
+    line_height_px: f64,
+    page_size_lines: usize,
+    pixel_remainder: &mut f64,
+) -> isize {
     use dioxus::html::geometry::WheelDelta;
+
+    #[allow(clippy::cast_possible_truncation)]
+    fn signed_ceil(value: f64) -> isize {
+        if value > 0.0 {
+            value.ceil() as isize
+        } else if value < 0.0 {
+            -(value.abs().ceil() as isize)
+        } else {
+            0
+        }
+    }
+
     match delta {
         WheelDelta::Pixels(px) => {
-            // Accumulate fractional lines — scroll at least 1 line per event
-            let lines = px.y / line_height_px;
-            if lines.abs() < 1.0 {
-                if lines > 0.0 { 1 } else if lines < 0.0 { -1 } else { 0 }
-            } else {
-                lines as isize
+            if line_height_px <= 0.0 {
+                return 0;
             }
+            let accumulated = *pixel_remainder + px.y;
+            let whole_lines = (accumulated / line_height_px).trunc() as isize;
+            *pixel_remainder = accumulated - ((whole_lines as f64) * line_height_px);
+            whole_lines
         }
-        WheelDelta::Lines(l) => l.y as isize,
-        WheelDelta::Pages(p) => (p.y * 20.0) as isize,
+        WheelDelta::Lines(l) => signed_ceil(l.y),
+        WheelDelta::Pages(p) => {
+            let page_size = isize::try_from(page_size_lines).unwrap_or(isize::MAX);
+            signed_ceil(p.y).saturating_mul(page_size)
+        }
     }
 }
 
@@ -128,10 +146,12 @@ pub fn EditorView() -> Element {
     let mut is_dragging = use_signal(|| false);
     let mut drag_anchor_line = use_signal(|| 0usize);
     let mut drag_anchor_col = use_signal(|| 0usize);
+    let mut wheel_pixel_remainder = use_signal(|| 0.0_f64);
 
     // Capture values needed in mouse closures
     let font_size = snapshot.font_size;
     let visible_start = snapshot.visible_start;
+    let viewport_lines = snapshot.viewport_lines;
     let total_lines = snapshot.total_lines;
     let show_buffer_bar = snapshot.show_buffer_bar;
     let mouse_blocked = snapshot.is_mouse_blocked();
@@ -169,10 +189,33 @@ pub fn EditorView() -> Element {
         is_dragging.set(false);
     };
 
+    let wheel_app_state = app_state.clone();
+    let handle_wheel = move |evt: WheelEvent| {
+        if mouse_blocked {
+            return;
+        }
+
+        evt.prevent_default();
+
+        let line_height_px = font_size * LINE_HEIGHT_RATIO;
+        let page_size_lines = viewport_lines.max(1);
+        let mut pixel_remainder = *wheel_pixel_remainder.peek();
+        let delta = evt.delta();
+        let lines = wheel_delta_to_lines(&delta, line_height_px, page_size_lines, &mut pixel_remainder);
+        wheel_pixel_remainder.set(pixel_remainder);
+
+        if lines == 0 {
+            return;
+        }
+
+        wheel_app_state.scroll_viewport_by_lines(lines, &mut snapshot_signal);
+    };
+
     rsx! {
         // Wrapper: positions the scrollbar alongside the grid
         div {
             class: "editor-view-wrapper",
+            onwheel: handle_wheel,
 
             // Full-screen overlay for drag selection
             if is_dragging() {
@@ -887,41 +930,75 @@ mod tests {
     #[test]
     fn wheel_delta_lines_variant() {
         use dioxus::html::geometry::WheelDelta;
-        let delta = WheelDelta::lines(0.0, 3.0, 0.0);
-        assert_eq!(wheel_delta_to_lines(&delta, 24.0), 3);
+        let mut remainder = 0.0;
+        let delta = WheelDelta::lines(0.0, 0.5, 0.0);
+        assert_eq!(wheel_delta_to_lines(&delta, 24.0, 20, &mut remainder), 1);
+        assert_eq!(remainder, 0.0);
     }
 
     #[test]
     fn wheel_delta_lines_negative() {
         use dioxus::html::geometry::WheelDelta;
-        let delta = WheelDelta::lines(0.0, -2.0, 0.0);
-        assert_eq!(wheel_delta_to_lines(&delta, 24.0), -2);
+        let mut remainder = 0.0;
+        let delta = WheelDelta::lines(0.0, -0.5, 0.0);
+        assert_eq!(wheel_delta_to_lines(&delta, 24.0, 20, &mut remainder), -1);
+        assert_eq!(remainder, 0.0);
     }
 
     #[test]
     fn wheel_delta_pixels_full_lines() {
         use dioxus::html::geometry::WheelDelta;
         // 48 pixels / 24px per line = 2 lines
+        let mut remainder = 0.0;
         let delta = WheelDelta::pixels(0.0, 48.0, 0.0);
-        assert_eq!(wheel_delta_to_lines(&delta, 24.0), 2);
+        assert_eq!(wheel_delta_to_lines(&delta, 24.0, 20, &mut remainder), 2);
+        assert_eq!(remainder, 0.0);
     }
 
     #[test]
-    fn wheel_delta_pixels_fractional_rounds_to_one() {
+    fn wheel_delta_pixels_accumulate_until_full_line() {
         use dioxus::html::geometry::WheelDelta;
-        // Small scroll: 5 pixels / 24px = 0.2 lines → rounds to 1
-        let delta = WheelDelta::pixels(0.0, 5.0, 0.0);
-        assert_eq!(wheel_delta_to_lines(&delta, 24.0), 1);
-        // Negative small scroll
-        let delta_neg = WheelDelta::pixels(0.0, -5.0, 0.0);
-        assert_eq!(wheel_delta_to_lines(&delta_neg, 24.0), -1);
+        let mut remainder = 0.0;
+        let first = WheelDelta::pixels(0.0, 10.0, 0.0);
+        let second = WheelDelta::pixels(0.0, 15.0, 0.0);
+
+        assert_eq!(wheel_delta_to_lines(&first, 24.0, 20, &mut remainder), 0);
+        assert_eq!(remainder, 10.0);
+
+        assert_eq!(wheel_delta_to_lines(&second, 24.0, 20, &mut remainder), 1);
+        assert_eq!(remainder, 1.0);
+    }
+
+    #[test]
+    fn wheel_delta_pixels_negative_accumulate_until_full_line() {
+        use dioxus::html::geometry::WheelDelta;
+        let mut remainder = 0.0;
+        let first = WheelDelta::pixels(0.0, -10.0, 0.0);
+        let second = WheelDelta::pixels(0.0, -15.0, 0.0);
+
+        assert_eq!(wheel_delta_to_lines(&first, 24.0, 20, &mut remainder), 0);
+        assert_eq!(remainder, -10.0);
+
+        assert_eq!(wheel_delta_to_lines(&second, 24.0, 20, &mut remainder), -1);
+        assert_eq!(remainder, -1.0);
+    }
+
+    #[test]
+    fn wheel_delta_pages_use_viewport_lines() {
+        use dioxus::html::geometry::WheelDelta;
+        let mut remainder = 0.0;
+        let delta = WheelDelta::pages(0.0, 1.5, 0.0);
+        assert_eq!(wheel_delta_to_lines(&delta, 24.0, 17, &mut remainder), 34);
+        assert_eq!(remainder, 0.0);
     }
 
     #[test]
     fn wheel_delta_zero_returns_zero() {
         use dioxus::html::geometry::WheelDelta;
+        let mut remainder = 5.0;
         let delta = WheelDelta::pixels(0.0, 0.0, 0.0);
-        assert_eq!(wheel_delta_to_lines(&delta, 24.0), 0);
+        assert_eq!(wheel_delta_to_lines(&delta, 24.0, 20, &mut remainder), 0);
+        assert_eq!(remainder, 5.0);
     }
 
     // --- is_mouse_blocked ---
