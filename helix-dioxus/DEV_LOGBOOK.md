@@ -2002,6 +2002,39 @@ Moved wheel handling into a Dioxus `onwheel` handler on the `editor-view-wrapper
 
 ---
 
+## 2026-02-28: clap CLI Argument Parser & Launch Flags
+
+### Problem
+`dhx` had no `--help` output and no way to override `dhx.toml` settings at launch without editing the file.
+
+### Solution
+Replaced the manual `std::env::args()` parser with `clap` (derive API). Added four CLI flags that override the corresponding `dhx.toml` values:
+
+| Flag | Effect |
+|------|--------|
+| `--theme <name>` | Override color theme (applied via `apply_theme()` before first snapshot) |
+| `--font-size <n>` | Override font size in pixels |
+| `--log <file>` | Override log file path |
+| `--log-level <level>` | Override log level (`error`/`warn`/`info`/`debug`/`trace`) |
+| `-v` / `--verbose` | Shorthand for `--log-level debug` |
+
+### Architecture
+- `parse_args()` runs **before** config loading so `--help`/`--version` exit cleanly without log-file noise.
+- Returns `ParsedArgs { startup_action, overrides: CliOverrides }`.
+- `CliOverrides::apply(config)` patches the loaded `DhxConfig` before tracing init so log settings take effect immediately.
+- `initial_theme: Option<String>` added to `DhxConfig` with `#[serde(skip)]` (CLI-only, not in TOML).
+- Theme applied in `lib.rs::launch()` after `EditorContext::new()` via `apply_theme()`.
+
+### Files Changed
+- `Cargo.toml` — added `clap = { version = "4", features = ["derive"] }`
+- `src/args.rs` — rewritten with `#[derive(Parser)]`, new `ParsedArgs`/`CliOverrides` structs, 6 new tests
+- `src/main.rs` — uses `ParsedArgs`, applies overrides before tracing init
+- `src/config.rs` — added `#[serde(skip)] pub initial_theme: Option<String>` to `DhxConfig`
+- `src/lib.rs` — applies `initial_theme` after `EditorContext::new()`
+- `CLAUDE.md` — updated module comment and configuration section
+
+---
+
 ## Template for Future Entries
 
 ```markdown

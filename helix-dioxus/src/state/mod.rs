@@ -531,7 +531,10 @@ impl EditorContext {
                 .unwrap_or_default()
         };
         if !initial_clipboard.is_empty() {
-            log::info!("Pre-populated clipboard register ({} chars) from OS clipboard", initial_clipboard.len());
+            log::info!(
+                "Pre-populated clipboard register ({} chars) from OS clipboard",
+                initial_clipboard.len()
+            );
         }
 
         Ok(Self {

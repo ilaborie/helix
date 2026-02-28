@@ -36,7 +36,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use dioxus::desktop::tao::window::Icon;
 
-use operations::{BufferOps as _, MovementOps as _};
+use operations::{BufferOps as _, MovementOps as _, ThemeOps as _};
 use state::PendingNotification;
 
 // Public library modules
@@ -115,10 +115,8 @@ pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
     let (command_tx, command_rx) = mpsc::channel::<EditorCommand>();
 
     // Create notification channel (bridge between EditorContext and ToastProvider)
-    let (notification_tx, notification_rx) =
-        tokio::sync::mpsc::unbounded_channel::<PendingNotification>();
-    let notification_receiver =
-        NotificationReceiver(Arc::new(tokio::sync::Mutex::new(notification_rx)));
+    let (notification_tx, notification_rx) = tokio::sync::mpsc::unbounded_channel::<PendingNotification>();
+    let notification_receiver = NotificationReceiver(Arc::new(tokio::sync::Mutex::new(notification_rx)));
 
     // Initialize editor context based on startup action
     let (mut editor_ctx, pending_commands) = match &startup_action {
@@ -127,7 +125,13 @@ pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
             Vec::new(),
         ),
         StartupAction::OpenFile(path, pos) => (
-            EditorContext::new(&config, Some((path.clone(), *pos)), command_rx, command_tx.clone(), notification_tx.clone())?,
+            EditorContext::new(
+                &config,
+                Some((path.clone(), *pos)),
+                command_rx,
+                command_tx.clone(),
+                notification_tx.clone(),
+            )?,
             Vec::new(),
         ),
         StartupAction::OpenFiles(files) => {
@@ -145,6 +149,13 @@ pub fn launch(config: DhxConfig, startup_action: StartupAction) -> Result<()> {
             )
         }
     };
+
+    // Apply --theme CLI override before first snapshot
+    if let Some(theme) = &config.initial_theme {
+        if let Err(err) = editor_ctx.apply_theme(theme) {
+            log::warn!("Failed to apply theme '{theme}': {err}");
+        }
+    }
 
     // Send pending commands (for glob pattern - open remaining files)
     for cmd in pending_commands {

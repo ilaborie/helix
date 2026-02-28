@@ -19,6 +19,9 @@ pub struct DhxConfig {
     pub font: FontConfig,
     pub logging: LoggingConfig,
     pub dialog: DialogConfig,
+    /// Initial theme to apply at startup (set by `--theme` CLI flag, not from TOML).
+    #[serde(skip)]
+    pub initial_theme: Option<String>,
 }
 
 /// Dialog/picker interaction mode.

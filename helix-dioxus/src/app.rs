@@ -477,9 +477,7 @@ fn NotificationBridge() -> Element {
                             NotificationSeverity::Success => ToastType::Success,
                         };
                         let options = match notif.severity {
-                            NotificationSeverity::Error => {
-                                ToastOptions::new().duration(Duration::from_secs(10))
-                            }
+                            NotificationSeverity::Error => ToastOptions::new().duration(Duration::from_secs(10)),
                             _ => ToastOptions::new(),
                         };
                         toasts.show(notif.message, toast_type, options);

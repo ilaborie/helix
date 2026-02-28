@@ -36,7 +36,7 @@ helix-dioxus/src/
 │   └── vscode_icons.rs         # 37 VSCode file type icon constants (colorful SVGs)
 │
 ├── main.rs                     # Binary entry point: loads config, inits tracing/loader, launches app
-├── args.rs                     # Command-line argument parsing → StartupAction
+├── args.rs                     # Command-line argument parsing → ParsedArgs (StartupAction + CliOverrides)
 ├── tracing_setup.rs            # Tracing subscriber init from LoggingConfig
 │
 ├── lsp/                        # LSP Data & Logic
@@ -557,6 +557,12 @@ cargo run -p helix-dioxus -- <directory>
 # Run with glob pattern
 cargo run -p helix-dioxus -- "src/*.rs"
 
+# CLI flags (all optional, override dhx.toml values)
+cargo run -p helix-dioxus -- --theme gruvbox src/lib.rs
+cargo run -p helix-dioxus -- --font-size 18 src/lib.rs
+cargo run -p helix-dioxus -- --log /tmp/my.log --log-level debug src/lib.rs
+cargo run -p helix-dioxus -- -v src/lib.rs   # verbose (debug) logging
+
 # Check compilation (both library and binary)
 cargo check -p helix-dioxus --bins --lib
 
@@ -597,9 +603,10 @@ fn main() -> anyhow::Result<()> {
 
 ### Configuration
 
-**Two-layer config strategy:**
+**Three-layer config strategy (lowest → highest priority):**
 - **Shared with helix-term**: `~/.config/helix/config.toml` (`[editor]` settings, `theme`) and `languages.toml` (LSP config)
 - **GUI-specific**: `~/.config/helix/dhx.toml` for window, font, and logging settings
+- **CLI flags**: `--theme`, `--font-size`, `--log`, `--log-level`, `-v` — override the corresponding `dhx.toml` values at startup
 
 ```toml
 # ~/.config/helix/dhx.toml

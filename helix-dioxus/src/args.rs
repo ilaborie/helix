@@ -2,27 +2,110 @@
 
 use std::path::{Path, PathBuf};
 
+use clap::Parser;
 use helix_core::Position;
-use helix_dioxus::StartupAction;
+use helix_dioxus::{DhxConfig, StartupAction};
+
+#[derive(Parser)]
+#[command(
+    name = "dhx",
+    about = "Dioxus GUI frontend for the Helix text editor",
+    long_about = "dhx opens files, directories, or glob patterns.\n\n\
+        File arguments support optional line/column suffixes:\n\
+        file.rs           — open at the beginning\n\
+        file.rs:42        — open at line 42\n\
+        file.rs:42:5      — open at line 42, column 5\n\n\
+        Passing a directory opens the file picker inside it.\n\
+        Passing a glob pattern (e.g. \"src/*.rs\") opens all matching files.",
+    version
+)]
+struct Args {
+    /// Files, directories, or glob patterns to open.
+    /// Supports `file:row` and `file:row:col` syntax.
+    #[arg(value_name = "FILE")]
+    files: Vec<String>,
+
+    /// Override the color theme (e.g. gruvbox, catppuccin-mocha).
+    #[arg(long, value_name = "THEME")]
+    theme: Option<String>,
+
+    /// Override the log file path.
+    #[arg(long, value_name = "FILE")]
+    log: Option<PathBuf>,
+
+    /// Set log level: error, warn, info, debug, trace. Overrides dhx.toml.
+    #[arg(long, value_name = "LEVEL")]
+    log_level: Option<String>,
+
+    /// Enable verbose (debug) logging. Shorthand for --log-level debug.
+    #[arg(short, long)]
+    verbose: bool,
+
+    /// Override the font size in pixels.
+    #[arg(long, value_name = "SIZE")]
+    font_size: Option<f64>,
+}
+
+/// Overrides parsed from CLI flags, applied on top of the loaded `DhxConfig`.
+pub struct CliOverrides {
+    pub theme: Option<String>,
+    pub log: Option<PathBuf>,
+    pub log_level: Option<String>,
+    pub verbose: bool,
+    pub font_size: Option<f64>,
+}
+
+impl CliOverrides {
+    /// Apply CLI overrides on top of a loaded [`DhxConfig`], returning the patched config.
+    pub fn apply(self, mut config: DhxConfig) -> DhxConfig {
+        if let Some(log_file) = self.log {
+            config.logging.log_file = Some(log_file);
+        }
+        // --verbose sets debug level; --log-level takes precedence if both given
+        if self.verbose {
+            config.logging.level = "debug".to_string();
+        }
+        if let Some(level) = self.log_level {
+            config.logging.level = level;
+        }
+        if let Some(theme) = self.theme {
+            config.initial_theme = Some(theme);
+        }
+        if let Some(size) = self.font_size {
+            config.font.size = size;
+        }
+        config
+    }
+}
+
+/// Result of argument parsing: startup file action plus config overrides.
+pub struct ParsedArgs {
+    pub startup_action: StartupAction,
+    pub overrides: CliOverrides,
+}
 
 /// Parse command-line arguments and determine the startup action.
-pub fn parse_args() -> StartupAction {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+pub fn parse_args() -> ParsedArgs {
+    let args = Args::parse();
 
-    if args.is_empty() {
-        return StartupAction::None;
-    }
-
-    if args.len() > 1 {
-        // Multiple arguments (shell-expanded glob or multiple files)
-        return parse_multiple_args(&args);
-    }
-
-    // Single argument — len == 1 after the checks above
-    let Some(arg) = args.first() else {
-        unreachable!("args is non-empty after is_empty check");
+    let startup_action = match args.files.as_slice() {
+        [] => StartupAction::None,
+        [arg] => parse_single_arg(arg),
+        files => parse_multiple_args(files),
     };
-    parse_single_arg(arg)
+
+    let overrides = CliOverrides {
+        theme: args.theme,
+        log: args.log,
+        log_level: args.log_level,
+        verbose: args.verbose,
+        font_size: args.font_size,
+    };
+
+    ParsedArgs {
+        startup_action,
+        overrides,
+    }
 }
 
 /// Parse multiple command-line arguments.
@@ -235,5 +318,95 @@ mod tests {
         let (path, pos) = parse_file("nonexistent_file.rs:abc");
         assert_eq!(path, PathBuf::from("nonexistent_file.rs:abc"));
         assert_eq!(pos, Position::default());
+    }
+
+    // --- CliOverrides::apply ---
+
+    #[test]
+    fn overrides_apply_log_file() {
+        let config = DhxConfig::default();
+        let overrides = CliOverrides {
+            log: Some(PathBuf::from("/tmp/test.log")),
+            log_level: None,
+            verbose: false,
+            theme: None,
+            font_size: None,
+        };
+        let config = overrides.apply(config);
+        assert_eq!(config.logging.log_file, Some(PathBuf::from("/tmp/test.log")));
+    }
+
+    #[test]
+    fn overrides_apply_verbose_sets_debug() {
+        let config = DhxConfig::default();
+        let overrides = CliOverrides {
+            log: None,
+            log_level: None,
+            verbose: true,
+            theme: None,
+            font_size: None,
+        };
+        let config = overrides.apply(config);
+        assert_eq!(config.logging.level, "debug");
+    }
+
+    #[test]
+    fn overrides_log_level_takes_precedence_over_verbose() {
+        let config = DhxConfig::default();
+        let overrides = CliOverrides {
+            log: None,
+            log_level: Some("trace".to_string()),
+            verbose: true,
+            theme: None,
+            font_size: None,
+        };
+        let config = overrides.apply(config);
+        assert_eq!(config.logging.level, "trace");
+    }
+
+    #[test]
+    fn overrides_apply_theme() {
+        let config = DhxConfig::default();
+        let overrides = CliOverrides {
+            log: None,
+            log_level: None,
+            verbose: false,
+            theme: Some("gruvbox".to_string()),
+            font_size: None,
+        };
+        let config = overrides.apply(config);
+        assert_eq!(config.initial_theme, Some("gruvbox".to_string()));
+    }
+
+    #[test]
+    fn overrides_apply_font_size() {
+        let config = DhxConfig::default();
+        let overrides = CliOverrides {
+            log: None,
+            log_level: None,
+            verbose: false,
+            theme: None,
+            font_size: Some(18.0),
+        };
+        let config = overrides.apply(config);
+        assert!((config.font.size - 18.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn overrides_empty_leaves_config_unchanged() {
+        let config = DhxConfig::default();
+        let original_level = config.logging.level.clone();
+        let original_size = config.font.size;
+        let overrides = CliOverrides {
+            log: None,
+            log_level: None,
+            verbose: false,
+            theme: None,
+            font_size: None,
+        };
+        let config = overrides.apply(config);
+        assert_eq!(config.logging.level, original_level);
+        assert!((config.font.size - original_size).abs() < f64::EPSILON);
+        assert!(config.initial_theme.is_none());
     }
 }

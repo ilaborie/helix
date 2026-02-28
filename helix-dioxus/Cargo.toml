@@ -65,6 +65,9 @@ parking_lot.workspace = true
 # File walking with gitignore support
 ignore = "0.4"
 
+# CLI argument parsing
+clap = { version = "4", features = ["derive"] }
+
 # Glob pattern matching
 glob = "0.3"
 

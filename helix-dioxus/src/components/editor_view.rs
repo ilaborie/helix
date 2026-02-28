@@ -920,8 +920,11 @@ mod tests {
         // Roundtrip for columns before/at/between/after hints
         for logical in [0, 2, 3, 5, 8, 12] {
             let visual = visual_col(logical, &hints);
-            assert_eq!(logical_col_from_visual(visual, &hints), logical,
-                "roundtrip failed for logical={logical}, visual={visual}");
+            assert_eq!(
+                logical_col_from_visual(visual, &hints),
+                logical,
+                "roundtrip failed for logical={logical}, visual={visual}"
+            );
         }
     }
 

@@ -5,7 +5,7 @@
 //! Optionally syntax-highlights fenced code blocks via a callback.
 
 use comrak::nodes::{NodeHtmlBlock, NodeValue};
-use comrak::{Arena, Options, format_html, parse_document};
+use comrak::{format_html, parse_document, Arena, Options};
 
 /// Escape special HTML characters in text content.
 fn escape_html(text: &str) -> String {
@@ -66,12 +66,10 @@ pub fn markdown_to_html(md: &str, highlight_code: Option<&dyn Fn(&str, &str) -> 
                 }
             };
 
-            let html_node = arena.alloc(comrak::nodes::AstNode::from(
-                NodeValue::HtmlBlock(NodeHtmlBlock {
-                    block_type: 6,
-                    literal: replacement,
-                }),
-            ));
+            let html_node = arena.alloc(comrak::nodes::AstNode::from(NodeValue::HtmlBlock(NodeHtmlBlock {
+                block_type: 6,
+                literal: replacement,
+            })));
             node.insert_before(html_node);
             node.detach();
         }

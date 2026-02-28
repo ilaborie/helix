@@ -7,12 +7,16 @@ use anyhow::Result;
 
 #[allow(clippy::print_stderr)] // pre-logging: tracing not yet initialized
 fn main() -> Result<()> {
-    // Load GUI-specific config (dhx.toml)
+    // Parse arguments first so --help/--version exit before any initialization.
+    let parsed = args::parse_args();
+
+    // Load GUI-specific config (dhx.toml), then apply CLI overrides on top.
     let config = helix_dioxus::DhxConfig::load_default().unwrap_or_else(|err| {
         eprintln!("Warning: failed to load dhx.toml: {err}");
         eprintln!("Using default configuration");
         helix_dioxus::DhxConfig::default()
     });
+    let config = parsed.overrides.apply(config);
 
     // Set up tracing subscriber BEFORE Dioxus to prevent dioxus-logger from setting its own.
     tracing_setup::init(&config.logging);
@@ -27,7 +31,5 @@ fn main() -> Result<()> {
     let runtime = tokio::runtime::Runtime::new()?;
     let _guard = runtime.enter();
 
-    // Parse command-line arguments and launch the application
-    let startup_action = args::parse_args();
-    helix_dioxus::launch(config, startup_action)
+    helix_dioxus::launch(config, parsed.startup_action)
 }

@@ -243,7 +243,12 @@ impl BufferOps for EditorContext {
         let view_id = self.editor.tree.focus;
         let doc_id = self.editor.tree.get(view_id).doc;
 
-        if self.editor.document(doc_id).and_then(helix_view::Document::path).is_none() {
+        if self
+            .editor
+            .document(doc_id)
+            .and_then(helix_view::Document::path)
+            .is_none()
+        {
             self.show_notification(
                 "Cannot reload: buffer has no file path".to_string(),
                 NotificationSeverity::Warning,
@@ -477,7 +482,10 @@ impl BufferOps for EditorContext {
         let content = match std::fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) => {
-                self.show_notification(format!("Failed to read {}: {e}", path.display()), NotificationSeverity::Error);
+                self.show_notification(
+                    format!("Failed to read {}: {e}", path.display()),
+                    NotificationSeverity::Error,
+                );
                 return;
             }
         };
@@ -488,11 +496,8 @@ impl BufferOps for EditorContext {
         let text = doc.text().slice(..);
         let cursor = doc.selection(view_id).primary().cursor(text);
 
-        let transaction = helix_core::Transaction::insert(
-            doc.text(),
-            &helix_core::Selection::point(cursor),
-            content.into(),
-        );
+        let transaction =
+            helix_core::Transaction::insert(doc.text(), &helix_core::Selection::point(cursor), content.into());
         doc.apply(&transaction, view_id);
     }
 

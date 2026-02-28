@@ -111,7 +111,10 @@ pub fn normal_mode_defaults() -> DhxKeyTrieNode {
     );
     root.insert(
         super_('x'),
-        DhxKeyTrie::seq(vec![EditorCommand::SetSelectedRegister('+'), EditorCommand::DeleteSelection]),
+        DhxKeyTrie::seq(vec![
+            EditorCommand::SetSelectedRegister('+'),
+            EditorCommand::DeleteSelection,
+        ]),
     );
     root.insert(
         super_('v'),
@@ -303,7 +306,10 @@ pub fn select_mode_defaults() -> DhxKeyTrieNode {
     );
     root.insert(
         super_('x'),
-        DhxKeyTrie::seq(vec![EditorCommand::SetSelectedRegister('+'), EditorCommand::DeleteSelection]),
+        DhxKeyTrie::seq(vec![
+            EditorCommand::SetSelectedRegister('+'),
+            EditorCommand::DeleteSelection,
+        ]),
     );
     root.insert(
         super_('v'),
@@ -457,7 +463,10 @@ pub fn insert_mode_defaults() -> DhxKeyTrieNode {
     // Cmd+V: paste from OS clipboard at cursor position (before = insert at cursor, not after)
     root.insert(
         super_('v'),
-        DhxKeyTrie::seq(vec![EditorCommand::SetSelectedRegister('+'), EditorCommand::PasteBefore]),
+        DhxKeyTrie::seq(vec![
+            EditorCommand::SetSelectedRegister('+'),
+            EditorCommand::PasteBefore,
+        ]),
     );
 
     // --- Ctrl+key combinations ---

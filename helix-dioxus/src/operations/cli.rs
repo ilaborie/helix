@@ -1089,10 +1089,7 @@ impl CliOps for EditorContext {
                         let target = line.saturating_sub(1); // 1-indexed to 0-indexed
                         self.goto_line_column(target, 0);
                     } else {
-                        self.show_notification(
-                            format!("Invalid line number: {line_str}"),
-                            NotificationSeverity::Error,
-                        );
+                        self.show_notification(format!("Invalid line number: {line_str}"), NotificationSeverity::Error);
                     }
                 } else {
                     self.show_notification("Usage: :goto <line>".to_string(), NotificationSeverity::Warning);
@@ -1411,7 +1408,11 @@ impl EditorContext {
         if let Some(arg) = args {
             let style = match arg.to_ascii_lowercase().as_str() {
                 "tabs" | "tab" => Some(IndentStyle::Tabs),
-                _ => arg.parse::<u8>().ok().filter(|&n| n > 0 && n <= 16).map(IndentStyle::Spaces),
+                _ => arg
+                    .parse::<u8>()
+                    .ok()
+                    .filter(|&n| n > 0 && n <= 16)
+                    .map(IndentStyle::Spaces),
             };
             if let Some(s) = style {
                 doc.indent_style = s;
@@ -1435,15 +1436,13 @@ impl EditorContext {
             let text = doc.text().slice(..);
             let selection = doc.selection(view.id);
             let count = selection.len();
-            let joined = selection
-                .fragments(text)
-                .fold(String::new(), |mut acc, fragment| {
-                    if !acc.is_empty() {
-                        acc.push_str(separator);
-                    }
-                    acc.push_str(&fragment);
-                    acc
-                });
+            let joined = selection.fragments(text).fold(String::new(), |mut acc, fragment| {
+                if !acc.is_empty() {
+                    acc.push_str(separator);
+                }
+                acc.push_str(&fragment);
+                acc
+            });
             (view.id, joined, count)
         };
         let _ = view_id; // used for context
@@ -1525,9 +1524,7 @@ impl EditorContext {
     fn lsp_stop(&mut self) {
         let server_names: Vec<String> = {
             let (_view, doc) = helix_view::current_ref!(self.editor);
-            doc.language_servers()
-                .map(|ls| ls.name().to_string())
-                .collect()
+            doc.language_servers().map(|ls| ls.name().to_string()).collect()
         };
 
         if server_names.is_empty() {

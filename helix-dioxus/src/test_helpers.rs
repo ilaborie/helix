@@ -69,9 +69,7 @@ pub fn test_context(annotated: &str) -> EditorContext {
     ctx
 }
 
-fn test_context_inner(
-    annotated: &str,
-) -> (EditorContext, tokio::sync::mpsc::UnboundedReceiver<PendingNotification>) {
+fn test_context_inner(annotated: &str) -> (EditorContext, tokio::sync::mpsc::UnboundedReceiver<PendingNotification>) {
     let _guard = init();
 
     let (text, selection) = print(annotated);
@@ -79,8 +77,7 @@ fn test_context_inner(
     let (notif_tx, notif_rx) = tokio::sync::mpsc::unbounded_channel::<PendingNotification>();
 
     let config = crate::config::DhxConfig::default();
-    let mut ctx =
-        EditorContext::new(&config, None, rx, tx, notif_tx).expect("EditorContext creation should succeed");
+    let mut ctx = EditorContext::new(&config, None, rx, tx, notif_tx).expect("EditorContext creation should succeed");
 
     // Replace the scratch buffer content with our test text
     {
