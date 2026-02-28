@@ -2035,6 +2035,51 @@ Replaced the manual `std::env::args()` parser with `clap` (derive API). Added fo
 
 ---
 
+## 2026-02-28: Keybinding Badges in Commands Picker & Keybinding Browser (`Space ?`)
+
+### Phase A: Keybinding Badges in Commands Picker
+
+Added first normal-mode keybinding as a kbd badge in commands picker rows and documentation preview.
+
+- `command_keybindings()` lazy reverse index in `keymap/mod.rs`: walks the normal-mode trie at startup, builds a `HashMap<String, Vec<String>>` mapping typable command name → key sequences (e.g., `"write"` → `["<space>w"]`)
+- `PreviewContent::Documentation` extended with `keybindings: Vec<String>` field — passed through from `show_commands_picker()`
+- Commands picker rows show the first normal-mode keybinding as a kbd badge (falls back to alias badge when no keybinding exists)
+- Commands picker Documentation preview shows a "Keybindings:" row with all kbd badges
+
+### Phase B: Keybinding Browser (`Space ?`)
+
+New picker that lists all ~220 normal-mode leaf bindings with their documentation.
+
+- `PickerMode::Keybindings` — title "Keybindings", `supports_preview = true`
+- `EditorCommand::ShowKeybindingsPicker`
+- `KeybindingEntry { key_sequence: String, command_label: String, slot: Option<CommandSlot> }` in `state/types.rs`
+- `all_keybindings()` in `keymap/mod.rs`: returns `&'static Vec<KeybindingEntry>` (lazily built via `OnceLock`) with every normal-mode leaf binding
+- `show_keybindings_picker()` in `picker_ops.rs`
+- `picker_confirm` for `PickerMode::Keybindings`: executes the bound command via `command_tx`
+- `Space ?` keybinding in `default.rs` → `ShowKeybindingsPicker`
+- Secondary text (key sequence) rendered as `<kbd>` badges in picker rows via new `secondary_as_kbd: bool` prop on `PickerItemRow`
+- `GenericPicker` passes `secondary_as_kbd: mode == PickerMode::Keybindings`
+- Documentation preview shown for typable-command entries (`:name` format)
+- `format_key_sequence` fix: `"space"` → `"Space"` (KeyCode::Char(' ') formats to lowercase via `keys::SPACE` constant)
+
+### Picker UI Fix: Hidden Native Scrollbar
+
+Native HTML scrollbar hidden inside picker list to avoid double-scrollbar visual:
+- `scrollbar-width: none` (Firefox)
+- `.picker-list-items::-webkit-scrollbar { display: none }` (WebKit/Blink)
+
+### Files Changed
+- `src/keymap/mod.rs` — `command_keybindings()` reverse index, `all_keybindings()` full listing, `format_key_sequence()` fix
+- `src/keymap/default.rs` — `Space ?` → `ShowKeybindingsPicker`
+- `src/state/types.rs` — `PickerMode::Keybindings`, `KeybindingEntry` struct, `PreviewContent::Documentation.keybindings` field
+- `src/operations/picker_ops.rs` — `show_keybindings_picker()`, `picker_confirm` Keybindings arm
+- `src/components/picker/item.rs` — `secondary_as_kbd: bool` prop, kbd badge rendering for secondary text
+- `src/components/picker/generic.rs` — passes `secondary_as_kbd` to `PickerItemRow`
+- `assets/styles.css` — hidden native scrollbar rules for `.picker-list-items`
+- `KEYBINDINGS.md` — `Space ?` entry updated to Keybinding Browser
+
+---
+
 ## Template for Future Entries
 
 ```markdown

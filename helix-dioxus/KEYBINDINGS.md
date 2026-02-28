@@ -153,7 +153,6 @@ Reference: `helix-term/src/keymap/default.rs`
 | Key | Action |
 |-----|--------|
 | `Space /` | Global search |
-| `Space ?` | Command palette |
 | `Space '` | Resume last picker |
 | `Space a` | Code actions |
 | `Space b` | Buffer picker |
@@ -177,6 +176,12 @@ Reference: `helix-term/src/keymap/default.rs`
 | `Space S` | Workspace symbols |
 | `Space y` | Yank to clipboard |
 | `Space Y` | Yank main selection to clipboard |
+
+### Deviations from Helix
+
+| Key | Helix Action | helix-dioxus Action | Notes |
+|-----|-------------|-------------------|-------|
+| `Space ?` | Command palette | Keybinding browser | Shows all ~220 normal-mode bindings with key sequence as kbd badges; confirm executes the binding |
 
 ### Custom Bindings (not in Helix)
 

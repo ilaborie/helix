@@ -79,7 +79,7 @@ helix-dioxus/src/
 │   ├── picker/                 # Picker components (overlay dialogs)
 │   │   ├── mod.rs              # Re-exports GenericPicker
 │   │   ├── generic.rs          # Main picker container (two-column with preview)
-│   │   ├── item.rs             # PickerItemRow component
+│   │   ├── item.rs             # PickerItemRow component (secondary_as_kbd prop renders secondary as kbd badges)
 │   │   ├── highlight.rs        # HighlightedText for fuzzy matches
 │   │   ├── preview.rs          # PickerPreviewPanel: syntax-highlighted file preview
 │   │   └── scrollbar.rs        # PickerScrollbar: track+thumb position indicator
@@ -89,14 +89,14 @@ helix-dioxus/src/
 │       └── list.rs             # List dialog with selection support
 │
 ├── keymap/                     # Configurable Keymap System (trie-based)
-│   ├── mod.rs                  # DhxKeymapResult, keymap dispatch, key sequence state
+│   ├── mod.rs                  # DhxKeymapResult, keymap dispatch, key sequence state; command_keybindings() reverse index (name→sequences); all_keybindings() full normal-mode listing
 │   ├── command.rs              # CommandSlot, AwaitCharKind, command name → EditorCommand mapping
 │   ├── default.rs              # Default keymaps for all modes (normal, insert, select, g, Space, etc.)
 │   └── trie.rs                 # DhxKeyTrie, DhxKeyTrieNode, TrieSearchResult — trie data structure
 │
 ├── state/                      # State Management
 │   ├── mod.rs                  # EditorContext, command dispatch, config loading
-│   ├── types.rs                # Data structures (EditorSnapshot, StartupAction, etc.)
+│   ├── types.rs                # Data structures (EditorSnapshot, StartupAction, PickerMode incl. Keybindings, KeybindingEntry, etc.)
 │   └── lsp_events.rs           # LspEventOps: poll_lsp_events, diagnostics handling
 │
 ├── operations/                 # Editor Operations (extension traits)
@@ -107,7 +107,7 @@ helix-dioxus/src/
 │   ├── clipboard.rs            # ClipboardOps: yank, paste, delete_selection
 │   ├── macro_ops.rs            # MacroOps: toggle_macro_recording, maybe_record_key, replay_macro
 │   ├── search.rs               # SearchOps: execute_search, search_next
-│   ├── picker_ops.rs           # PickerOps: show_*_picker, picker_confirm
+│   ├── picker_ops.rs           # PickerOps: show_*_picker (incl. show_keybindings_picker), picker_confirm
 │   ├── buffer.rs               # BufferOps: switch_to_buffer, save_document
 │   ├── cli.rs                  # CliOps: execute_command (88 commands — buffer, clipboard, config, LSP, tree-sitter, etc.)
 │   ├── shell.rs                # ShellOps: execute_shell_command (pipe selections)
@@ -408,6 +408,7 @@ Functions defined in `script.js`:
 - `.statusline`, `.statusline-lsp`, `.statusline-recording` (status bar)
 - `.picker-*` (container, header, list, list-items, item, body, left, preview)
 - `.picker-scrollbar-track`, `.picker-scrollbar-thumb` (picker list scrollbar)
+- `.picker-list-items::-webkit-scrollbar { display: none }` + `scrollbar-width: none` — hides native scrollbar inside picker list (custom scrollbar used instead)
 - `.prompt`, `.prompt-cursor`
 - `.completion-*`, `.hover-*`, `.code-action-*` (LSP popups)
 - `.inline-dialog`, `.inline-dialog-list`, `.inline-dialog-item` (cursor-positioned popups)
