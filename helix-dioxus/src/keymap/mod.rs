@@ -293,17 +293,16 @@ pub fn command_keybindings() -> &'static HashMap<String, Vec<String>> {
 }
 
 /// Recursively collect `TypeableCommand` leaf bindings into `index`.
-fn collect_typable_bindings(
-    node: &trie::DhxKeyTrieNode,
-    path: &[KeyEvent],
-    index: &mut HashMap<String, Vec<String>>,
-) {
+fn collect_typable_bindings(node: &trie::DhxKeyTrieNode, path: &[KeyEvent], index: &mut HashMap<String, Vec<String>>) {
     for (key, child) in node.children() {
         let mut new_path = path.to_vec();
         new_path.push(*key);
         match child {
             DhxKeyTrie::Command(command::CommandSlot::Cmd(EditorCommand::TypeableCommand(name))) => {
-                index.entry(name.clone()).or_default().push(format_key_sequence(&new_path));
+                index
+                    .entry(name.clone())
+                    .or_default()
+                    .push(format_key_sequence(&new_path));
             }
             DhxKeyTrie::Node(child_node) => collect_typable_bindings(child_node, &new_path, index),
             _ => {}
@@ -337,11 +336,7 @@ pub fn all_keybindings() -> &'static Vec<KeybindingEntry> {
 }
 
 /// Recursively collect all leaf bindings into `out`.
-fn collect_all_leaves(
-    node: &trie::DhxKeyTrieNode,
-    path: &[KeyEvent],
-    out: &mut Vec<KeybindingEntry>,
-) {
+fn collect_all_leaves(node: &trie::DhxKeyTrieNode, path: &[KeyEvent], out: &mut Vec<KeybindingEntry>) {
     for (key, child) in node.children() {
         let mut new_path = path.to_vec();
         new_path.push(*key);
@@ -406,11 +401,7 @@ fn format_key_sequence(keys: &[KeyEvent]) -> String {
 fn label_for_slot(slot: &command::CommandSlot) -> String {
     match slot {
         command::CommandSlot::Cmd(cmd) => label_for_cmd(cmd),
-        command::CommandSlot::Seq(cmds) => cmds
-            .iter()
-            .map(label_for_cmd)
-            .collect::<Vec<_>>()
-            .join(" + "),
+        command::CommandSlot::Seq(cmds) => cmds.iter().map(label_for_cmd).collect::<Vec<_>>().join(" + "),
         command::CommandSlot::AwaitChar(kind) => format!("{kind:?} <char>"),
     }
 }

@@ -10,7 +10,6 @@ use crate::state::{PickerIcon, PickerItem};
 
 use super::highlight::HighlightedText;
 
-
 /// Individual picker item row.
 #[component]
 pub fn PickerItemRow(
